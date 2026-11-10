@@ -2,6 +2,8 @@
 
 Chrome extension (MV3) with tools that connect [Moxfield](https://moxfield.com) and [Face to Face Games](https://facetofacegames.com) (F2F).
 
+**Install:** download it and follow the 5-step guide on **https://tithies.github.io/** (Chrome, Edge, Brave; not on the Chrome Web Store).
+
 ## Feature 1 — F2F buylist checker
 
 1. Open **moxfield.com/collection** and apply any filters you want (set, rarity, search…).
@@ -62,6 +64,15 @@ npm run build:win  # build + copy to C:\Users\<you>\tithies-ext (set TITHIES_WIN
 
 Load it in Chrome: `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick the build folder. After rebuilding, click the reload ↻ icon on the extension card.
 
+### Releasing (GitHub Pages)
+
+Every push to `master` runs `.github/workflows/pages.yml`: typecheck, tests, `npm run site`, then deploy to GitHub Pages. The site is the download page in `site/`, plus `tithies.zip`, `tithies-<version>.zip` and `version.json`.
+
+- **To release:** bump `version` in `package.json`, then push. The dashboard reads `version.json` at most once a day and shows a "new version available" banner when it is newer than the installed version.
+- **One-time setup:** the repository is `tithies/tithies.github.io` (a free GitHub organization; that repository name puts the page at the domain root). In the repository, go to **Settings → Pages → Source** and pick **GitHub Actions**.
+- **Preview locally:** `npm run site` builds the site into `site-dist/`.
+- **Fixed extension ID:** the manifest `key` (in `wxt.config.ts`) pins the ID to `cihnokdnhnhjamllchdmnehblkekcjbj` wherever the folder lives. That's what lets users update by replacing files without losing data. The matching private key is kept outside the repo, and is only needed to pack a `.crx` or publish to a store.
+
 ### Layout
 
 ```
@@ -70,7 +81,8 @@ src/features/f2f-buylist/ runner (batches, cache, resume), matcher, bulk rates, 
 src/features/deck-mismatch/ deck ↔ collection comparison, saved options, mismatch page
 src/lib/decks/            reusable Moxfield deck sync + cache, collection snapshot, background job, folder tree, deck picker
 src/lib/moxfield/         Moxfield normalisation, API requests, polite client, tab transport
-src/lib/                  F2F API client, Dexie DB, settings, messaging, shared UI/format helpers
+src/lib/                  F2F API client, Dexie DB, settings, messaging, update check, shared UI/format/sort helpers
+site/                     download page (GitHub Pages); scripts/build-site.mjs fills it in and adds the zip + version.json
 tests/                    Vitest specs + trimmed real API fixtures
 ```
 

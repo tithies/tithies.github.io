@@ -11,7 +11,8 @@
     "zip": "wxt zip",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "site": "wxt zip && node scripts/build-site.mjs"
   },
   "dependencies": {
     "@mantine/core": "^9.8.0",

@@ -13,3 +13,6 @@ coverage
 *.log
 .DS_Store
 Thumbs.db
+
+# GitHub Pages build (npm run site)
+site-dist

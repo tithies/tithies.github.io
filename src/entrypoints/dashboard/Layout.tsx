@@ -2,6 +2,7 @@ import { ActionIcon, AppShell, Burger, Group, NavLink, Text, Title, Tooltip, use
 import { useDisclosure } from '@mantine/hooks';
 import { IconArrowsDiff, IconCards, IconCash, IconHistory, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
 import { Link, Outlet, useLocation } from 'react-router';
+import { UpdateBanner } from '@/lib/ui/UpdateBanner';
 
 /** Each feature contributes a section to the navbar. */
 const NAV = [
@@ -61,6 +62,7 @@ export function Layout() {
         ))}
       </AppShell.Navbar>
       <AppShell.Main>
+        <UpdateBanner />
         <Outlet />
       </AppShell.Main>
     </AppShell>
