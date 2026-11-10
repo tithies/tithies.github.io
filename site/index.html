@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tithies: Moxfield × Face to Face Games tools</title>
-  <meta name="description" content="Free Chrome extension for Magic: The Gathering collectors: see what Face to Face Games pays for your Moxfield collection, and find mismatches between your decks and your collection." />
+  <title>Tithies: a toolbox for Magic: The Gathering collectors</title>
+  <meta name="description" content="Tithies is a free Chrome extension with handy tools for Magic: The Gathering collectors: check what Face to Face Games pays for your Moxfield collection, find mismatches between your decks and your collection, and more to come." />
   <meta name="color-scheme" content="dark light" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='3' width='19' height='26' rx='3' fill='%231971c2' transform='rotate(-8 14 16)'/%3E%3Crect x='9' y='4' width='19' height='26' rx='3' fill='%2337b24d' transform='rotate(8 18 17)'/%3E%3C/svg%3E" />
   <style>
@@ -102,6 +102,7 @@
       .feature .text { grid-template-columns: 1fr; }
       .feature .text > ul { grid-column: 1; grid-row: auto; padding-top: 0; }
     }
+    .tools-intro { max-width: 720px; margin-bottom: 40px; }
     .tag { display: inline-block; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
     .feature ul { padding-left: 20px; margin: 0; color: var(--muted); }
     .feature li { margin-bottom: 6px; }
@@ -171,7 +172,7 @@
         Tithies
       </a>
       <nav class="nav">
-        <a href="#features">Features</a>
+        <a href="#features">Tools</a>
         <a href="#install">Install</a>
         <a href="#update">Update</a>
         <a href="#faq">FAQ</a>
@@ -182,8 +183,8 @@
 
   <main>
     <div class="wrap hero">
-      <h1>Your Moxfield collection,<br />priced by Face to Face Games</h1>
-      <p class="lead">A free Chrome extension for Magic: The Gathering collectors. See which of your cards F2F buys and for how much, and keep your Moxfield decks and collection in sync. Everything runs in your browser.</p>
+      <h1>Handy tools for<br />Magic: The Gathering collectors</h1>
+      <p class="lead">Tithies is a free Chrome extension that adds a toolbox to your browser, built around your Moxfield collection and decks. Check what Face to Face Games would pay for your cards, find mismatches between your decks and your collection, and more tools to come. Everything runs in your browser.</p>
       <div class="cta">
         <a class="btn btn-primary" href="tithies.zip" download="tithies-{{VERSION}}.zip">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M5 21h14" /></svg>
@@ -196,9 +197,14 @@
 
     <section id="features">
       <div class="wrap">
+        <div class="tools-intro">
+          <h2>What's in the toolbox</h2>
+          <p class="muted">Every tool lives in the Tithies dashboard, next to the others, and shares the same Moxfield connection. New tools are added over time: you get them by updating (see below), with nothing else to set up.</p>
+        </div>
+
         <div class="feature">
           <div class="text">
-            <span class="tag">Feature 1</span>
+            <span class="tag">Tool 1</span>
             <h2>F2F buylist checker</h2>
             <p class="muted">Open your collection on Moxfield, apply any filters, and click <b>Check F2F buylist</b>. Tithies looks up each exact print (set, collector number and finish) on Face to Face Games.</p>
             <ul>
@@ -216,7 +222,7 @@
 
         <div class="feature">
           <div class="text">
-            <span class="tag">Feature 2</span>
+            <span class="tag">Tool 2</span>
             <h2>Deck ↔ collection mismatches</h2>
             <p class="muted">Every card in your decks should also be in your collection, and every collection card in a deck. Tithies lists every exact print where they disagree, with quantities.</p>
             <ul>
@@ -244,6 +250,7 @@
           </a>
         </div>
       </div>
+        <p class="muted" style="margin-top: 40px; text-align: center">More tools are on the way. They appear in the same dashboard when you update.</p>
     </section>
 
     <section id="install" style="background: var(--bg-soft); border-block: 1px solid var(--border)">
@@ -340,7 +347,7 @@
             <li><b>Face to Face Games</b>: F2F's public buylist search, one request at a time.</li>
             <li><b>This page</b>: once a day, the dashboard reads <code>version.json</code> here to tell you about updates.</li>
           </ul>
-          <p>That's all. There's no Tithies server and no tracking: results stay in your browser.</p>
+          <p>That's all today. There's no Tithies server and no tracking: results stay in your browser. If a future tool contacts another site, this list will say so before the update is published.</p>
         </details>
         <details>
           <summary>Why isn't it on the Chrome Web Store?</summary>

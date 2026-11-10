@@ -1,6 +1,6 @@
 # Tithies
 
-Chrome extension (MV3) with tools that connect [Moxfield](https://moxfield.com) and [Face to Face Games](https://facetofacegames.com) (F2F).
+A toolbox for Magic: The Gathering collectors: a Chrome extension (MV3) that adds tools around your [Moxfield](https://moxfield.com) collection and decks, and connects them to shops such as [Face to Face Games](https://facetofacegames.com) (F2F). Each tool is a feature below; more are added over time.
 
 **Install:** download it and follow the 5-step guide on **https://tithies.github.io/** (Chrome, Edge, Brave; not on the Chrome Web Store).
 
