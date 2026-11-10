@@ -3,20 +3,23 @@
 // Usage: npm run zip && node scripts/build-site.mjs
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = join(import.meta.dirname, '..');
 const out = join(root, 'site-dist');
-const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-
 const outputDir = join(root, '.output');
-const zipName = existsSync(outputDir) && readdirSync(outputDir).find((f) => f.endsWith(`-${version}-chrome.zip`));
-if (!zipName) throw new Error(`No .output/*-${version}-chrome.zip: run "npm run zip" first.`);
-const zip = readFileSync(join(outputDir, zipName));
+
+// The built manifest has the real version (computed by scripts/version.mjs, not package.json).
+const manifestPath = join(outputDir, 'chrome-mv3', 'manifest.json');
+if (!existsSync(manifestPath)) throw new Error('No .output/chrome-mv3: run "npm run zip" first.');
+const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+const { version } = manifest;
+const zipPath = join(outputDir, 'tithies-chrome.zip');
+if (!existsSync(zipPath)) throw new Error('No .output/tithies-chrome.zip: run "npm run zip" first.');
+const zip = readFileSync(zipPath);
 
 // Extension ID = first 128 bits of SHA-256(public key), written with the letters a–p.
-const manifest = JSON.parse(readFileSync(join(outputDir, 'chrome-mv3', 'manifest.json'), 'utf8'));
 const extensionId = manifest.key
   ? [...createHash('sha256').update(Buffer.from(manifest.key, 'base64')).digest('hex').slice(0, 32)]
       .map((c) => String.fromCharCode(97 + Number.parseInt(c, 16)))

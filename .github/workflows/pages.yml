@@ -1,6 +1,7 @@
 # Tests, builds the extension zip and publishes the download page to GitHub Pages
 # (Settings → Pages → Source: GitHub Actions). Runs on every push to master.
-# Bump "version" in package.json to release: the dashboard announces newer versions.
+# The version is automatic (scripts/version.mjs): every commit that changes the extension makes
+# a new 0.1.N, which installed copies announce. Failing tests publish nothing.
 name: Publish site
 
 on:
@@ -22,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history: the version counts commits
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc

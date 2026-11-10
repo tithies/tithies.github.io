@@ -1,5 +1,7 @@
 import { defineConfig } from 'wxt';
 import { RELEASE_PAGE_URL } from './src/lib/release-url';
+// @ts-expect-error plain ESM helper shared with scripts/build-site.mjs (no type declarations)
+import { extensionVersion } from './scripts/version.mjs';
 
 /**
  * Public half of the extension's signing key. It fixes the extension ID to
@@ -12,9 +14,13 @@ const EXTENSION_KEY =
 
 export default defineConfig({
   srcDir: 'src',
+  // Fixed zip name: WXT's {{version}} is package.json's, not the computed manifest version.
+  zip: { artifactTemplate: '{{name}}-{{browser}}.zip' },
   modules: ['@wxt-dev/module-react'],
   manifest: {
     name: 'Tithies',
+    // Automatic: <major.minor from package.json>.<commits that changed the extension>.
+    version: extensionVersion(),
     description: 'Moxfield + Face to Face Games tools: check which of your cards F2F buys, and find mismatches between your decks and collection.',
     permissions: ['storage', 'unlimitedStorage', 'alarms'],
     // moxfield.com: lets the background find logged-in Moxfield tabs (tabs.query url filter); the content scripts already run there.

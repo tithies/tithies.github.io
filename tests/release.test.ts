@@ -37,3 +37,14 @@ describe('Release check', () => {
     expect((await getLatestRelease(offline as typeof fetch, t0 + day * 2)).latest?.version).toBe('0.2.0');
   });
 });
+
+describe('Automatic version', () => {
+  it('adds the number of extension commits as the patch', async () => {
+    // @ts-expect-error plain ESM helper without type declarations
+    const { toExtensionVersion } = await import('../scripts/version.mjs');
+    expect(toExtensionVersion('0.1.0', 7)).toBe('0.1.7');
+    expect(toExtensionVersion('1.2.9', 7, true)).toBe('1.2.8');
+    expect(toExtensionVersion('0.3.0-beta', 0)).toBe('0.3.0');
+    expect(toExtensionVersion('0.1.0', 99_999)).toBe('0.1.65535');
+  });
+});
