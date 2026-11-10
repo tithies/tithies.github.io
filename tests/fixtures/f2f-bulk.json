@@ -1,0 +1,1315 @@
+{
+  "hits": {
+    "total": {
+      "value": 29,
+      "relation": "eq"
+    },
+    "hits": [
+      {
+        "_id": "gid://shopify/Product/14641395237236",
+        "_source": {
+          "title": "Lorcana TCG - Common Card - Non-Foil",
+          "handle": "lorcana-tcg-common-card-non-foil",
+          "Card Name": "Lorcana TCG - Common Card - Non-Foil",
+          "General_Card_Name": "Lorcana TCG - Common Card - Non-Foil",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647669010804",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+              "altText": "SIN-LOR-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730700468596",
+              "price": 0,
+              "sellPrice": 0.01,
+              "inventoryQuantity": 178,
+              "sku": "SIN-LOR-WHO-COM-NF-1",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-LOR-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641395171700",
+        "_source": {
+          "title": "Lorcana TCG - Super Rare Card - Foil",
+          "handle": "lorcana-tcg-super-rare-card-foil",
+          "Card Name": "Lorcana TCG - Super Rare Card - Foil",
+          "General_Card_Name": "Lorcana TCG - Super Rare Card - Foil",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647669010804",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+              "altText": "SIN-LOR-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730700304756",
+              "price": 0,
+              "sellPrice": 0.1,
+              "inventoryQuantity": 0,
+              "sku": "SIN-LOR-WHO-SUR-F-1",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-LOR-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641393926516",
+        "_source": {
+          "title": "Lorcana TCG - Uncommon Card - Foil",
+          "handle": "lorcana-tcg-uncommon-card-foil",
+          "Card Name": "Lorcana TCG - Uncommon Card - Foil",
+          "General_Card_Name": "Lorcana TCG - Uncommon Card - Foil",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647669010804",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+              "altText": "SIN-LOR-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730699092340",
+              "price": 0,
+              "sellPrice": 0.02,
+              "inventoryQuantity": 0,
+              "sku": "SIN-LOR-WHO-UNC-F-1",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-LOR-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641394155892",
+        "_source": {
+          "title": "Lorcana TCG - Common Card - Foil",
+          "handle": "lorcana-tcg-common-card-foil",
+          "Card Name": "Lorcana TCG - Common Card - Foil",
+          "General_Card_Name": "Lorcana TCG - Common Card - Foil",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647669010804",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+              "altText": "SIN-LOR-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730699256180",
+              "price": 0,
+              "sellPrice": 0.02,
+              "inventoryQuantity": 0,
+              "sku": "SIN-LOR-WHO-COM-F-1",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-LOR-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641394188660",
+        "_source": {
+          "title": "Lorcana TCG - Rare Card - Non-Foil",
+          "handle": "lorcana-tcg-rare-card-non-foil",
+          "Card Name": "Lorcana TCG - Rare Card - Non-Foil",
+          "General_Card_Name": "Lorcana TCG - Rare Card - Non-Foil",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647669010804",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+              "altText": "SIN-LOR-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730699387252",
+              "price": 0,
+              "sellPrice": 0.03,
+              "inventoryQuantity": 0,
+              "sku": "SIN-LOR-WHO-RAR-NF-1",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-LOR-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641394254196",
+        "_source": {
+          "title": "Lorcana TCG - Uncommon Card - Non-Foil",
+          "handle": "lorcana-tcg-uncommon-card-non-foil",
+          "Card Name": "Lorcana TCG - Uncommon Card - Non-Foil",
+          "General_Card_Name": "Lorcana TCG - Uncommon Card - Non-Foil",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647669010804",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+              "altText": "SIN-LOR-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730699420020",
+              "price": 0,
+              "sellPrice": 0.01,
+              "inventoryQuantity": 0,
+              "sku": "SIN-LOR-WHO-UNC-NF-1",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-LOR-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641393631604",
+        "_source": {
+          "title": "Lorcana TCG - Rare Card - Foil",
+          "handle": "lorcana-tcg-rare-card-foil",
+          "Card Name": "Lorcana TCG - Rare Card - Foil",
+          "General_Card_Name": "Lorcana TCG - Rare Card - Foil",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647669010804",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+              "altText": "SIN-LOR-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730698797428",
+              "price": 0,
+              "sellPrice": 0.05,
+              "inventoryQuantity": 0,
+              "sku": "SIN-LOR-WHO-RAR-F-1",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-LOR-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641393664372",
+        "_source": {
+          "title": "Lorcana TCG - Super Rare Card - Non-Foil",
+          "handle": "lorcana-tcg-super-rare-card-non-foil",
+          "Card Name": "Lorcana TCG - Super Rare Card - Non-Foil",
+          "General_Card_Name": "Lorcana TCG - Super Rare Card - Non-Foil",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647669010804",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+              "altText": "SIN-LOR-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730698862964",
+              "price": 0,
+              "sellPrice": 0.05,
+              "inventoryQuantity": 0,
+              "sku": "SIN-LOR-WHO-SUR-NF-1",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-LOR-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/261fd4ea38f3263d916a6619d986ed3cdece33cd_Asset_SIN_LOR_WHO_GENERIC_675fb673-6b30-4904-9aa0-9e4b9713279a.jpg?v=1740605767",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641692279156",
+        "_source": {
+          "title": "1000 Yu-Gi-Oh! - Common/Rare/Super Rare Cards",
+          "handle": "1000-yu-gi-oh-commonraresuper-rare-cards",
+          "Card Name": "1000 Yu-Gi-Oh! - Common/Rare/Super Rare Cards",
+          "General_Card_Name": "1000 Yu-Gi-Oh! - Common/Rare/Super Rare Cards",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647665013108",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/9e155787f63a9bc25791d78ab404f1e93b9e532a_Asset_SIN_YGO_WHO_GENERIC_39ff8691-8e27-417b-8699-dd838c998a0b.png?v=1740605715",
+              "altText": "SIN-YGO-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730876891508",
+              "price": 0,
+              "sellPrice": 2,
+              "inventoryQuantity": 0,
+              "sku": "Y-1000-C-U-SUP",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-YGO-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/9e155787f63a9bc25791d78ab404f1e93b9e532a_Asset_SIN_YGO_WHO_GENERIC_39ff8691-8e27-417b-8699-dd838c998a0b.png?v=1740605715",
+                "width": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641393729908",
+        "_source": {
+          "title": "Magic the Gathering - Promotional Card",
+          "handle": "magic-the-gathering-promotional-card",
+          "Card Name": "Magic the Gathering - Promotional Card",
+          "General_Card_Name": "Magic the Gathering - Promotional Card",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51888434577780",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+              "altText": "SIN-MTG-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730698895732",
+              "price": 0,
+              "sellPrice": 0.02,
+              "inventoryQuantity": 0,
+              "sku": "SIN-MTG-WHO-NF-F-PROMO",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-MTG-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641246929268",
+        "_source": {
+          "title": "Pokémon - Reverse Holo Rare",
+          "handle": "pokemon-reverse-holo-rare",
+          "Card Name": "Pokémon - Reverse Holo Rare",
+          "General_Card_Name": "Pokémon - Reverse Holo Rare",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647659147636",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+              "altText": "SIN-PKM-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730630017396",
+              "price": 0,
+              "sellPrice": 0.1,
+              "inventoryQuantity": 0,
+              "sku": "PKM_Bulk_REVERSE_HOLO_RARE",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-PKM-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+                "width": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641246962036",
+        "_source": {
+          "title": "Pokémon - Mega Ultra Rare",
+          "handle": "pokemon-mega-ultra-rare",
+          "Card Name": "Pokémon - Mega Ultra Rare",
+          "General_Card_Name": "Pokémon - Mega Ultra Rare",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647659147636",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+              "altText": "SIN-PKM-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730630082932",
+              "price": 0,
+              "sellPrice": 0.75,
+              "inventoryQuantity": 0,
+              "sku": "PKM_Bulk_MEGA_ULTRA_RARE",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-PKM-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+                "width": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641246830964",
+        "_source": {
+          "title": "Pokémon - Reverse Holo Commons / Uncommons",
+          "handle": "pokemon-reverse-holo-commons-uncommons",
+          "Card Name": "Pokémon - Reverse Holo Commons / Uncommons",
+          "General_Card_Name": "Pokémon - Reverse Holo Commons / Uncommons",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647659147636",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+              "altText": "SIN-PKM-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730629820788",
+              "price": 0,
+              "sellPrice": 0.05,
+              "inventoryQuantity": 16000,
+              "sku": "PKM_Bulk_REVERSE_HOLO_CU",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-PKM-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+                "width": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641246863732",
+        "_source": {
+          "title": "Pokémon - Non-Holo Promo",
+          "handle": "pokemon-non-holo-promo",
+          "Card Name": "Pokémon - Non-Holo Promo",
+          "General_Card_Name": "Pokémon - Non-Holo Promo",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647659147636",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+              "altText": "SIN-PKM-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730629853556",
+              "price": 0,
+              "sellPrice": 0.05,
+              "inventoryQuantity": 0,
+              "sku": "PKM_Bulk_NONHOLO_PROMO",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-PKM-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+                "width": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641246634356",
+        "_source": {
+          "title": "Pokémon - Holo Rare",
+          "handle": "pokemon-holo-rare",
+          "Card Name": "Pokémon - Holo Rare",
+          "General_Card_Name": "Pokémon - Holo Rare",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647659147636",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+              "altText": "SIN-PKM-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730629558644",
+              "price": 0,
+              "sellPrice": 0.1,
+              "inventoryQuantity": 0,
+              "sku": "PKM_Bulk_HOLO_RARE",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-PKM-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+                "width": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641246437748",
+        "_source": {
+          "title": "Pokémon - Non-Holo Rare",
+          "handle": "pokemon-non-holo-rare",
+          "Card Name": "Pokémon - Non-Holo Rare",
+          "General_Card_Name": "Pokémon - Non-Holo Rare",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647659147636",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+              "altText": "SIN-PKM-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730629263732",
+              "price": 0,
+              "sellPrice": 0.05,
+              "inventoryQuantity": 0,
+              "sku": "PKM_Bulk_NONHOLO_RARE",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-PKM-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+                "width": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641246306676",
+        "_source": {
+          "title": "Pokémon - Ultra Rare EX/V/Full Art",
+          "handle": "pokemon-ultra-rare-exvfull-art",
+          "Card Name": "Pokémon - Ultra Rare EX/V/Full Art",
+          "General_Card_Name": "Pokémon - Ultra Rare EX/V/Full Art",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647659147636",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+              "altText": "SIN-PKM-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730629067124",
+              "price": 0,
+              "sellPrice": 0.5,
+              "inventoryQuantity": 0,
+              "sku": "PKM_Bulk_ULTRA_EX_V_FULL_ART",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-PKM-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+                "width": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641246142836",
+        "_source": {
+          "title": "Magic the Gathering - 1000 Basic Lands",
+          "handle": "magic-the-gathering-1000-basic-lands",
+          "Card Name": "Magic the Gathering - 1000 Basic Lands",
+          "General_Card_Name": "Magic the Gathering - 1000 Basic Lands",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51888434577780",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+              "altText": "SIN-MTG-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730628870516",
+              "price": 0,
+              "sellPrice": 10,
+              "inventoryQuantity": 0,
+              "sku": "MTG_Bulk_Basic",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-MTG-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641246241140",
+        "_source": {
+          "title": "Magic the Gathering - Foil Common/Uncommon (Excludes Unfinity and Unstable)",
+          "handle": "magic-the-gathering-foil-commonuncommon-excludes-unfinity-and-unstable",
+          "Card Name": "Magic the Gathering - Foil Common/Uncommon (Excludes Unfinity and Unstable)",
+          "General_Card_Name": "Magic the Gathering - Foil Common/Uncommon (Excludes Unfinity and Unstable)",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51888434577780",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+              "altText": "SIN-MTG-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730629001588",
+              "price": 0,
+              "sellPrice": 0.01,
+              "inventoryQuantity": 986500,
+              "sku": "MTG_Bulk_Foil_CU",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-MTG-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641246077300",
+        "_source": {
+          "title": "Magic the Gathering - Foil Rare (Excludes Unfinity, Unstable, and Mystery Booster)",
+          "handle": "magic-the-gathering-foil-rare-excludes-unfinity-unstable-and-mystery-booster",
+          "Card Name": "Magic the Gathering - Foil Rare (Excludes Unfinity, Unstable, and Mystery Booster)",
+          "General_Card_Name": "Magic the Gathering - Foil Rare (Excludes Unfinity, Unstable, and Mystery Booster)",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51888434577780",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+              "altText": "SIN-MTG-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730628804980",
+              "price": 0,
+              "sellPrice": 0.07,
+              "inventoryQuantity": 0,
+              "sku": "MTG_Bulk_Foil_R",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-MTG-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641245913460",
+        "_source": {
+          "title": "Pokémon - GX Hyper/Rainbow/Secret Rare",
+          "handle": "pokemon-gx-hyperrainbowsecret-rare",
+          "Card Name": "Pokémon - GX Hyper/Rainbow/Secret Rare",
+          "General_Card_Name": "Pokémon - GX Hyper/Rainbow/Secret Rare",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647659147636",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+              "altText": "SIN-PKM-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730628575604",
+              "price": 0,
+              "sellPrice": 1,
+              "inventoryQuantity": 0,
+              "sku": "PKM_Bulk_GX_HYPER_RAINBOW_SECRET",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-PKM-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+                "width": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641245782388",
+        "_source": {
+          "title": "Pokémon - 1000 Common/Uncommons Cards",
+          "handle": "pokemon-1000-commonuncommons-cards",
+          "Card Name": "Pokémon - 1000 Common/Uncommons Cards",
+          "General_Card_Name": "Pokémon - 1000 Common/Uncommons Cards",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51647659147636",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+              "altText": "SIN-PKM-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730628444532",
+              "price": 0,
+              "sellPrice": 9,
+              "inventoryQuantity": 288,
+              "sku": "P-1000-C-U",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-PKM-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/1f01d2c92eb9fc9a94686a8e538fcbc337588eb7_Asset_SIN_PKM_WHO_GENERIC.png?v=1740605681",
+                "width": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641245815156",
+        "_source": {
+          "title": "Magic the Gathering - Foil Mythic Rare (Excludes Unfinity, Unstable, Unsanctioned, Commander Decks and Duel Decks)",
+          "handle": "magic-the-gathering-foil-mythic-rare-excludes-unfinity-unstable-unsanctioned-commander-decks-and-duel-decks",
+          "Card Name": "Magic the Gathering - Foil Mythic Rare (Excludes Unfinity, Unstable, Unsanctioned, Commander Decks and Duel Decks)",
+          "General_Card_Name": "Magic the Gathering - Foil Mythic Rare (Excludes Unfinity, Unstable, Unsanctioned, Commander Decks and Duel Decks)",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51888434577780",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+              "altText": "SIN-MTG-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730628477300",
+              "price": 0,
+              "sellPrice": 0.5,
+              "inventoryQuantity": 0,
+              "sku": "MTG_Bulk_Foil_M",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-MTG-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641245716852",
+        "_source": {
+          "title": "Magic the Gathering - Rare (Excludes Unfinity, Unstable, and Unsanctioned)",
+          "handle": "magic-the-gathering-rare-excludes-unfinity-unstable-and-unsanctioned",
+          "Card Name": "Magic the Gathering - Rare (Excludes Unfinity, Unstable, and Unsanctioned)",
+          "General_Card_Name": "Magic the Gathering - Rare (Excludes Unfinity, Unstable, and Unsanctioned)",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51888434577780",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+              "altText": "SIN-MTG-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730628378996",
+              "price": 0,
+              "sellPrice": 0.07,
+              "inventoryQuantity": 0,
+              "sku": "MTG_Bulk_Rare",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-MTG-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641245651316",
+        "_source": {
+          "title": "Magic the Gathering - Foil Basic Land",
+          "handle": "magic-the-gathering-foil-basic-land",
+          "Card Name": "Magic the Gathering - Foil Basic Land",
+          "General_Card_Name": "Magic the Gathering - Foil Basic Land",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51888434577780",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+              "altText": "SIN-MTG-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730628215156",
+              "price": 0,
+              "sellPrice": 0.01,
+              "inventoryQuantity": 0,
+              "sku": "MTG_Bulk_Foil_Basic",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-MTG-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641245553012",
+        "_source": {
+          "title": "Magic the Gathering - 1000 Commons/Uncommons (Excludes Unfinity, Unstable and Unsanctioned)",
+          "handle": "magic-the-gathering-1000-commonsuncommons-excludes-unfinity-unstable-and-unsanctioned",
+          "Card Name": "Magic the Gathering - 1000 Commons/Uncommons (Excludes Unfinity, Unstable and Unsanctioned)",
+          "General_Card_Name": "Magic the Gathering - 1000 Commons/Uncommons (Excludes Unfinity, Unstable and Unsanctioned)",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51888434577780",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+              "altText": "SIN-MTG-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730628116852",
+              "price": 0,
+              "sellPrice": 2,
+              "inventoryQuantity": 9916,
+              "sku": "MTG_Bulk_CU_1000",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-MTG-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641245520244",
+        "_source": {
+          "title": "Magic the Gathering - Mythic Rare (Excludes Unfinity, Unstable, and Unsanctioned)",
+          "handle": "magic-the-gathering-mythic-rare-excludes-unfinity-unstable-and-unsanctioned",
+          "Card Name": "Magic the Gathering - Mythic Rare (Excludes Unfinity, Unstable, and Unsanctioned)",
+          "General_Card_Name": "Magic the Gathering - Mythic Rare (Excludes Unfinity, Unstable, and Unsanctioned)",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51888434577780",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+              "altText": "SIN-MTG-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730628051316",
+              "price": 0,
+              "sellPrice": 0.25,
+              "inventoryQuantity": 0,
+              "sku": "MTG_Bulk_Mythic_Rare",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-MTG-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641394090356",
+        "_source": {
+          "title": "Magic the Gathering - 100 Full Art Basic Lands - Non-Foil",
+          "handle": "magic-the-gathering-100-full-art-basic-lands-non-foil",
+          "Card Name": "Magic the Gathering - 100 Full Art Basic Lands - Non-Foil",
+          "General_Card_Name": "Magic the Gathering - 100 Full Art Basic Lands - Non-Foil",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51888434577780",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+              "altText": "SIN-MTG-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730699288948",
+              "price": 0,
+              "sellPrice": 10,
+              "inventoryQuantity": 0,
+              "sku": "SIN-MTG-WHO-FA-BASIC-NF-100",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-MTG-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14641393566068",
+        "_source": {
+          "title": "Magic the Gathering - Full Art Basic Land - Non-Foil",
+          "handle": "magic-the-gathering-full-art-basic-land-non-foil",
+          "Card Name": "Magic the Gathering - Full Art Basic Land - Non-Foil",
+          "General_Card_Name": "Magic the Gathering - Full Art Basic Land - Non-Foil",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": null,
+          "MTG_Collector_Number": null,
+          "MTG_Foil_Option": null,
+          "MTG_Rarity": null,
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Lots & Bundles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51888434577780",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+              "altText": "SIN-MTG-WHO-GENERIC",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51730698699124",
+              "price": 0,
+              "sellPrice": 0.1,
+              "inventoryQuantity": 0,
+              "sku": "SIN-MTG-WHO-FA-BASIC-NF",
+              "selectedOptions": [
+                {
+                  "name": "Title",
+                  "value": "Default Title"
+                }
+              ],
+              "image": {
+                "altText": "SIN-MTG-WHO-GENERIC",
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/ba8ffd3412e03ec9444e0197dd01195f27ac0776_Asset_SIN_MTG_WHO_GENERIC.jpg?v=1745868776",
+                "width": 1490
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

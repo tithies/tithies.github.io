@@ -1,0 +1,165 @@
+{
+ "id": "deck07",
+ "publicId": "TestDeck07Public_HHHHHH",
+ "name": "Split test",
+ "lastUpdatedAtUtc": "2026-06-01T03:39:43.31Z",
+ "boards": {
+  "mainboard": {
+   "count": 3,
+   "cards": {
+    "kpXp0": {
+     "quantity": 3,
+     "boardType": "mainboard",
+     "finish": "nonFoil",
+     "isFoil": false,
+     "isAlter": false,
+     "isProxy": false,
+     "card": {
+      "id": "OxNJn",
+      "uniqueCardId": "kpXp0",
+      "scryfall_id": "0a1d6dcd-bd41-4f57-a35b-6613811fe4d4",
+      "set": "fin",
+      "set_name": "Final Fantasy",
+      "set_type": "expansion",
+      "name": "Adventurer's Airship",
+      "cn": "252",
+      "lang": "en",
+      "rarity": "common",
+      "type_line": "Artifact \u2014 Vehicle",
+      "isToken": false,
+      "card_faces": [],
+      "prices": {
+       "usd": 0.16,
+       "usd_foil": 0.24
+      },
+      "layout": "normal"
+     },
+     "printingData": [
+      {
+       "id": "OxNJn",
+       "quantity": 2,
+       "finish": "nonFoil",
+       "isFoil": false,
+       "isAlter": false,
+       "isProxy": false,
+       "lang": "en",
+       "set": "fin",
+       "set_name": "Final Fantasy",
+       "rarity": "common",
+       "cn": "252",
+       "card": {
+        "id": "OxNJn",
+        "uniqueCardId": "kpXp0",
+        "scryfall_id": "0a1d6dcd-bd41-4f57-a35b-6613811fe4d4",
+        "set": "fin",
+        "set_name": "Final Fantasy",
+        "set_type": "expansion",
+        "name": "Adventurer's Airship",
+        "cn": "252",
+        "lang": "en",
+        "rarity": "common",
+        "type_line": "Artifact \u2014 Vehicle",
+        "isToken": false,
+        "card_faces": [],
+        "prices": {
+         "usd": 0.16,
+         "usd_foil": 0.24
+        },
+        "layout": "normal"
+       }
+      },
+      {
+       "id": "OxNJn",
+       "quantity": 1,
+       "finish": "foil",
+       "isFoil": true,
+       "isAlter": false,
+       "isProxy": false,
+       "lang": "en",
+       "set": "fin",
+       "set_name": "Final Fantasy",
+       "rarity": "common",
+       "cn": "252",
+       "card": {
+        "id": "OxNJn",
+        "uniqueCardId": "kpXp0",
+        "scryfall_id": "0a1d6dcd-bd41-4f57-a35b-6613811fe4d4",
+        "set": "fin",
+        "set_name": "Final Fantasy",
+        "set_type": "expansion",
+        "name": "Adventurer's Airship",
+        "cn": "252",
+        "lang": "en",
+        "rarity": "common",
+        "type_line": "Artifact \u2014 Vehicle",
+        "isToken": false,
+        "card_faces": [],
+        "prices": {
+         "usd": 0.16,
+         "usd_foil": 0.24
+        },
+        "layout": "normal"
+       }
+      }
+     ]
+    }
+   }
+  },
+  "sideboard": {
+   "count": 4,
+   "cards": {
+    "multi1": {
+     "quantity": 4,
+     "boardType": "mainboard",
+     "finish": "nonFoil",
+     "isFoil": false,
+     "isAlter": false,
+     "isProxy": false,
+     "card": {
+      "id": "OxNJn",
+      "uniqueCardId": "kpXp0",
+      "scryfall_id": "0a1d6dcd-bd41-4f57-a35b-6613811fe4d4",
+      "set": "fin",
+      "set_name": "Final Fantasy",
+      "set_type": "expansion",
+      "name": "Adventurer's Airship",
+      "cn": "252",
+      "lang": "en",
+      "rarity": "common",
+      "type_line": "Artifact \u2014 Vehicle",
+      "isToken": false,
+      "card_faces": [],
+      "prices": {
+       "usd": 0.16,
+       "usd_foil": 0.24
+      },
+      "layout": "normal"
+     },
+     "printingData": [
+      {
+       "id": "OxNJn",
+       "quantity": 2,
+       "finish": "nonFoil",
+       "isFoil": false,
+       "isAlter": false,
+       "isProxy": false,
+       "set": "fin",
+       "cn": "252"
+      },
+      {
+       "id": "zzz01",
+       "quantity": 1,
+       "finish": "etched",
+       "isFoil": false,
+       "isAlter": false,
+       "isProxy": true,
+       "set": "fca",
+       "cn": "99",
+       "set_name": "Final Fantasy: Through the Ages"
+      }
+     ]
+    }
+   }
+  }
+ }
+}

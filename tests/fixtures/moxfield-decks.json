@@ -1,0 +1,253 @@
+{
+ "decks": [
+  {
+   "id": "deck00",
+   "publicId": "TestDeck00Public_AAAAAA",
+   "name": "Test deck A",
+   "format": "commander",
+   "visibility": "unlisted",
+   "folder": {
+    "id": "fold00",
+    "name": "Collection"
+   },
+   "lastUpdatedAtUtc": "2026-10-27T02:38:44.147Z",
+   "createdAtUtc": "2025-05-09T20:05:46.167Z",
+   "mainboardCount": 21,
+   "sideboardCount": 0,
+   "maybeboardCount": 0,
+   "commanders": [
+    {
+     "name": "Veyran, Voice of Duality",
+     "id": "vPKgq"
+    }
+   ],
+   "publicUrl": "https://moxfield.com/decks/TestDeck00Public_AAAAAA",
+   "colors": [
+    "U",
+    "R"
+   ],
+   "colorIdentity": [
+    "U",
+    "R"
+   ],
+   "bracket": 2,
+   "isLegal": false,
+   "createdByUser": {
+    "userName": "tester",
+    "displayName": "Tester",
+    "badges": []
+   }
+  },
+  {
+   "id": "deck01",
+   "publicId": "TestDeck01Public_BBBBBB",
+   "name": "Test deck B",
+   "format": "none",
+   "visibility": "private",
+   "folder": {
+    "id": "fold01",
+    "name": "Collection/Final Fantasy"
+   },
+   "lastUpdatedAtUtc": "2026-09-19T04:18:09.797Z",
+   "createdAtUtc": "2025-07-04T18:18:59.87Z",
+   "mainboardCount": 47,
+   "sideboardCount": 0,
+   "maybeboardCount": 0,
+   "commanders": [],
+   "publicUrl": "https://moxfield.com/decks/TestDeck01Public_BBBBBB",
+   "colors": [
+    "B"
+   ],
+   "colorIdentity": [
+    "B"
+   ],
+   "bracket": 2,
+   "isLegal": true,
+   "createdByUser": {
+    "userName": "tester",
+    "displayName": "Tester",
+    "badges": []
+   }
+  },
+  {
+   "id": "deck02",
+   "publicId": "TestDeck02Public_CCCCCC",
+   "name": "Test deck C",
+   "format": "commander",
+   "visibility": "unlisted",
+   "folder": {
+    "id": "fold02",
+    "name": "Utils/Copy"
+   },
+   "lastUpdatedAtUtc": "2024-07-02T19:04:39.6Z",
+   "createdAtUtc": "2024-07-02T19:04:39.6Z",
+   "mainboardCount": 100,
+   "sideboardCount": 2,
+   "maybeboardCount": 0,
+   "commanders": [
+    {
+     "name": "Bruna, the Fading Light",
+     "id": "xR8zV"
+    }
+   ],
+   "publicUrl": "https://moxfield.com/decks/TestDeck02Public_CCCCCC",
+   "colors": [
+    "W"
+   ],
+   "colorIdentity": [
+    "W"
+   ],
+   "bracket": 2,
+   "isLegal": true,
+   "createdByUser": {
+    "userName": "tester",
+    "displayName": "Tester",
+    "badges": []
+   }
+  },
+  {
+   "id": "deck03",
+   "publicId": "TestDeck03Public_DDDDDD",
+   "name": "Test deck D",
+   "format": "none",
+   "visibility": "unlisted",
+   "folder": {
+    "id": "fold03",
+    "name": "Utils/Lists"
+   },
+   "lastUpdatedAtUtc": "2026-10-03T15:00:25.017Z",
+   "createdAtUtc": "2025-09-01T13:19:19.34Z",
+   "mainboardCount": 66,
+   "sideboardCount": 0,
+   "maybeboardCount": 0,
+   "commanders": [],
+   "publicUrl": "https://moxfield.com/decks/TestDeck03Public_DDDDDD",
+   "colors": [
+    "B"
+   ],
+   "colorIdentity": [
+    "B"
+   ],
+   "bracket": 4,
+   "isLegal": true,
+   "createdByUser": {
+    "userName": "tester",
+    "displayName": "Tester",
+    "badges": []
+   }
+  },
+  {
+   "id": "deck04",
+   "publicId": "TestDeck04Public_EEEEEE",
+   "name": "Test deck E",
+   "format": "pauperEdh",
+   "visibility": "public",
+   "lastUpdatedAtUtc": "2025-10-25T22:18:07.923Z",
+   "createdAtUtc": "2024-07-29T15:24:10.607Z",
+   "mainboardCount": 100,
+   "sideboardCount": 0,
+   "maybeboardCount": 0,
+   "commanders": [
+    {
+     "name": "Soulherder",
+     "id": "kXKGZ"
+    }
+   ],
+   "publicUrl": "https://moxfield.com/decks/TestDeck04Public_EEEEEE",
+   "colors": [
+    "W",
+    "U"
+   ],
+   "colorIdentity": [
+    "W",
+    "U"
+   ],
+   "bracket": 2,
+   "isLegal": true,
+   "createdByUser": {
+    "userName": "tester",
+    "displayName": "Tester",
+    "badges": []
+   }
+  },
+  {
+   "id": "deck05",
+   "publicId": "TestDeck05Public_FFFFFF",
+   "name": "Test deck F",
+   "format": "commander",
+   "visibility": "private",
+   "folder": {
+    "id": "fold05",
+    "name": "Ideas"
+   },
+   "lastUpdatedAtUtc": "2026-02-20T22:33:19.09Z",
+   "createdAtUtc": "2026-01-22T14:28:58.217Z",
+   "mainboardCount": 100,
+   "sideboardCount": 2,
+   "maybeboardCount": 54,
+   "commanders": [
+    {
+     "name": "Jenova, Ancient Calamity",
+     "id": "yDbOD"
+    }
+   ],
+   "publicUrl": "https://moxfield.com/decks/TestDeck05Public_FFFFFF",
+   "colors": [
+    "B",
+    "G"
+   ],
+   "colorIdentity": [
+    "B",
+    "G"
+   ],
+   "bracket": 2,
+   "isLegal": true,
+   "createdByUser": {
+    "userName": "tester",
+    "displayName": "Tester",
+    "badges": []
+   }
+  },
+  {
+   "id": "deck06",
+   "publicId": "TestDeck06Public_GGGGGG",
+   "name": "Test deck G",
+   "format": "commander",
+   "visibility": "unlisted",
+   "folder": {
+    "id": "fold06",
+    "name": "Decks"
+   },
+   "lastUpdatedAtUtc": "2026-11-07T18:37:43.82Z",
+   "createdAtUtc": "2025-07-10T21:26:13.697Z",
+   "mainboardCount": 100,
+   "sideboardCount": 10,
+   "maybeboardCount": 0,
+   "commanders": [
+    {
+     "name": "Y'shtola, Night's Blessed",
+     "id": "a2o4x"
+    }
+   ],
+   "publicUrl": "https://moxfield.com/decks/TestDeck06Public_GGGGGG",
+   "colors": [
+    "W",
+    "U",
+    "B"
+   ],
+   "colorIdentity": [
+    "W",
+    "U",
+    "B"
+   ],
+   "bracket": 3,
+   "isLegal": true,
+   "createdByUser": {
+    "userName": "tester",
+    "displayName": "Tester",
+    "badges": []
+   }
+  }
+ ],
+ "pinnedDeckIds": []
+}

@@ -1,0 +1,331 @@
+{
+  "hits": {
+    "total": {
+      "value": 5,
+      "relation": "eq"
+    },
+    "hits": [
+      {
+        "_id": "gid://shopify/Product/15012300128628",
+        "_source": {
+          "title": "Abigale, Poet Laureate // Heroic Stanza [170] [Secrets of Strixhaven] [Foil]",
+          "handle": "abigale-poet-laureate-heroic-stanza-170-secrets-of-strixhaven-foil",
+          "Card Name": [
+            "Abigale, Poet Laureate",
+            "Heroic Stanza"
+          ],
+          "General_Card_Name": "Abigale, Poet Laureate",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": "Secrets of Strixhaven",
+          "MTG_Collector_Number": 170,
+          "MTG_Foil_Option": "Foil",
+          "MTG_Rarity": "Uncommon",
+          "publishedF2FSell": 0,
+          "publishedOnlineStore": 1,
+          "product_type": "Singles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/53543146815860",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/83f78800306d22d3dac3f319368e0962baf296f0_Asset_SIN_MTG_SOS_170_ENG_F.jpg?v=1774995531",
+              "altText": "",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/54223550382452",
+              "price": 0.75,
+              "sellPrice": 0,
+              "inventoryQuantity": 27,
+              "sku": "SIN-MTG-SOS-170-ENG-NM-F",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "NM"
+                }
+              ],
+              "image": {
+                "altText": null,
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/83f78800306d22d3dac3f319368e0962baf296f0_Asset_SIN_MTG_SOS_170_ENG_F.jpg?v=1774995531",
+                "width": 744
+              }
+            },
+            {
+              "id": "gid://shopify/ProductVariant/54223550415220",
+              "price": 0.6,
+              "sellPrice": 0,
+              "inventoryQuantity": 0,
+              "sku": "SIN-MTG-SOS-170-ENG-PL-F",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "PL"
+                }
+              ],
+              "image": {
+                "altText": null,
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/83f78800306d22d3dac3f319368e0962baf296f0_Asset_SIN_MTG_SOS_170_ENG_F.jpg?v=1774995531",
+                "width": 744
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/15012298719604",
+        "_source": {
+          "title": "Abigale, Poet Laureate // Heroic Stanza [170] [Secrets of Strixhaven] [Non-Foil]",
+          "handle": "abigale-poet-laureate-heroic-stanza-170-secrets-of-strixhaven-non-foil",
+          "Card Name": [
+            "Abigale, Poet Laureate",
+            "Heroic Stanza"
+          ],
+          "General_Card_Name": "Abigale, Poet Laureate",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": "Secrets of Strixhaven",
+          "MTG_Collector_Number": 170,
+          "MTG_Foil_Option": "Non-Foil",
+          "MTG_Rarity": "Uncommon",
+          "publishedF2FSell": 0,
+          "publishedOnlineStore": 1,
+          "product_type": "Singles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/53543145079156",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/276f361842af1d9e54d7c03563f069868f40a33b_Asset_SIN_MTG_SOS_170_ENG_NF.jpg?v=1774995520",
+              "altText": "",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/54223547597172",
+              "price": 0.49,
+              "sellPrice": 0,
+              "inventoryQuantity": 58,
+              "sku": "SIN-MTG-SOS-170-ENG-NM-NF",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "NM"
+                }
+              ],
+              "image": {
+                "altText": null,
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/276f361842af1d9e54d7c03563f069868f40a33b_Asset_SIN_MTG_SOS_170_ENG_NF.jpg?v=1774995520",
+                "width": 744
+              }
+            },
+            {
+              "id": "gid://shopify/ProductVariant/54223547629940",
+              "price": 0.39,
+              "sellPrice": 0,
+              "inventoryQuantity": 0,
+              "sku": "SIN-MTG-SOS-170-ENG-PL-NF",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "PL"
+                }
+              ],
+              "image": {
+                "altText": null,
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/276f361842af1d9e54d7c03563f069868f40a33b_Asset_SIN_MTG_SOS_170_ENG_NF.jpg?v=1774995520",
+                "width": 744
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14647129375092",
+        "_source": {
+          "title": "________ Goblin [393] [Unfinity] [Galaxy Foil]",
+          "handle": "goblin-393-unfinity-galaxy-foil",
+          "Card Name": "_____ Goblin",
+          "General_Card_Name": "_____ Goblin",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": "Unfinity",
+          "MTG_Collector_Number": 393,
+          "MTG_Foil_Option": "Galaxy Foil",
+          "MTG_Rarity": "Common",
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Singles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51523560472948",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/b4f402cfe86a0124a3ca8fec677806aca124a70e_Asset_MTG_UNF_393_ENG_XF_jpg.jpg?v=1737579338",
+              "altText": "",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51739774812532",
+              "price": 64.99,
+              "sellPrice": 32,
+              "inventoryQuantity": 5,
+              "sku": "SIN-MTG-UNF-393-ENG-NM-XF",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "NM"
+                }
+              ],
+              "image": {
+                "altText": null,
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/b4f402cfe86a0124a3ca8fec677806aca124a70e_Asset_MTG_UNF_393_ENG_XF_jpg.jpg?v=1737579338",
+                "width": 1467
+              }
+            },
+            {
+              "id": "gid://shopify/ProductVariant/51739774845300",
+              "price": 51.99,
+              "sellPrice": 25.6,
+              "inventoryQuantity": 0,
+              "sku": "SIN-MTG-UNF-393-ENG-PL-XF",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "PL"
+                }
+              ],
+              "image": {
+                "altText": null,
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/b4f402cfe86a0124a3ca8fec677806aca124a70e_Asset_MTG_UNF_393_ENG_XF_jpg.jpg?v=1737579338",
+                "width": 1467
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14647106634100",
+        "_source": {
+          "title": "________ Goblin [107] [Unfinity] [Non-Foil]",
+          "handle": "goblin-107-unfinity-non-foil",
+          "Card Name": "_____ Goblin",
+          "General_Card_Name": "_____ Goblin",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": "Unfinity",
+          "MTG_Collector_Number": 107,
+          "MTG_Foil_Option": "Non-Foil",
+          "MTG_Rarity": "Common",
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Singles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51523513188724",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/40cdaee915be50ae872c35e8a14c64b6173a6ad7_Asset_MTG_UNF_107_ENG_NF_jpg.jpg?v=1737579022",
+              "altText": "",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51739725169012",
+              "price": 0.75,
+              "sellPrice": 0.1,
+              "inventoryQuantity": 8,
+              "sku": "SIN-MTG-UNF-107-ENG-NM-NF",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "NM"
+                }
+              ],
+              "image": {
+                "altText": null,
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/40cdaee915be50ae872c35e8a14c64b6173a6ad7_Asset_MTG_UNF_107_ENG_NF_jpg.jpg?v=1737579022",
+                "width": 265
+              }
+            },
+            {
+              "id": "gid://shopify/ProductVariant/51739725201780",
+              "price": 0.6,
+              "sellPrice": 0.06,
+              "inventoryQuantity": 0,
+              "sku": "SIN-MTG-UNF-107-ENG-PL-NF",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "PL"
+                }
+              ],
+              "image": {
+                "altText": null,
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/40cdaee915be50ae872c35e8a14c64b6173a6ad7_Asset_MTG_UNF_107_ENG_NF_jpg.jpg?v=1737579022",
+                "width": 265
+              }
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14647105257844",
+        "_source": {
+          "title": "________ Goblin [107] [Unfinity] [Foil]",
+          "handle": "goblin-107-unfinity-foil",
+          "Card Name": "_____ Goblin",
+          "General_Card_Name": "_____ Goblin",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": "Unfinity",
+          "MTG_Collector_Number": 107,
+          "MTG_Foil_Option": "Foil",
+          "MTG_Rarity": "Common",
+          "publishedF2FSell": 1,
+          "publishedOnlineStore": 1,
+          "product_type": "Singles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51523516727668",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/aa5c182a20e279757380b90cb886143f6cb8f186_Asset_MTG_UNF_107_ENG_F_jpg.jpg?v=1737579033",
+              "altText": "",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51739722285428",
+              "price": 6.99,
+              "sellPrice": 2,
+              "inventoryQuantity": 10,
+              "sku": "SIN-MTG-UNF-107-ENG-NM-F",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "NM"
+                }
+              ],
+              "image": {
+                "altText": null,
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/aa5c182a20e279757380b90cb886143f6cb8f186_Asset_MTG_UNF_107_ENG_F_jpg.jpg?v=1737579033",
+                "width": 1467
+              }
+            },
+            {
+              "id": "gid://shopify/ProductVariant/51739722318196",
+              "price": 5.59,
+              "sellPrice": 1.4,
+              "inventoryQuantity": 1,
+              "sku": "SIN-MTG-UNF-107-ENG-PL-F",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "PL"
+                }
+              ],
+              "image": {
+                "altText": null,
+                "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/aa5c182a20e279757380b90cb886143f6cb8f186_Asset_MTG_UNF_107_ENG_F_jpg.jpg?v=1737579033",
+                "width": 1467
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

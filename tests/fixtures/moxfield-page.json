@@ -1,0 +1,219 @@
+{
+  "totalResults": 3912,
+  "totalPages": 79,
+  "pageNumber": 1,
+  "pageSize": 50,
+  "data": [
+    {
+      "id": "WOmayJD",
+      "quantity": 1,
+      "condition": "nearMint",
+      "finish": "nonFoil",
+      "isFoil": false,
+      "isAlter": false,
+      "isProxy": false,
+      "rarity": "common",
+      "language": {
+        "id": "LD58x",
+        "code": "en",
+        "name": "English"
+      },
+      "card": {
+        "id": "6JzJo",
+        "scryfall_id": "5819e3f3-da49-4003-88ce-f3b7bb495787",
+        "set": "unf",
+        "set_name": "Unfinity",
+        "set_type": "funny",
+        "name": "_____ Goblin",
+        "cn": "107",
+        "rarity": "common",
+        "layout": "normal",
+        "type_line": "Creature — Goblin Guest",
+        "isToken": false,
+        "card_faces": [],
+        "prices": {
+          "usd": 0.34,
+          "usd_foil": 4.84,
+          "usd_etched": null
+        }
+      }
+    },
+    {
+      "id": "PbKOXjv",
+      "quantity": 1,
+      "condition": "nearMint",
+      "finish": "nonFoil",
+      "isFoil": false,
+      "isAlter": false,
+      "isProxy": false,
+      "rarity": "rare",
+      "language": {
+        "id": "LD58x",
+        "code": "en",
+        "name": "English"
+      },
+      "card": {
+        "id": "7RgKp",
+        "scryfall_id": "d1af74e4-38d5-44b5-85e1-4d13f6970453",
+        "set": "fin",
+        "set_name": "Final Fantasy",
+        "set_type": "expansion",
+        "name": "A Realm Reborn",
+        "cn": "196",
+        "rarity": "rare",
+        "layout": "normal",
+        "type_line": "Enchantment",
+        "isToken": false,
+        "card_faces": [],
+        "prices": {
+          "usd": 0.46,
+          "usd_foil": 0.62,
+          "usd_etched": null
+        }
+      }
+    },
+    {
+      "id": "P1Pyr9",
+      "quantity": 1,
+      "condition": "nearMint",
+      "finish": "nonFoil",
+      "isFoil": false,
+      "isAlter": false,
+      "isProxy": false,
+      "rarity": "rare",
+      "language": {
+        "id": "LD58x",
+        "code": "en",
+        "name": "English"
+      },
+      "card": {
+        "id": "Q4zae",
+        "scryfall_id": "ca0c8d3b-ce30-4da5-a6a8-9bdcb3c757f9",
+        "set": "woe",
+        "set_name": "Wilds of Eldraine",
+        "set_type": "expansion",
+        "name": "A Tale for the Ages",
+        "cn": "34",
+        "rarity": "rare",
+        "layout": "normal",
+        "type_line": "Enchantment",
+        "isToken": false,
+        "card_faces": [],
+        "prices": {
+          "usd": 0.26,
+          "usd_foil": 0.34,
+          "usd_etched": null
+        }
+      }
+    },
+    {
+      "id": "g16PZr",
+      "quantity": 1,
+      "condition": "nearMint",
+      "finish": "nonFoil",
+      "isFoil": false,
+      "isAlter": false,
+      "isProxy": false,
+      "rarity": "common",
+      "language": {
+        "id": "LD58x",
+        "code": "en",
+        "name": "English"
+      },
+      "card": {
+        "id": "XdMJA",
+        "scryfall_id": "c775a7d1-a1f7-460b-b1f4-888006058e15",
+        "set": "unf",
+        "set_name": "Unfinity",
+        "set_type": "funny",
+        "name": "Aardwolf's Advantage",
+        "cn": "97",
+        "rarity": "common",
+        "layout": "normal",
+        "type_line": "Sorcery",
+        "isToken": false,
+        "card_faces": [],
+        "prices": {
+          "usd": 0.1,
+          "usd_foil": 0.05,
+          "usd_etched": null
+        }
+      }
+    },
+    {
+      "id": "G4RAWoB",
+      "quantity": 1,
+      "condition": "nearMint",
+      "finish": "etched",
+      "isFoil": false,
+      "isAlter": false,
+      "isProxy": false,
+      "rarity": "uncommon",
+      "language": {
+        "id": "LD58x",
+        "code": "en",
+        "name": "English"
+      },
+      "card": {
+        "id": "V2BmR",
+        "scryfall_id": "e5cb7668-e07d-4551-9525-68974b33ad87",
+        "set": "clb",
+        "set_name": "Commander Legends: Battle for Baldur's Gate",
+        "set_type": "draft_innovation",
+        "name": "Abdel Adrian, Gorion's Ward",
+        "cn": "471",
+        "rarity": "uncommon",
+        "layout": "normal",
+        "type_line": "Legendary Creature — Human Warrior",
+        "isToken": false,
+        "card_faces": [],
+        "prices": {
+          "usd": null,
+          "usd_foil": null,
+          "usd_etched": 0.55
+        }
+      }
+    },
+    {
+      "id": "J7OO2Qm",
+      "quantity": 1,
+      "condition": "nearMint",
+      "finish": "nonFoil",
+      "isFoil": false,
+      "isAlter": false,
+      "isProxy": false,
+      "rarity": "uncommon",
+      "language": {
+        "id": "LD58x",
+        "code": "en",
+        "name": "English"
+      },
+      "card": {
+        "id": "7RZ8p",
+        "scryfall_id": "77285d12-e658-4eb3-ba13-ff202afab9c8",
+        "set": "sos",
+        "set_name": "Secrets of Strixhaven",
+        "set_type": "expansion",
+        "name": "Abigale, Poet Laureate // Heroic Stanza",
+        "cn": "170",
+        "rarity": "uncommon",
+        "layout": "prepare",
+        "type_line": "Legendary Creature — Bird Bard // Sorcery",
+        "isToken": false,
+        "card_faces": [
+          {
+            "name": "Abigale, Poet Laureate"
+          },
+          {
+            "name": "Heroic Stanza"
+          }
+        ],
+        "prices": {
+          "usd": 0.23,
+          "usd_foil": 0.24,
+          "usd_etched": null
+        }
+      }
+    }
+  ]
+}

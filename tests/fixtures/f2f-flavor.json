@@ -1,0 +1,166 @@
+{
+  "hits": {
+    "total": {
+      "value": 3,
+      "relation": "eq"
+    },
+    "hits": [
+      {
+        "_id": "gid://shopify/Product/14720730792308",
+        "_source": {
+          "title": "The Imperial City of Archades - Wall of Omens [27] [Borderless] [FINAL FANTASY: Through the Ages] [Foil]",
+          "handle": "the-imperial-city-of-archades-wall-of-omens-27-borderless-final-fantasy-through-the-ages-foil",
+          "Card Name": "The Imperial City of Archades - Wall of Omens",
+          "General_Card_Name": "The Imperial City of Archades - Wall of Omens",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": "FINAL FANTASY: Through the Ages",
+          "MTG_Collector_Number": 27,
+          "MTG_Foil_Option": "Foil",
+          "MTG_Rarity": "Uncommon",
+          "publishedF2FSell": 1,
+          "product_type": "Singles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51918039056756",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/3964c6e5891d0f15ef79346438855f94277b3605_Asset_SIN_MTG_FCA_27_ENG_F.jpg?v=1747083804",
+              "altText": "",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/52097239744884",
+              "price": 0.75,
+              "sellPrice": 0.1,
+              "inventoryQuantity": 4,
+              "sku": "SIN-MTG-FCA-27-ENG-NM-F",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "NM"
+                }
+              ]
+            },
+            {
+              "id": "gid://shopify/ProductVariant/52097239777652",
+              "price": 0.6,
+              "sellPrice": 0.06,
+              "inventoryQuantity": 0,
+              "sku": "SIN-MTG-FCA-27-ENG-PL-F",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "PL"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14720730726772",
+        "_source": {
+          "title": "The Imperial City of Archades - Wall of Omens [27] [Borderless] [FINAL FANTASY: Through the Ages] [Non-Foil]",
+          "handle": "the-imperial-city-of-archades-wall-of-omens-27-borderless-final-fantasy-through-the-ages-non-foil",
+          "Card Name": "The Imperial City of Archades - Wall of Omens",
+          "General_Card_Name": "The Imperial City of Archades - Wall of Omens",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": "FINAL FANTASY: Through the Ages",
+          "MTG_Collector_Number": 27,
+          "MTG_Foil_Option": "Non-Foil",
+          "MTG_Rarity": "Uncommon",
+          "publishedF2FSell": 0,
+          "product_type": "Singles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51918039253364",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/cdd76057fd97bd4d8dc4449689862145c2e178a6_Asset_SIN_MTG_FCA_27_ENG_NF.jpg?v=1747083805",
+              "altText": "",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/52097239679348",
+              "price": 0.49,
+              "sellPrice": 0,
+              "inventoryQuantity": 20,
+              "sku": "SIN-MTG-FCA-27-ENG-NM-NF",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "NM"
+                }
+              ]
+            },
+            {
+              "id": "gid://shopify/ProductVariant/52097239712116",
+              "price": 0.39,
+              "sellPrice": 0,
+              "inventoryQuantity": 0,
+              "sku": "SIN-MTG-FCA-27-ENG-PL-NF",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "PL"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "_id": "gid://shopify/Product/14644177437044",
+        "_source": {
+          "title": "Gleeful Arsonist [27] [Duskmourn: House of Horror: Commander] [Non-Foil]",
+          "handle": "gleeful-arsonist-27-duskmourn-house-of-horror-commander-non-foil",
+          "Card Name": "Gleeful Arsonist",
+          "General_Card_Name": "Gleeful Arsonist",
+          "General_Card_Language": "English",
+          "MTG_Set_Name": "Duskmourn: House of Horror: Commander",
+          "MTG_Collector_Number": 27,
+          "MTG_Foil_Option": "Non-Foil",
+          "MTG_Rarity": "Rare",
+          "publishedF2FSell": 1,
+          "product_type": "Singles",
+          "media": [
+            {
+              "id": "gid://shopify/MediaImage/51527187595636",
+              "url": "https://cdn.shopify.com/s/files/1/0574/4692/4324/files/03cfe0b54bb911d119314df8e2f9313ac49d1a27_Asset_MTG_DSC_27_ENG_NF_jpg.jpg?v=1737643194",
+              "altText": "",
+              "mediaContentType": "IMAGE"
+            }
+          ],
+          "variants": [
+            {
+              "id": "gid://shopify/ProductVariant/51733680849268",
+              "price": 12.99,
+              "sellPrice": 6,
+              "inventoryQuantity": 22,
+              "sku": "SIN-MTG-DSC-27-ENG-NM-NF",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "NM"
+                }
+              ]
+            },
+            {
+              "id": "gid://shopify/ProductVariant/51733680882036",
+              "price": 9.74,
+              "sellPrice": 4.2,
+              "inventoryQuantity": 0,
+              "sku": "SIN-MTG-DSC-27-ENG-PL-NF",
+              "selectedOptions": [
+                {
+                  "name": "Condition",
+                  "value": "PL"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

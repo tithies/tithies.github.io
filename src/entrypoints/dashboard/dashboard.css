@@ -1,0 +1,21 @@
+body {
+  background: var(--mantine-color-body);
+}
+.ti-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Data tables: make the active sort column obvious (default arrow inherits the dim header color). */
+.mantine-datatable-header-cell-sortable-icon {
+  color: var(--mantine-primary-color-filled);
+}
+.mantine-datatable-header-cell-sortable-icon svg {
+  stroke-width: 3;
+}
+.mantine-datatable-header-cell-sortable:has(.mantine-datatable-header-cell-sortable-icon) {
+  color: var(--mantine-primary-color-filled);
+  box-shadow: inset 0 -2px 0 var(--mantine-primary-color-filled);
+}
+.mantine-datatable-header-cell-sortable-unsorted-icon {
+  opacity: 0.45;
+}

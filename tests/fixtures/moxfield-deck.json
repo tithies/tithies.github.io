@@ -1,0 +1,258 @@
+{
+ "id": "deck06",
+ "name": "Test deck G",
+ "format": "commander",
+ "visibility": "unlisted",
+ "publicUrl": "https://moxfield.com/decks/TestDeck06Public_GGGGGG",
+ "publicId": "TestDeck06Public_GGGGGG",
+ "createdByUser": {
+  "userName": "tester",
+  "displayName": "Tester",
+  "badges": []
+ },
+ "authors": [
+  {
+   "userName": "tester",
+   "displayName": "Tester",
+   "badges": []
+  }
+ ],
+ "boards": {
+  "mainboard": {
+   "count": 12,
+   "cards": {
+    "kaN49": {
+     "quantity": 9,
+     "boardType": "mainboard",
+     "finish": "nonFoil",
+     "isFoil": false,
+     "isAlter": false,
+     "isProxy": false,
+     "card": {
+      "id": "nan0y",
+      "scryfall_id": "947702ca-d065-4368-9f26-f859d4642cb6",
+      "set": "dsk",
+      "set_name": "Duskmourn: House of Horror",
+      "set_type": "expansion",
+      "name": "Island",
+      "cn": "279",
+      "lang": "en",
+      "rarity": "common",
+      "type_line": "Basic Land \u2014 Island",
+      "isToken": false,
+      "card_faces": [],
+      "prices": {
+       "usd": 0.19,
+       "usd_foil": 0.26
+      },
+      "layout": "normal",
+      "uniqueCardId": "kaN49"
+     }
+    },
+    "kaN92": {
+     "quantity": 1,
+     "boardType": "mainboard",
+     "finish": "nonFoil",
+     "isFoil": false,
+     "isAlter": false,
+     "isProxy": false,
+     "card": {
+      "id": "g32yx",
+      "scryfall_id": "5306a95e-fb18-463d-81a9-3c3b8121fc94",
+      "set": "ltc",
+      "set_name": "Tales of Middle-earth Commander",
+      "set_type": "commander",
+      "name": "Command Tower",
+      "cn": "301",
+      "lang": "en",
+      "rarity": "common",
+      "type_line": "Land",
+      "isToken": false,
+      "card_faces": [],
+      "prices": {
+       "usd": 0.36
+      },
+      "layout": "normal",
+      "uniqueCardId": "kaN92"
+     }
+    },
+    "E1dwm": {
+     "quantity": 1,
+     "boardType": "mainboard",
+     "finish": "nonFoil",
+     "isFoil": false,
+     "isAlter": false,
+     "isProxy": false,
+     "card": {
+      "id": "G4Gwo",
+      "scryfall_id": "42799f51-0f8c-444b-974e-dae281a5c697",
+      "set": "fdn",
+      "set_name": "Foundations",
+      "set_type": "core",
+      "name": "Thornwood Falls",
+      "cn": "269",
+      "lang": "en",
+      "rarity": "common",
+      "type_line": "Land",
+      "isToken": false,
+      "card_faces": [],
+      "prices": {
+       "usd": 0.21,
+       "usd_foil": 0.25
+      },
+      "layout": "normal",
+      "uniqueCardId": "E1dwm"
+     }
+    },
+    "LVN8q": {
+     "quantity": 1,
+     "boardType": "mainboard",
+     "finish": "nonFoil",
+     "isFoil": false,
+     "isAlter": false,
+     "isProxy": true,
+     "card": {
+      "id": "01We3",
+      "scryfall_id": "c5988fba-e870-4eb7-8469-01dff0c93d3f",
+      "set": "ltc",
+      "set_name": "Tales of Middle-earth Commander",
+      "set_type": "commander",
+      "name": "Tranquil Thicket",
+      "cn": "341",
+      "lang": "en",
+      "rarity": "uncommon",
+      "type_line": "Land",
+      "isToken": false,
+      "card_faces": [],
+      "prices": {
+       "usd": 0.23
+      },
+      "layout": "normal",
+      "uniqueCardId": "LVN8q"
+     }
+    }
+   }
+  },
+  "sideboard": {
+   "count": 0,
+   "cards": {}
+  },
+  "maybeboard": {
+   "count": 2,
+   "cards": {
+    "kOde4": {
+     "quantity": 1,
+     "boardType": "maybeboard",
+     "finish": "foil",
+     "isFoil": true,
+     "isAlter": false,
+     "isProxy": false,
+     "card": {
+      "id": "Q4JOa",
+      "scryfall_id": "56910251-6339-4f8b-b863-29caab4965d8",
+      "set": "ltc",
+      "set_name": "Tales of Middle-earth Commander",
+      "set_type": "commander",
+      "name": "Gandalf, Westward Voyager",
+      "cn": "6",
+      "lang": "en",
+      "rarity": "mythic",
+      "type_line": "Legendary Creature \u2014 Avatar Wizard",
+      "isToken": false,
+      "card_faces": [],
+      "prices": {
+       "usd": 0.28,
+       "usd_foil": 0.36
+      },
+      "layout": "normal",
+      "uniqueCardId": "kOde4"
+     }
+    },
+    "E6QQN": {
+     "quantity": 1,
+     "boardType": "maybeboard",
+     "finish": "nonFoil",
+     "isFoil": false,
+     "isAlter": false,
+     "isProxy": false,
+     "card": {
+      "id": "R9GpR",
+      "scryfall_id": "8deeb2b0-9bcb-439c-870a-8f46cf6fd995",
+      "set": "j25",
+      "set_name": "Foundations Jumpstart",
+      "set_type": "draft_innovation",
+      "name": "Wavebreak Hippocamp",
+      "cn": "387",
+      "lang": "en",
+      "rarity": "rare",
+      "type_line": "Enchantment Creature \u2014 Horse Fish",
+      "isToken": false,
+      "card_faces": [],
+      "prices": {
+       "usd": 0.58
+      },
+      "layout": "normal",
+      "uniqueCardId": "E6QQN"
+     }
+    }
+   }
+  },
+  "commanders": {
+   "count": 1,
+   "cards": {
+    "kApxe": {
+     "quantity": 1,
+     "boardType": "commanders",
+     "finish": "nonFoil",
+     "isFoil": false,
+     "isAlter": false,
+     "isProxy": false,
+     "card": {
+      "id": "8O8X7",
+      "scryfall_id": "6bf721b0-2b5a-4085-b50c-89cbe7420673",
+      "set": "2x2",
+      "set_name": "Double Masters 2022",
+      "set_type": "masters",
+      "name": "Ezuri, Claw of Progress",
+      "cn": "211",
+      "lang": "en",
+      "rarity": "mythic",
+      "type_line": "Legendary Creature \u2014 Phyrexian Elf Warrior",
+      "isToken": false,
+      "card_faces": [],
+      "prices": {
+       "usd": 2.54,
+       "usd_foil": 2.28
+      },
+      "layout": "normal",
+      "uniqueCardId": "kApxe"
+     }
+    }
+   }
+  },
+  "tokens": {
+   "count": 0,
+   "cards": {}
+  }
+ },
+ "tokens": [
+  {
+   "id": "dXAQ3",
+   "scryfall_id": "46f644a6-9621-429e-a0a0-4c74d0ecff2e",
+   "set": "znr",
+   "name": "A-Gnarlid Colony",
+   "cn": "A-185",
+   "isToken": false,
+   "type_line": "Creature \u2014 Beast"
+  }
+ ],
+ "version": 0,
+ "createdAtUtc": "2025-01-30T01:21:32.833Z",
+ "lastUpdatedAtUtc": "2025-02-28T18:12:58.63Z",
+ "exportId": "00000000-0000-0000-0000-000000000000",
+ "folder": {
+  "id": "fold06",
+  "name": "Ideas/Others"
+ },
+ "ownerUserId": "user0"
+}
