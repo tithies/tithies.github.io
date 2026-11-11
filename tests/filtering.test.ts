@@ -1,4 +1,4 @@
-import { applyFilters, applySort, EMPTY_FILTERS, filtersFromParams, isProblem, itemState, nameNote, pctOf, sortFromParams, writeParams } from '@/features/f2f-buylist/ui/filtering';
+import { applyFilters, applySort, detailedFinish, EMPTY_FILTERS, filtersFromParams, isProblem, itemState, nameNote, pctOf, sortFromParams, writeParams } from '@/features/f2f-buylist/ui/filtering';
 import type { Item } from '@/features/f2f-buylist/types';
 
 const item = (p: Partial<Item>): Item =>
@@ -110,8 +110,23 @@ describe('filters & sort', () => {
     expect(applySort(items, { key: 'name', dir: 'asc' }).map((i) => i.name)).toEqual(['Abigale', 'Sheoldred', 'Sol Ring']);
   });
 
+  it('filters by special finish, using the name shown in the table', () => {
+    const doc = (finish: string) => ({ finish }) as Item['doc'];
+    const plain = item({ name: 'Plain', finish: 'nonFoil' });
+    const foil = item({ name: 'Foil', finish: 'foil', doc: doc('Foil') });
+    const surge = item({ name: 'Surge', finish: 'foil', doc: doc('Surge Foil') });
+    const etched = item({ name: 'Etched', finish: 'etched', doc: doc('Etched Foil') });
+    const all = [plain, foil, surge, etched];
+    expect(all.map(detailedFinish)).toEqual(['Non-foil', 'Foil', 'Surge Foil', 'Etched']);
+    expect(applyFilters(all, { ...EMPTY_FILTERS, specialFinishes: ['Surge Foil'] }).map((i) => i.name)).toEqual(['Surge']);
+    expect(applyFilters(all, { ...EMPTY_FILTERS, specialFinishes: ['Surge Foil', 'Foil'] }).map((i) => i.name)).toEqual(['Foil', 'Surge']);
+    // The plain Finish filter is unchanged: a surge foil is still a "foil".
+    expect(applyFilters(all, { ...EMPTY_FILTERS, finishes: ['foil'] }).map((i) => i.name)).toEqual(['Foil', 'Surge']);
+    expect(applyFilters(all, { ...EMPTY_FILTERS, finishes: ['foil'], specialFinishes: ['Surge Foil'] }).map((i) => i.name)).toEqual(['Surge']);
+  });
+
   it('round-trips through URL params', () => {
-    const f = { ...EMPTY_FILTERS, q: 'bolt', category: 'not_bought' as const, sets: ['dmu', 'tmc'], minPct: 30, stock: 'out' as const, status: ['error'], noted: true };
+    const f = { ...EMPTY_FILTERS, q: 'bolt', category: 'not_bought' as const, sets: ['dmu', 'tmc'], minPct: 30, stock: 'out' as const, status: ['error'], noted: true, specialFinishes: ['Surge Foil'] };
     const p = writeParams(new URLSearchParams(), f, { key: 'pctCash', dir: 'asc' }, 3);
     expect(filtersFromParams(p)).toEqual(f);
     expect(sortFromParams(p)).toEqual({ key: 'pctCash', dir: 'asc' });

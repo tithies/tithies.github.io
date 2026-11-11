@@ -1,12 +1,12 @@
 import { ActionIcon, Badge, Group, Stack, Text, ThemeIcon, Tooltip } from '@mantine/core';
-import { IconAlertTriangle, IconBan, IconBox, IconCash, IconClock, IconExternalLink, IconShoppingCart, IconTag } from '@tabler/icons-react';
+import { IconBan, IconBox, IconCash, IconClock, IconExternalLink, IconRefreshAlert, IconShoppingCart, IconTag } from '@tabler/icons-react';
 import type { DataTableColumn } from 'mantine-datatable';
 import { sizedImage } from '@/lib/f2f/api';
 import { CardThumb } from '@/lib/ui/CardThumb';
 import { f2fLinks, scryfallCardLink, scryfallImage } from '@/lib/f2f/links';
 import { categoryOf, matchOf, type Category, type Item } from '../types';
-import { isProblem, nameNote, pctOf } from './filtering';
-import { finishLabel, money, moneyUsd, pct, pctColor, RARITY_COLOR, rarityLabel } from './format';
+import { detailedFinish, isProblem, nameNote, pctOf } from './filtering';
+import { money, moneyUsd, pct, pctColor, RARITY_COLOR, rarityLabel } from './format';
 
 const num = (children: React.ReactNode, c?: string) => (
   <Text size="sm" className="ti-num" c={c} ta="right">
@@ -14,17 +14,10 @@ const num = (children: React.ReactNode, c?: string) => (
   </Text>
 );
 
-/** Same red warning as the "Needs review" card. */
-const ReviewIcon = () => (
-  <ThemeIcon color="red" variant="filled">
-    <IconAlertTriangle size={18} />
-  </ThemeIcon>
-);
-
 /**
  * Green cash = F2F buylist, orange box = bulk, grey ban = F2F doesn't buy it at all (tokens,
- * Unfinity…), red warning = needs review (lookup error, loose match, price to check by hand or
- * not found on F2F, exactly the rows counted by the "Needs review" card).
+ * Unfinity…). Rows still being looked up show a grey clock, failed lookups a grey retry icon.
+ * "Needs review" isn't an icon: those rows are tinted red (see `reviewRowClass`).
  */
 const CATEGORY_ICON: Record<Category, { color: string; icon: React.ReactNode }> = {
   buylist: { color: 'teal', icon: <IconCash size={18} /> },
@@ -32,13 +25,20 @@ const CATEGORY_ICON: Record<Category, { color: string; icon: React.ReactNode }> 
   not_bought: { color: 'gray', icon: <IconBan size={18} /> },
 };
 
+/**
+ * Red background for rows that need review (the rows counted by the "Needs review" card); the
+ * colours are in dashboard.css. A class rather than the table's `rowBackgroundColor`, which
+ * loses to its striped and hover rules.
+ */
+export const reviewRowClass = (item: Item) => (isProblem(item) ? 'ti-review-row' : undefined);
+
 export function CategoryIcon({ item }: { item: Item }) {
   if (item.status === 'error') {
     return (
       <Tooltip label={`Needs review — lookup failed: ${item.error ?? 'unknown error'}. Use "Retry errors" on the run.`} multiline w={280}>
-        <span>
-          <ReviewIcon />
-        </span>
+        <ThemeIcon color="gray" variant="light">
+          <IconRefreshAlert size={18} />
+        </ThemeIcon>
       </Tooltip>
     );
   }
@@ -80,15 +80,9 @@ export function CategoryIcon({ item }: { item: Item }) {
         </Stack>
       }
     >
-      {review ? (
-        <span>
-          <ReviewIcon />
-        </span>
-      ) : (
-        <ThemeIcon color={CATEGORY_ICON[category].color} variant="filled">
-          {CATEGORY_ICON[category].icon}
-        </ThemeIcon>
-      )}
+      <ThemeIcon color={CATEGORY_ICON[category].color} variant="filled">
+        {CATEGORY_ICON[category].icon}
+      </ThemeIcon>
     </Tooltip>
   );
 }
@@ -242,7 +236,7 @@ export function buildColumns(hidden: ReadonlySet<string> = new Set()): DataTable
           </Text>
         ) : (
           <Badge variant="gradient" gradient={{ from: 'grape', to: 'cyan' }} radius="sm" tt="none">
-            {i.doc && i.finish === 'foil' && i.doc.finish && i.doc.finish !== 'Foil' ? i.doc.finish : finishLabel(i.finish)}
+            {detailedFinish(i)}
           </Badge>
         ),
     },

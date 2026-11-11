@@ -2,6 +2,7 @@ import { Alert, Anchor, Badge, Button, Group, Paper, Progress, Stack, Text, Titl
 import { IconInfoCircle } from '@tabler/icons-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { DataTable } from 'mantine-datatable';
+import { useStickyTableHeader } from '@/lib/ui/useStickyTableHeader';
 import { Link, useNavigate } from 'react-router';
 import { db } from '@/lib/db';
 import { f2fLinks } from '@/lib/f2f/links';
@@ -10,6 +11,7 @@ import { RunActions } from './RunActions';
 import { dateTime, money, PHASE_LABEL, STATUS_COLOR, STATUS_LABEL } from './format';
 
 export function RunsPage() {
+  const tableRef = useStickyTableHeader();
   const runs = useLiveQuery(() => db.runs.orderBy('createdAt').reverse().toArray(), []);
   const navigate = useNavigate();
 
@@ -40,7 +42,7 @@ export function RunsPage() {
         </Alert>
       )}
 
-      <Paper withBorder radius="md">
+      <Paper ref={tableRef} withBorder radius="md">
         <DataTable<Run>
           minHeight={runs?.length ? undefined : 150}
           fetching={runs === undefined}

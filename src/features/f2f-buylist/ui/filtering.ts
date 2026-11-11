@@ -2,6 +2,7 @@ import { fold } from '@/lib/format';
 import { compareValues } from '@/lib/sort';
 import { OVERSIZED_REASON } from '../bulk';
 import { categoryOf, matchOf, type Category, type Item } from '../types';
+import { finishLabel } from './format';
 
 export type CategoryFilter = 'all' | 'buylist' | 'bulk' | 'not_bought';
 export type StockFilter = 'any' | 'in' | 'out';
@@ -11,11 +12,17 @@ export type ItemState = 'exact' | 'loose' | 'price_check' | 'unlisted' | 'not_fo
 export const itemState = (it: Item): ItemState =>
   it.status === 'error' ? 'error' : it.status !== 'done' ? 'pending' : (matchOf(it) ?? 'pending');
 
+/** The finish as shown in the table: F2F's own name for special foils ("Surge Foil"…), else the standard label. */
+export const detailedFinish = (it: Item): string =>
+  it.doc && it.finish === 'foil' && it.doc.finish && it.doc.finish !== 'Foil' ? it.doc.finish : finishLabel(it.finish);
+
 export interface Filters {
   q: string;
   category: CategoryFilter;
   sets: string[];
   finishes: string[];
+  /** Values of `detailedFinish`. */
+  specialFinishes: string[];
   rarities: string[];
   status: string[];
   minBuy: number | null;
@@ -34,6 +41,7 @@ export const EMPTY_FILTERS: Filters = {
   category: 'all',
   sets: [],
   finishes: [],
+  specialFinishes: [],
   rarities: [],
   status: [],
   minBuy: null,
@@ -88,6 +96,7 @@ export function filtersFromParams(p: URLSearchParams): Filters {
     category: cat === 'buylist' || cat === 'bulk' || cat === 'not_bought' ? cat : 'all',
     sets: list(p.get('sets')),
     finishes: list(p.get('fin')),
+    specialFinishes: list(p.get('sfin')),
     rarities: list(p.get('rar')),
     // `match` is the pre-0.2 name of the status filter.
     status: list(p.get('status') ?? p.get('match')),
@@ -119,6 +128,7 @@ export function writeParams(base: URLSearchParams, f: Filters, s: Sort, page: nu
   set('cat', f.category === 'all' ? null : f.category);
   set('sets', f.sets.join(','));
   set('fin', f.finishes.join(','));
+  set('sfin', f.specialFinishes.join(','));
   set('rar', f.rarities.join(','));
   p.delete('match');
   set('status', f.status.join(','));
@@ -141,6 +151,7 @@ export const activeFilterCount = (f: Filters) =>
   (f.category !== 'all' ? 1 : 0) +
   (f.sets.length ? 1 : 0) +
   (f.finishes.length ? 1 : 0) +
+  (f.specialFinishes.length ? 1 : 0) +
   (f.rarities.length ? 1 : 0) +
   (f.status.length ? 1 : 0) +
   (f.minBuy != null || f.maxBuy != null ? 1 : 0) +
@@ -183,6 +194,7 @@ export function applyFilters(items: Item[], f: Filters): Item[] {
   const terms = fold(f.q).split(/\s+/).filter(Boolean);
   const sets = new Set(f.sets);
   const fins = new Set(f.finishes);
+  const sfins = new Set(f.specialFinishes);
   const rars = new Set(f.rarities);
   const states = new Set(f.status);
   return items.filter((it) => {
@@ -196,6 +208,7 @@ export function applyFilters(items: Item[], f: Filters): Item[] {
     if (f.category !== 'all' && categoryOf(it) !== f.category) return false;
     if (sets.size && !sets.has(it.set)) return false;
     if (fins.size && !fins.has(it.finish)) return false;
+    if (sfins.size && !sfins.has(detailedFinish(it))) return false;
     if (rars.size && !rars.has(it.rarity)) return false;
     if (states.size && !states.has(itemState(it))) return false;
     const buy = it.buyCash ?? null;

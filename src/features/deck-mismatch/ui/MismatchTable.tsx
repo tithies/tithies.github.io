@@ -2,6 +2,7 @@ import { ActionIcon, Anchor, Badge, Button, Group, HoverCard, Menu, MultiSelect,
 import { useDebouncedCallback, useLocalStorage } from '@mantine/hooks';
 import { IconDownload, IconExternalLink, IconSearch } from '@tabler/icons-react';
 import { DataTable, type DataTableColumn, type DataTableSortStatus } from 'mantine-datatable';
+import { useStickyTableHeader } from '@/lib/ui/useStickyTableHeader';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import type { DeckRow } from '@/lib/decks/types';
@@ -197,8 +198,9 @@ interface Props {
 }
 
 export function MismatchTable({ rows, decks, loading, emptyText }: Props) {
+  const tableRef = useStickyTableHeader();
   const [params, setParams] = useSearchParams();
-  const [pageSize, setPageSize] = useLocalStorage({ key: 'tithies:decks:pageSize', defaultValue: 100 });
+  const [pageSize, setPageSize] = useLocalStorage({ key: 'tithies:decks:pageSize', defaultValue: 50 });
   const filters = useMemo(() => mismatchFiltersFromParams(params), [params]);
   const sort = useMemo(() => mismatchSortFromParams(params), [params]);
   const page = Math.max(1, Number(params.get('page')) || 1);
@@ -280,7 +282,7 @@ export function MismatchTable({ rows, decks, loading, emptyText }: Props) {
         </Menu>
       </Group>
 
-      <Paper withBorder radius="md">
+      <Paper ref={tableRef} withBorder radius="md">
         <DataTable<MismatchRow>
           idAccessor="key"
           records={records}

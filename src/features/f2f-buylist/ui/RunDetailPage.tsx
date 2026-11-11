@@ -3,6 +3,7 @@ import { useLocalStorage } from '@mantine/hooks';
 import { IconAlertTriangle, IconArrowLeft, IconBox, IconBuildingStore, IconCash } from '@tabler/icons-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
+import { useStickyTableHeader } from '@/lib/ui/useStickyTableHeader';
 import { useCallback, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { db } from '@/lib/db';
@@ -12,7 +13,7 @@ import { summarize } from '../summary';
 import { Stat } from '@/lib/ui/Stat';
 import { RunActions } from './RunActions';
 import { ColumnsMenu, useHiddenColumns } from './ColumnsMenu';
-import { buildColumns } from './columns';
+import { buildColumns, reviewRowClass } from './columns';
 import { applyFilters, applySort, filtersFromParams, sortFromParams, writeParams, type Filters, type Sort, type SortKey } from './filtering';
 import { FiltersBar } from './FiltersBar';
 import { dateTime, money, pct, PHASE_LABEL, STATUS_COLOR, STATUS_LABEL } from './format';
@@ -54,9 +55,10 @@ function CashCreditTable({ rows }: { rows: { label: React.ReactNode; cash: strin
 }
 
 export function RunDetailPage() {
+  const tableRef = useStickyTableHeader();
   const runId = Number(useParams().runId);
   const [params, setParams] = useSearchParams();
-  const [pageSize, setPageSize] = useLocalStorage({ key: 'tithies:f2f:pageSize', defaultValue: 100 });
+  const [pageSize, setPageSize] = useLocalStorage({ key: 'tithies:f2f:pageSize', defaultValue: 50 });
 
   // null = not found (undefined means "still loading" for useLiveQuery).
   const run = useLiveQuery(async () => (await db.runs.get(runId)) ?? null, [runId]);
@@ -271,7 +273,7 @@ export function RunDetailPage() {
         </Group>
       </Group>
 
-      <Paper withBorder radius="md">
+      <Paper ref={tableRef} withBorder radius="md">
         <DataTable<Item>
           idAccessor="key"
           records={records}
@@ -281,6 +283,7 @@ export function RunDetailPage() {
           noRecordsText={all.length ? 'No cards match these filters' : 'No cards'}
           striped
           highlightOnHover
+          rowClassName={reviewRowClass}
           verticalSpacing={4}
           horizontalSpacing="xs"
           sortStatus={sortStatus}
