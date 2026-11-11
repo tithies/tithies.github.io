@@ -6,15 +6,15 @@ export const settingsSchema = z.object({
   requestIntervalMs: z.number().int().min(500).max(30_000).default(1500),
   /** Extra random delay added to each request (ms). */
   jitterMs: z.number().int().min(0).max(10_000).default(750),
-  /** Prints looked up per F2F request. */
-  batchSize: z.number().int().min(5).max(100).default(40),
+  /** Prints looked up per F2F request (a request with more than 100 hits is split automatically). */
+  batchSize: z.number().int().min(5).max(100).default(20),
   /** Reuse F2F results younger than this (hours, 0 = never). F2F reprices during the day, so keep it short. */
   cacheTtlHours: z.number().min(0).max(24 * 14).default(1),
   /** Store-credit bonus over cash (0.3 = +30 %). */
   creditBonus: z.number().min(0).max(2).default(0.3),
   /** Set + collector number search for prints the name lookup missed. */
   fallbackEnabled: z.boolean().default(true),
-  /** Max fallback requests per run (each covers up to `batchSize` prints). */
+  /** Max fallback requests per run (each covers up to `batchSize` prints); also the most cards checked on Shopify search (pass 3). */
   fallbackCap: z.number().int().min(0).max(2000).default(200),
   /** Moxfield page size requested when reading the collection (verified: Moxfield accepts up to 5000). */
   moxfieldPageSize: z.number().int().min(25).max(5000).default(1000),

@@ -1,0 +1,286 @@
+{
+ "hits": {
+  "total": {
+   "value": 8,
+   "relation": "eq"
+  },
+  "hits": [
+   {
+    "_id": "gid://shopify/Product/15381412020596",
+    "_source": {
+     "title": "Y'shtola, Night's Blessed — Borderless|Character|Surge Foil — ID 21301",
+     "handle": "yshtola-nights-blessed-borderlesscharactersurge-foil-id-21301",
+     "Card Name": "Y'shtola, Night's Blessed",
+     "General_Card_Name": "Y'shtola, Night's Blessed",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "FINAL FANTASY: Commander",
+     "MTG_Collector_Number": 215,
+     "MTG_Foil_Option": "Surge Foil",
+     "MTG_Rarity": "Mythic Rare",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "price": 1799.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 1,
+       "sku": "SIN-SCAN-21301",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/15381411430772",
+    "_source": {
+     "title": "Y'shtola, Night's Blessed — Borderless|Character|Surge Foil — ID 21302",
+     "handle": "yshtola-nights-blessed-borderlesscharactersurge-foil-id-21302",
+     "Card Name": "Y'shtola, Night's Blessed",
+     "General_Card_Name": "Y'shtola, Night's Blessed",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "FINAL FANTASY: Commander",
+     "MTG_Collector_Number": 215,
+     "MTG_Foil_Option": "Surge Foil",
+     "MTG_Rarity": "Mythic Rare",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "price": 1799.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 1,
+       "sku": "SIN-SCAN-21302",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/15345328423284",
+    "_source": {
+     "title": "Y'shtola, Night's Blessed — Borderless|Character|Surge Foil — ID 20912",
+     "handle": "yshtola-nights-blessed-borderlesscharactersurge-foil-id-20912",
+     "Card Name": "Y'shtola, Night's Blessed",
+     "General_Card_Name": "Y'shtola, Night's Blessed",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "FINAL FANTASY: Commander",
+     "MTG_Collector_Number": 215,
+     "MTG_Foil_Option": "Surge Foil",
+     "MTG_Rarity": "Mythic Rare",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "price": 1799.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 1,
+       "sku": "SIN-SCAN-20912",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14994860736884",
+    "_source": {
+     "title": "Y'shtola, Night's Blessed - Borderless - Character - Surge Foil - Scan 15788",
+     "handle": "yshtola-nights-blessed-borderless-character-surge-foil-scan-15788",
+     "Card Name": "Y'shtola, Night's Blessed",
+     "General_Card_Name": "Y'shtola, Night's Blessed",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "FINAL FANTASY: Commander",
+     "MTG_Collector_Number": 215,
+     "MTG_Foil_Option": "Surge Foil",
+     "MTG_Rarity": "Mythic Rare",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "price": 849.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-SCAN-15788",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14721924202868",
+    "_source": {
+     "title": "Y'shtola, Night's Blessed [226] [FINAL FANTASY: Commander] [Surge Foil]",
+     "handle": "yshtola-nights-blessed-226-final-fantasy-commander-surge-foil",
+     "Card Name": "Y'shtola, Night's Blessed",
+     "General_Card_Name": "Y'shtola, Night's Blessed",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "FINAL FANTASY: Commander",
+     "MTG_Collector_Number": 226,
+     "MTG_Foil_Option": "Surge Foil",
+     "MTG_Rarity": "Mythic Rare",
+     "publishedF2FSell": 1,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "price": 25.99,
+       "sellPrice": 9,
+       "inventoryQuantity": 12,
+       "sku": "SIN-MTG-FIC-226-ENG-NM-SF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "price": 20.79,
+       "sellPrice": 7.2,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FIC-226-ENG-PL-SF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/15463331725684",
+    "_source": {
+     "title": "Y'shtola, Night's Blessed — Borderless|Character|Foil — ID 21604",
+     "handle": "yshtola-nights-blessed-borderlesscharacterfoil-id-21604",
+     "Card Name": "Y'shtola, Night's Blessed",
+     "General_Card_Name": "Y'shtola, Night's Blessed",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "FINAL FANTASY: Commander",
+     "MTG_Collector_Number": 207,
+     "MTG_Foil_Option": "Foil",
+     "MTG_Rarity": "Mythic Rare",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "price": 599.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-SCAN-21604",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14721923547508",
+    "_source": {
+     "title": "Y'shtola, Night's Blessed [215] [Borderless] [Character] [FINAL FANTASY: Commander] [Surge Foil]",
+     "handle": "yshtola-nights-blessed-215-borderless-character-final-fantasy-commander-surge-foil",
+     "Card Name": "Y'shtola, Night's Blessed",
+     "General_Card_Name": "Y'shtola, Night's Blessed",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "FINAL FANTASY: Commander",
+     "MTG_Collector_Number": 215,
+     "MTG_Foil_Option": "Surge Foil",
+     "MTG_Rarity": "Mythic Rare",
+     "publishedF2FSell": 1,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "price": 1799.99,
+       "sellPrice": 1100,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FIC-215-ENG-NM-SF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "price": 1349.99,
+       "sellPrice": 825,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FIC-215-ENG-PL-SF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14721923613044",
+    "_source": {
+     "title": "Y'shtola, Night's Blessed [207] [Borderless] [Character] [FINAL FANTASY: Commander] [Foil]",
+     "handle": "yshtola-nights-blessed-207-borderless-character-final-fantasy-commander-foil",
+     "Card Name": "Y'shtola, Night's Blessed",
+     "General_Card_Name": "Y'shtola, Night's Blessed",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "FINAL FANTASY: Commander",
+     "MTG_Collector_Number": 207,
+     "MTG_Foil_Option": "Foil",
+     "MTG_Rarity": "Mythic Rare",
+     "publishedF2FSell": 1,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "price": 499.99,
+       "sellPrice": 300,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FIC-207-ENG-NM-F",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "price": 374.99,
+       "sellPrice": 225,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FIC-207-ENG-PL-F",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

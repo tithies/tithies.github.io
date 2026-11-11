@@ -1,20 +1,44 @@
-import { buildSearchUrl, F2F_COLLECTIONS } from '@/lib/f2f/api';
+import { buildSearchUrl, F2F_COLLECTIONS, F2F_MAX_PAGE_SIZE, type F2FDoc } from '@/lib/f2f/api';
 import { describeError, F2FClient } from '@/lib/f2f/client';
 import { db } from '@/lib/db';
 import { groupPrints, type MoxEntry } from '@/lib/moxfield/normalize';
 import { getSettings, type Settings } from '@/lib/settings';
-import { batchPageUrl, f2fSetLookup, makeBatches, makeSetBatches, type Batch } from './batching';
-import { DEFAULT_BULK_RATES, parseBulkRates } from './bulk';
-import { evaluate, matchByNumber, matchPrint, type MatchResult } from './matcher';
+import { batchPageUrl, buildBatch, f2fSetLookup, makeBatches, makeSetBatches, nameFacets, setFacets, type Batch } from './batching';
+import { productJsUrl, SUGGEST_LIMIT, suggestUrl, withProductVariants } from '@/lib/f2f/shopify';
+import { DEFAULT_BULK_RATES, isOversized, parseBulkRates } from './bulk';
+import { evaluate, matchByNumber, matchPrint, matchShopify, PRICE_CHECK_NOTE, type MatchResult } from './matcher';
 import { summarize } from './summary';
 import { emptyTotals, type BulkRates, type CacheEntry, type Item, type Run, type RunProgress, type RunSource } from './types';
 
 const BULK_RATES_TTL = 24 * 3600_000;
 const SET_LIST_TTL = 24 * 3600_000;
 /** Bump when matching logic changes so older cached lookups are redone. */
-export const CACHE_VERSION = 2;
+export const CACHE_VERSION = 3;
 const MAX_CONSECUTIVE_FAILURES = 3;
-const MAX_PAGES_PER_BATCH = 5;
+/** Hits per request aimed for when an oversized batch is split (one F2F page holds 100). */
+const SPLIT_TARGET_HITS = 60;
+/** Pages read for a single print that alone has more than one page of hits (rare). */
+const MAX_PAGES_SINGLE_PRINT = 10;
+
+/**
+ * Result for a print no search found. Oversized cards (schemes, planes…) are "unlisted": F2F
+ * never lists them, so there is nothing to review. Anything else is "not found".
+ */
+export const missResult = (item: Pick<Item, 'typeLine'>, note?: string): MatchResult =>
+  isOversized(item.typeLine) ? { match: 'unlisted', doc: null, note: "F2F doesn't list oversized cards" } : { match: 'not_found', doc: null, note };
+
+/** Splits `items` into `parts` runs of near-equal length, keeping their order. */
+export function splitEvenly<T>(items: T[], parts: number): T[][] {
+  const n = Math.max(1, Math.min(parts, items.length));
+  return Array.from({ length: n }, (_, i) => items.slice(Math.floor((i * items.length) / n), Math.floor(((i + 1) * items.length) / n)));
+}
+
+/**
+ * Parts to split an oversized batch into. Hits grow about with prints² (every name is crossed
+ * with every number), so k parts hold roughly total / k² hits each.
+ */
+export const splitParts = (prints: number, total: number) =>
+  Math.min(prints, Math.max(2, Math.ceil(Math.sqrt(total / SPLIT_TARGET_HITS))));
 
 // ---------------------------------------------------------------------------------------------
 // Run creation
@@ -178,7 +202,7 @@ export class Runner {
     // Pass 1: batched exact lookups.
     const pending = await db.items.where('[runId+status]').equals([runId, 'pending']).toArray();
     const byKey = new Map(pending.map((i) => [i.key, i]));
-    const batches = makeBatches(pending, { maxPrints: settings.batchSize, maxUrlLength: 6000, pageSize: 500 });
+    const batches = makeBatches(pending, { maxPrints: settings.batchSize, maxUrlLength: 6000, pageSize: F2F_MAX_PAGE_SIZE });
     for (const batch of batches) {
       run = await this.assertRunning(runId);
       await this.runBatch(run, batch, byKey, rates, settings);
@@ -187,6 +211,11 @@ export class Runner {
     // Pass 2: keyword fallback for prints the batch lookup missed.
     await db.runs.update(runId, { phase: 'fallback' });
     await this.runFallback(runId, rates, settings);
+
+    // Pass 3: Shopify's own product search for prints F2F's search index doesn't have.
+    run = await this.assertRunning(runId);
+    await db.runs.update(runId, { phase: 'shop_search' });
+    await this.runShopSearch(runId, rates, settings);
 
     run = await this.assertRunning(runId);
     await db.runs.update(runId, { status: 'completed', phase: 'done', finishedAt: Date.now(), error: undefined, updatedAt: Date.now() });
@@ -253,7 +282,7 @@ export class Runner {
     pending.forEach((item, idx) => {
       const c = cached[idx];
       // Misses are never reused: they are cheap to retry and matching keeps improving.
-      if (c && c.fetchedAt >= minTime && c.v === CACHE_VERSION && c.match !== 'not_found') {
+      if (c && c.fetchedAt >= minTime && c.v === CACHE_VERSION && c.match !== 'not_found' && c.match !== 'unlisted') {
         updates.push(this.finalize(item, { match: c.match, doc: c.doc, note: c.matchNote }, rates, run.creditBonus, true));
       }
     });
@@ -262,7 +291,8 @@ export class Runner {
 
   private async fail(run: Run, items: Item[], error: unknown) {
     const message = describeError(error);
-    const failures = run.consecutiveFailures + 1;
+    // Re-read: parts of the same batch may have committed (and reset the counter) since `run` was loaded.
+    const failures = ((await db.runs.get(run.id!))?.consecutiveFailures ?? run.consecutiveFailures) + 1;
     await db.transaction('rw', db.items, db.runs, async () => {
       await db.items.bulkPut(items.map((i) => ({ ...i, status: 'error' as const, error: message, updatedAt: Date.now() })));
       await db.runs.update(run.id!, { consecutiveFailures: failures, requests: this.client.requests, updatedAt: Date.now() });
@@ -279,37 +309,82 @@ export class Runner {
     await this.emit(run.id!, message);
   }
 
-  private async fetchBatch(batch: Batch) {
-    const docs = [];
-    for (let page = 1; page <= MAX_PAGES_PER_BATCH; page++) {
-      const res = await this.client.search(page === 1 ? batch.url : batchPageUrl(batch.facets, 500, page));
-      docs.push(...res.docs);
-      if (docs.length >= res.total || !res.docs.length) break;
+  /**
+   * Looks up `items` so that every request fits in one F2F page. F2F caps pages at 100 hits and
+   * orders ties differently from one request to the next, so paging can skip docs. A batch with
+   * more hits is split and each part looked up again. Only a single print that still has more
+   * than a page of hits is paged (deduplicated, best effort). `onPart` gets each settled part.
+   */
+  private async lookup(runId: number, items: Item[], build: (items: Item[]) => Batch, onPart: (items: Item[], docs: F2FDoc[]) => Promise<void>): Promise<void> {
+    const batch = build(items);
+    const first = await this.client.search(batch.url);
+    if (first.docs.length >= first.total || !first.docs.length) return onPart(items, first.docs);
+    if (items.length === 1) {
+      const docs = new Map(first.docs.map((d) => [d.id, d]));
+      const pages = Math.min(MAX_PAGES_SINGLE_PRINT, Math.ceil(first.total / F2F_MAX_PAGE_SIZE));
+      for (let page = 2; page <= pages; page++) {
+        await this.assertRunning(runId);
+        const res = await this.client.search(batchPageUrl(batch.facets, F2F_MAX_PAGE_SIZE, page));
+        res.docs.forEach((d) => docs.set(d.id, d));
+        if (!res.docs.length) break;
+      }
+      return onPart(items, [...docs.values()]);
     }
-    return docs;
+    for (const part of splitEvenly(items, splitParts(items.length, first.total))) {
+      await this.assertRunning(runId);
+      await this.lookup(runId, part, build, onPart);
+    }
+  }
+
+  /** Runs `lookup` for one batch, committing each settled part; parts that fail become retryable errors. */
+  private async lookupBatch(
+    run: Run,
+    items: Item[],
+    build: (items: Item[]) => Batch,
+    settle: (items: Item[], docs: F2FDoc[]) => { updates: Item[]; cache: CacheEntry[] },
+  ) {
+    const settled = new Set<string>();
+    try {
+      await this.lookup(run.id!, items, build, async (part, docs) => {
+        const { updates, cache } = settle(part, docs);
+        await this.commit(run, updates, cache);
+        part.forEach((i) => settled.add(i.key));
+      });
+    } catch (e) {
+      if (e instanceof StopRun) throw e;
+      await this.fail(run, items.filter((i) => !settled.has(i.key)), e);
+    }
   }
 
   private async runBatch(run: Run, batch: Batch, byKey: Map<string, Item>, rates: BulkRates, settings: Settings) {
     const items = batch.keys.map((k) => byKey.get(k)!).filter(Boolean);
-    let docs;
-    try {
-      docs = await this.fetchBatch(batch);
-    } catch (e) {
-      await this.fail(run, items, e);
-      return;
-    }
-    const updates: Item[] = [];
-    const cache: CacheEntry[] = [];
-    for (const item of items) {
-      const result = matchPrint(item, docs);
-      if (result.match === 'not_found' && settings.fallbackEnabled) {
-        updates.push({ ...item, status: 'fallback', updatedAt: Date.now() });
-      } else {
-        updates.push(this.finalize(item, result, rates, run.creditBonus));
-        cache.push(this.cacheRow(item, result));
+    await this.lookupBatch(run, items, (part) => buildBatch(part, nameFacets), (part, docs) => {
+      const updates: Item[] = [];
+      const cache: CacheEntry[] = [];
+      for (const item of part) {
+        const found = matchPrint(item, docs);
+        if (found.match === 'not_found' && settings.fallbackEnabled) {
+          updates.push({ ...item, status: 'fallback', updatedAt: Date.now() });
+        } else {
+          const result = found.match === 'not_found' ? missResult(item, found.note) : found;
+          updates.push(this.finalize(item, result, rates, run.creditBonus));
+          cache.push(this.cacheRow(item, result));
+        }
       }
-    }
-    await this.commit(run, updates, cache);
+      return { updates, cache };
+    });
+  }
+
+  /** Moxfield set code → F2F set name, learned from this run's matched cards (F2F SKUs carry the code). */
+  private async learnedSetNames(runId: number): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    await db.items
+      .where('runId')
+      .equals(runId)
+      .each((i) => {
+        if (i.doc?.setName && i.doc.skuSet === i.set && !out.has(i.set)) out.set(i.set, i.doc.setName);
+      });
+    return out;
   }
 
   private async commit(run: Run, updates: Item[], cache: CacheEntry[]) {
@@ -329,8 +404,10 @@ export class Runner {
     const waiting = await db.items.where('[runId+status]').equals([runId, 'fallback']).toArray();
     if (!waiting.length) return;
     let run = await this.assertRunning(runId);
-    const notFound = (items: Item[], note: string) =>
-      items.map((i) => this.finalize(i, { match: 'not_found', doc: null, note }, rates, run.creditBonus));
+    const notFound = (items: Item[], note: string) => items.map((i) => this.finalize(i, missResult(i, note), rates, run.creditBonus));
+    // Misses wait for pass 3 (Shopify product search), keeping why F2F's index didn't have them.
+    const toShopSearch = (items: Item[], note: string): Item[] =>
+      items.map((i) => ({ ...i, status: 'shop_search', matchNote: note, updatedAt: Date.now() }));
 
     let f2fSets: string[];
     try {
@@ -340,31 +417,87 @@ export class Runner {
       await this.fail(run, waiting, e);
       return;
     }
-    const setOf = f2fSetLookup(f2fSets);
+    const setOf = f2fSetLookup(f2fSets, await this.learnedSetNames(runId));
     const byKey = new Map(waiting.map((i) => [i.key, i]));
-    const { batches, unknownSet } = makeSetBatches(waiting, setOf, { maxPrints: settings.batchSize, maxUrlLength: 6000, pageSize: 500 });
-    if (unknownSet.length) await this.commit(run, notFound(unknownSet.map((k) => byKey.get(k)!), "F2F doesn't carry this set"), []);
+    const { batches, unknownSet } = makeSetBatches(waiting, setOf, { maxPrints: settings.batchSize, maxUrlLength: 6000, pageSize: F2F_MAX_PAGE_SIZE });
+    if (unknownSet.length) await this.commit(run, toShopSearch(unknownSet.map((k) => byKey.get(k)!), "F2F doesn't carry this set"), []);
 
     const overCap = batches.slice(settings.fallbackCap).flatMap((b) => b.keys.map((k) => byKey.get(k)!));
     if (overCap.length) await this.commit(run, notFound(overCap, 'Fallback search limit reached (see Settings)'), []);
 
+    const byNumber = setFacets(setOf);
     for (const batch of batches.slice(0, settings.fallbackCap)) {
       run = await this.assertRunning(runId);
-      const items = batch.keys.map((k) => byKey.get(k)!);
-      let docs;
-      try {
-        docs = await this.fetchBatch(batch);
-      } catch (e) {
-        await this.fail(run, items, e);
-        continue;
-      }
-      const results = items.map((i) => [i, matchByNumber(i, docs)] as const);
-      await this.commit(
-        run,
-        results.map(([i, r]) => this.finalize(i, r.match === 'not_found' ? { ...r, note: 'Not listed on F2F' } : r, rates, run.creditBonus)),
-        results.map(([i, r]) => this.cacheRow(i, r)),
-      );
+      const current = run;
+      await this.lookupBatch(current, batch.keys.map((k) => byKey.get(k)!), (part) => buildBatch(part, byNumber), (part, docs) => {
+        const results = part.map((i) => [i, matchByNumber(i, docs)] as const);
+        const found = results.filter(([, r]) => r.match !== 'not_found');
+        const missed = results.filter(([, r]) => r.match === 'not_found').map(([i]) => i);
+        return {
+          updates: [...found.map(([i, r]) => this.finalize(i, r, rates, current.creditBonus)), ...toShopSearch(missed, 'Not listed on F2F')],
+          cache: found.map(([i, r]) => this.cacheRow(i, r)),
+        };
+      });
     }
+  }
+
+  /**
+   * Pass 3 for prints neither search found. F2F's search index misses some live products (blocks
+   * of them, e.g. Magic 2015 #3 Avacyn), so ask Shopify's own product search. A print found there
+   * is on F2F, but its buy price only shows on the sell-mode product page: it's marked
+   * "price_check" (check by hand) and valued at the bulk rate meanwhile.
+   */
+  private async runShopSearch(runId: number, rates: BulkRates, settings: Settings) {
+    const waiting = await db.items.where('[runId+status]').equals([runId, 'shop_search']).toArray();
+    if (!waiting.length) return;
+    let run = await this.assertRunning(runId);
+    const notFound = (i: Item, note = i.matchNote) => this.finalize(i, missResult(i, note), rates, run.creditBonus);
+
+    // F2F doesn't list oversized Archenemy schemes / Planechase planes at all.
+    const oversized = waiting.filter((i) => isOversized(i.typeLine));
+    const candidates = waiting.filter((i) => !isOversized(i.typeLine));
+    const overCap = candidates.slice(settings.fallbackCap);
+    if (oversized.length || overCap.length) {
+      const limit = (i: Item) => notFound(i, `${i.matchNote ?? 'Not listed on F2F'} (search limit reached, see Settings)`);
+      await this.commit(run, [...oversized.map((i) => notFound(i)), ...overCap.map(limit)], []);
+    }
+
+    // F2F's own set names help when Scryfall's differ ("Midnight Hunt Commander"); optional here.
+    const f2fSets = await this.getF2fSets().catch(() => [] as string[]);
+    const setOf = f2fSetLookup(f2fSets, await this.learnedSetNames(runId));
+    for (const item of candidates.slice(0, settings.fallbackCap)) {
+      run = await this.assertRunning(runId);
+      try {
+        const doc = await this.findOnShopify(runId, item, setOf(item));
+        const result: MatchResult = doc ? { match: 'price_check', doc, note: PRICE_CHECK_NOTE } : missResult(item, item.matchNote);
+        await this.commit(run, [this.finalize(item, result, rates, run.creditBonus)], doc ? [this.cacheRow(item, result)] : []);
+      } catch (e) {
+        if (e instanceof StopRun) throw e;
+        await this.fail(run, [item], e);
+      }
+    }
+  }
+
+  /**
+   * The exact print on Shopify: search its name (then name + set when the results are full, as
+   * for cards with many prints), then read the product JSON for conditions and retail prices.
+   */
+  private async findOnShopify(runId: number, item: Item, f2fSetName?: string): Promise<F2FDoc | null> {
+    for (const q of [item.frontName, `${item.frontName} ${f2fSetName ?? item.setName}`]) {
+      await this.assertRunning(runId);
+      const { total, docs } = await this.client.suggest(suggestUrl(q));
+      const hit = matchShopify(item, docs, f2fSetName);
+      if (hit) {
+        await this.assertRunning(runId);
+        const product = await this.client.product(productJsUrl(hit.handle));
+        if (!product) return null;
+        const doc = withProductVariants(hit, product);
+        // The SKU can reveal a non-English print the title didn't.
+        return !doc.language || doc.language.toLowerCase() === 'english' ? doc : null;
+      }
+      if (total < SUGGEST_LIMIT) return null;
+    }
+    return null;
   }
 }
 

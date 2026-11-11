@@ -1,13 +1,19 @@
 import type { F2FDoc } from '@/lib/f2f/api';
+import { isOversized } from './bulk';
 import type { MoxFinish } from '@/lib/moxfield/normalize';
 
 export type RunStatus = 'fetching_collection' | 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
-export type RunPhase = 'bulk_rates' | 'lookup' | 'fallback' | 'done';
+export type RunPhase = 'bulk_rates' | 'lookup' | 'fallback' | 'shop_search' | 'done';
 
-export type Category = 'buylist' | 'bulk';
-export type MatchStatus = 'exact' | 'loose' | 'not_found';
-/** pending → (pass 1) → fallback? → done | error */
-export type ItemStatus = 'pending' | 'fallback' | 'done' | 'error';
+/** What F2F pays: its buylist price, the wholesale bulk rate, or nothing (tokens, Unfinity, oversized cards…). */
+export type Category = 'buylist' | 'bulk' | 'not_bought';
+/**
+ * price_check: the exact print is on F2F but missing from its search index, so its buy price is unknown.
+ * unlisted: not found, and F2F never lists this kind of card (oversized schemes, planes…): nothing to review.
+ */
+export type MatchStatus = 'exact' | 'loose' | 'price_check' | 'unlisted' | 'not_found';
+/** pending → (pass 1) → fallback? → shop_search? (Shopify product search) → done | error */
+export type ItemStatus = 'pending' | 'fallback' | 'shop_search' | 'done' | 'error';
 
 export interface BulkRates {
   /** Per-card CAD rates. */
@@ -38,7 +44,11 @@ export interface RunTotals {
   bulkPrints: number;
   bulkCopies: number;
   notFound: number;
+  /** Oversized cards F2F never lists (not counted in notFound). */
+  unlisted: number;
   loose: number;
+  /** Prints on F2F whose buy price must be checked by hand (missing from F2F's search). */
+  priceCheck: number;
   buylistCash: number;
   buylistCredit: number;
   bulkCash: number;
@@ -148,6 +158,14 @@ export interface RunProgress {
   message?: string;
 }
 
+/** A row's category. Rows saved before 'not_bought' existed say 'bulk' with a $0 value. */
+export const categoryOf = (it: Pick<Item, 'category' | 'buyCash'>): Category | undefined =>
+  it.category === 'bulk' && !((it.buyCash ?? 0) > 0) ? 'not_bought' : it.category;
+
+/** A row's match. Rows saved before 'unlisted' existed say 'not_found' for oversized cards too. */
+export const matchOf = (it: Pick<Item, 'match' | 'typeLine'>): MatchStatus | undefined =>
+  it.match === 'not_found' && isOversized(it.typeLine ?? '') ? 'unlisted' : it.match;
+
 export const emptyTotals = (): RunTotals => ({
   entries: 0,
   prints: 0,
@@ -159,7 +177,9 @@ export const emptyTotals = (): RunTotals => ({
   bulkPrints: 0,
   bulkCopies: 0,
   notFound: 0,
+  unlisted: 0,
   loose: 0,
+  priceCheck: 0,
   buylistCash: 0,
   buylistCredit: 0,
   bulkCash: 0,

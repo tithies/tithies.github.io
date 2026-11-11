@@ -1,4 +1,4 @@
-import { nmVariant, type F2FDoc } from '@/lib/f2f/api';
+import { isScanListing, nmVariant, type F2FDoc } from '@/lib/f2f/api';
 import type { MoxFinish } from '@/lib/moxfield/normalize';
 import { bulkValue } from './bulk';
 import type { BulkRates, Category, Item, MatchStatus } from './types';
@@ -63,15 +63,32 @@ const nameMatches = (d: F2FDoc, p: PrintRef) => {
 const setMatches = (d: F2FDoc, p: PrintRef) =>
   (d.skuSet != null && d.skuSet === p.set.toLowerCase()) || (Boolean(d.setName) && normSet(d.setName) === normSet(p.setName));
 
-/** Picks the doc with the right finish. Foil prints may be listed under a special foil name (Surge, Galaxy…). */
+/** Regular listing first, then on the buylist, then with a buy price; one-off scanned copies last. */
+const docRank = (d: F2FDoc) => (isScanListing(d) ? 0 : 4) + (d.publishedF2FSell ? 2 : 0) + ((nmVariant(d)?.buy ?? 0) > 0 ? 1 : 0);
+/** Best candidates first (stable, so F2F's order breaks ties). */
+const byRank = (docs: F2FDoc[]) => [...docs].sort((a, b) => docRank(b) - docRank(a));
+
+const SCAN_NOTE = 'F2F only lists individually scanned copies of this print (not on the buylist)';
+const withScanNote = (doc: F2FDoc, note?: string) => ({
+  doc,
+  note: isScanListing(doc) ? (note ? `${note}; ${SCAN_NOTE}` : SCAN_NOTE) : note,
+});
+
+/**
+ * Picks the doc with the right finish. Foil prints may be listed under a special foil name
+ * (Surge, Galaxy…). F2F can list dozens of scanned single copies next to the regular product,
+ * so candidates are ranked rather than taken in F2F's order.
+ */
 function pickFinish(docs: F2FDoc[], finish: MoxFinish): { doc: F2FDoc; note?: string } | null {
-  const target = F2F_FINISH[finish];
-  const exact = docs.find((d) => d.finish.toLowerCase() === target.toLowerCase());
-  if (exact) return { doc: exact };
+  const ranked = byRank(docs);
+  const target = F2F_FINISH[finish].toLowerCase();
+  const exact = ranked.find((d) => d.finish.toLowerCase() === target);
+  if (exact) return withScanNote(exact);
   if (finish === 'foil') {
-    const others = docs.filter((d) => /foil/i.test(d.finish) && !/^non-?foil$/i.test(d.finish) && !/etched/i.test(d.finish));
-    if (others.length >= 1) {
-      return { doc: others[0], note: `F2F lists this foil as "${others[0].finish}"${others.length > 1 ? ' (several foil types)' : ''}` };
+    const others = ranked.filter((d) => /foil/i.test(d.finish) && !/^non-?foil$/i.test(d.finish) && !/etched/i.test(d.finish));
+    if (others.length) {
+      const kinds = new Set(others.map((d) => d.finish.toLowerCase()));
+      return withScanNote(others[0], `F2F lists this foil as "${others[0].finish}"${kinds.size > 1 ? ' (several foil types)' : ''}`);
     }
   }
   return null;
@@ -90,8 +107,11 @@ export function matchPrint(p: PrintRef, docs: F2FDoc[]): MatchResult {
 
   const otherCn = pool.filter((d) => normCn(d.cn) !== normCn(p.cn));
   const byFinish = otherCn.filter((d) => d.finish.toLowerCase() === F2F_FINISH[p.finish].toLowerCase());
-  if (byFinish.length === 1) {
-    return { match: 'loose', doc: byFinish[0], note: `Collector number differs on F2F (#${byFinish[0].cn})` };
+  // Scanned copies of the same product don't make it ambiguous.
+  const regular = byFinish.filter((d) => !isScanListing(d));
+  const candidates = regular.length ? regular : byFinish;
+  if (candidates.length === 1) {
+    return { match: 'loose', ...withScanNote(candidates[0], `Collector number differs on F2F (#${candidates[0].cn})`) };
   }
   return { match: 'not_found', doc: null };
 }
@@ -107,6 +127,23 @@ export function matchByNumber(p: PrintRef, docs: F2FDoc[]): MatchResult {
   if (!picked) return { match: 'not_found', doc: null };
   if (nameMatches(picked.doc, p)) return { match: 'exact', doc: picked.doc, note: picked.note };
   return { match: 'loose', doc: picked.doc, note: `Found by set and number; F2F calls it "${picked.doc.name}"` };
+}
+
+export const PRICE_CHECK_NOTE =
+  "On F2F, but missing from F2F's search, so Tithies can't read its buy price. Check it on the card's F2F sell page.";
+
+/**
+ * Pass 3 matcher for docs from Shopify's product search (titles only, no variants yet). The
+ * search is fuzzy, so only the exact print counts: same name, set, collector number and finish.
+ * `f2fSetName` is F2F's own name for the print's set when known ("Duskmourn: House of Horror: Commander").
+ */
+export function matchShopify(p: PrintRef, docs: F2FDoc[], f2fSetName?: string): F2FDoc | null {
+  for (const setName of new Set([p.setName, f2fSetName])) {
+    if (!setName) continue;
+    const r = matchByNumber({ ...p, setName }, docs);
+    if (r.match === 'exact' && r.doc) return r.doc;
+  }
+  return null;
 }
 
 export interface Evaluation {
@@ -141,10 +178,13 @@ export function evaluate(
     category = 'buylist';
     buyCash = nm!.buy!;
   } else {
-    category = 'bulk';
     const b = bulkValue({ ...item, doc: result.doc }, rates);
+    category = b.value > 0 ? 'bulk' : 'not_bought';
     buyCash = b.value;
-    bulkReason = result.doc ? b.reason : `Not on F2F's buylist — ${b.reason.charAt(0).toLowerCase()}${b.reason.slice(1)}`;
+    const reason = `${b.reason.charAt(0).toLowerCase()}${b.reason.slice(1)}`;
+    if (!result.doc) bulkReason = `Not on F2F's buylist — ${reason}`;
+    else if (result.doc.source === 'shopify') bulkReason = `Buy price unknown (check it on F2F) — ${reason}`;
+    else bulkReason = b.reason;
   }
   const buyCredit = round4(buyCash * (1 + creditBonus));
   return {
@@ -152,8 +192,9 @@ export function evaluate(
     retail,
     buyCash: round4(buyCash),
     buyCredit,
-    pctCash: retail ? round2((buyCash / retail) * 100) : null,
-    pctCredit: retail ? round2((buyCredit / retail) * 100) : null,
+    // A buy ÷ sell ratio means nothing for cards F2F doesn't buy at all.
+    pctCash: retail && category !== 'not_bought' ? round2((buyCash / retail) * 100) : null,
+    pctCredit: retail && category !== 'not_bought' ? round2((buyCredit / retail) * 100) : null,
     stock,
     bulkReason,
   };

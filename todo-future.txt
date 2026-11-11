@@ -19,11 +19,7 @@ in collection mismatches, there is "likely wrong print only", what does it mean 
 
 in runs page, for items with a message under the card name, maybe have a filter to show them only.
 
-in runs page, "Y'shtola, Night's Blessed" surge foil seems to have a problem. I can see f2f buying it for 1100$. https://facetofacegames.com/products/yshtola-nights-blessed-215-borderless-character-final-fantasy-commander-surge-foil
-
 Maybe add a filter for the foil variations like "surge foil" or "ripple foil". Its data could be calculated from the list.
-
-Some cards like "Ancient Stone Idol" or "Birthing Ritual" is being sold AND bought by f2f, but in Runs page, it doesn say "exact print not found on f2f"
 
 Make the dashboard darker in dark mode.
 

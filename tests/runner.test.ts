@@ -1,9 +1,12 @@
 import { vi } from 'vitest';
+import type { F2FDoc } from '@/lib/f2f/api';
 import { F2FClient } from '@/lib/f2f/client';
 import { db } from '@/lib/db';
 import { normalizeEntry, type MoxEntry } from '@/lib/moxfield/normalize';
 import { saveSettings } from '@/lib/settings';
 import { clearCaches, controlRun, createRun, Runner } from '@/features/f2f-buylist/runner';
+import { PRICE_CHECK_NOTE } from '@/features/f2f-buylist/matcher';
+import { parseSuggest, productJsUrl, type ProductJs, type SuggestResponse } from '@/lib/f2f/shopify';
 import { docs, fixture } from './helpers';
 
 const bulkDocs = docs('f2f-bulk.json');
@@ -48,6 +51,8 @@ async function waitFor(pred: () => Promise<boolean>, ms = 5000) {
 
 describe('Runner', () => {
   let urls: string[];
+  /** Shopify predictive-search and product JSON requests (pass 3). */
+  let shopUrls: string[];
   beforeEach(async () => {
     await Promise.all([db.runs.clear(), db.items.clear(), db.f2fCache.clear(), db.meta.clear()]);
     await saveSettings({ requestIntervalMs: 500, jitterMs: 0, batchSize: 5, fallbackEnabled: true, cacheTtlHours: 6 });
@@ -65,6 +70,16 @@ describe('Runner', () => {
     vi.spyOn(F2FClient.prototype, 'facetValues').mockImplementation(async (url: string) => {
       urls.push(url);
       return f2fSets;
+    });
+    // Shopify knows none of the cards unless a test says otherwise.
+    shopUrls = [];
+    vi.spyOn(F2FClient.prototype, 'suggest').mockImplementation(async (url: string) => {
+      shopUrls.push(url);
+      return { total: 0, docs: [] };
+    });
+    vi.spyOn(F2FClient.prototype, 'product').mockImplementation(async (url: string) => {
+      shopUrls.push(url);
+      return null;
     });
   });
   // One runner per test, like the single instance in the background worker.
@@ -184,6 +199,100 @@ describe('Runner', () => {
     expect(await db.meta.count()).toBe(0);
     expect(await db.runs.get(runId)).toBeDefined();
     expect(await db.items.where('runId').equals(runId).count()).toBe(ENTRIES.length);
+  });
+
+  it('splits batches with more hits than one F2F page instead of paging through them', async () => {
+    await saveSettings({ batchSize: 20 });
+    const facet = (url: string, name: string) => {
+      const m = url.match(new RegExp(`/${encodeURIComponent(name)}/([^/]+)`));
+      return m ? decodeURIComponent(decodeURIComponent(m[1])).split('$^') : [];
+    };
+    const doc = (name: string, setName: string, code: string, cn: string): F2FDoc => ({
+      id: `${code}-${name}-${cn}`,
+      handle: `${code}-${cn}`,
+      title: name,
+      name,
+      names: [name],
+      setName,
+      skuSet: code,
+      cn,
+      finish: 'Non-Foil',
+      rarity: 'Rare',
+      language: 'English',
+      publishedF2FSell: true,
+      image: null,
+      variants: [{ condition: 'NM', retail: 2, buy: 1, stock: 1, sku: `SIN-MTG-${code.toUpperCase()}-${cn}-ENG-NM-NF` }],
+    });
+    const served: { total: number; prints: number }[] = [];
+    // Like F2F: every name × number exists in some reprint set (hits ≈ prints²), the wanted
+    // prints sort last, and a page never holds more than 100 hits.
+    vi.spyOn(F2FClient.prototype, 'search').mockImplementation(async (url: string) => {
+      if (url.includes('/collections/616828141940/')) return { total: bulkDocs.length, docs: bulkDocs };
+      const names = facet(url, 'Card Name');
+      const numbers = facet(url, 'Collector Number');
+      const noise = names.flatMap((n) => numbers.map((cn) => doc(n, 'Reprint Set', 'rpr', cn)));
+      const wanted = names.map((n) => doc(n, 'Big Set', 'big', n.split(' ')[1])).filter((d) => numbers.includes(d.cn));
+      const all = [...noise, ...wanted];
+      const page = Number(url.match(/\/page\/(\d+)\//)![1]);
+      served.push({ total: all.length, prints: names.length });
+      return { total: all.length, docs: all.slice((page - 1) * 100, page * 100) };
+    });
+    const entries = Array.from({ length: 20 }, (_, i) => entry(`Card ${i + 1}`, 'big', 'Big Set', String(i + 1), 'nonFoil'));
+    const { runId } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, entries, 0.3);
+    startRunner();
+    await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
+
+    const items = await db.items.where('runId').equals(runId).toArray();
+    expect(items.map((i) => i.match)).toEqual(Array(20).fill('exact'));
+    expect(items.every((i) => i.doc?.setName === 'Big Set' && i.category === 'buylist')).toBe(true);
+    // 420 hits for 20 prints → split into parts that each fit in one page; nothing is paged.
+    expect(served[0]).toEqual({ total: 420, prints: 20 });
+    expect(served.slice(1).every((s) => s.total <= 100)).toBe(true);
+    expect(served.slice(1).reduce((n, s) => n + s.prints, 0)).toBe(20);
+    expect(urls.some((u) => /\/page\/[2-9]\//.test(u))).toBe(false);
+  });
+
+  it("finds prints missing from F2F's search on Shopify and flags them for a manual price check", async () => {
+    const avacynResults = parseSuggest(fixture<SuggestResponse>('shopify-suggest-avacyn.json'));
+    vi.spyOn(F2FClient.prototype, 'suggest').mockImplementation(async (url: string) => {
+      shopUrls.push(url);
+      return url.includes('Avacyn') ? avacynResults : { total: 3, docs: [] };
+    });
+    vi.spyOn(F2FClient.prototype, 'product').mockImplementation(async (url: string) => {
+      shopUrls.push(url);
+      return fixture<ProductJs>('shopify-product-avacyn.json');
+    });
+    const scheme = entry('Chaos Is My Plaything', 'dsc', 'Duskmourn: House of Horror Commander', '329', 'nonFoil');
+    scheme.card = { ...scheme.card, typeLine: 'Scheme' };
+    const entries = [entry('Avacyn, Guardian Angel', 'm15', 'Magic 2015', '3', 'nonFoil'), entry('Not A Real Card', 'zzz', 'Nowhere', '999', 'nonFoil', 'mythic'), scheme];
+    const { runId } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, entries, 0.3);
+    startRunner();
+    await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
+
+    const avacyn = await db.items.get([runId, 'm15|3|nonFoil']);
+    expect(avacyn).toMatchObject({ status: 'done', match: 'price_check', matchNote: PRICE_CHECK_NOTE, category: 'bulk', buyCash: 0.07, retail: 2.49, stock: null });
+    expect(avacyn?.doc).toMatchObject({ handle: 'avacyn-guardian-angel-3-magic-2015-non-foil', source: 'shopify', skuSet: 'm15' });
+    expect(await db.items.get([runId, 'zzz|999|nonFoil'])).toMatchObject({ status: 'done', match: 'not_found', matchNote: "F2F doesn't carry this set" });
+    // F2F never lists oversized schemes: "unlisted", not bought, and not something to review.
+    expect(await db.items.get([runId, 'dsc|329|nonFoil'])).toMatchObject({ status: 'done', match: 'unlisted', category: 'not_bought', buyCash: 0 });
+    // Avacyn: name search + product JSON. The made-up card: one search (results not full). The scheme: none.
+    expect(shopUrls.filter((u) => u.includes('/search/suggest.json')).length).toBe(2);
+    expect(shopUrls.filter((u) => u.endsWith('.js'))).toEqual([productJsUrl('avacyn-guardian-angel-3-magic-2015-non-foil')]);
+    expect(shopUrls.some((u) => u.includes('Chaos'))).toBe(false);
+    expect((await db.runs.get(runId))!.totals).toMatchObject({ priceCheck: 1, unlisted: 1, notFound: 1 });
+    expect((await db.f2fCache.get('m15|3|nonFoil'))?.match).toBe('price_check');
+  });
+
+  it('searches Shopify again with the set name when the name alone fills the results', async () => {
+    vi.spyOn(F2FClient.prototype, 'suggest').mockImplementation(async (url: string) => {
+      shopUrls.push(url);
+      return { total: 10, docs: [] };
+    });
+    const { runId } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, [entry('Not A Real Card', 'zzz', 'Nowhere', '999', 'nonFoil')], 0.3);
+    startRunner();
+    await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
+    expect(shopUrls.map((u) => decodeURIComponent(new URL(u).searchParams.get('q') ?? ''))).toEqual(['Not A Real Card', 'Not A Real Card Nowhere']);
+    expect((await db.items.get([runId, 'zzz|999|nonFoil']))?.match).toBe('not_found');
   });
 
   it('pauses after three failures in a row and can retry errors', async () => {

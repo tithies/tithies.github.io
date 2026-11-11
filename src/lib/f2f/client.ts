@@ -1,6 +1,7 @@
 import ky, { HTTPError } from 'ky';
 import PQueue from 'p-queue';
 import { parseFacetValues, parseSearch, type F2FDoc, type SearchResponse } from './api';
+import { parseSuggest, type ProductJs, type SuggestResponse } from './shopify';
 
 export interface ThrottleOptions {
   intervalMs: number;
@@ -50,16 +51,16 @@ export class F2FClient {
   });
 
   /** GET one URL as JSON, waiting for its throttle slot first. */
-  private get(url: string): Promise<SearchResponse> {
+  private get<T = SearchResponse>(url: string): Promise<T> {
     return this.queue.add(async () => {
       const wait = this.lastAt + this.throttle.intervalMs + Math.random() * this.throttle.jitterMs - Date.now();
       if (wait > 0) await sleep(wait);
       try {
-        return await this.http.get(url).json<SearchResponse>();
+        return await this.http.get(url).json<T>();
       } finally {
         this.lastAt = Date.now();
       }
-    }) as Promise<SearchResponse>;
+    }) as Promise<T>;
   }
 
   /** Product search: parsed, trimmed docs. */
@@ -70,6 +71,21 @@ export class F2FClient {
   /** Values of one facet aggregation (e.g. all F2F set names). */
   async facetValues(url: string, facet: string): Promise<string[]> {
     return parseFacetValues(await this.get(url), facet);
+  }
+
+  /** Shopify predictive search: singles among the results (`total` counts every result). */
+  async suggest(url: string): Promise<{ total: number; docs: F2FDoc[] }> {
+    return parseSuggest(await this.get<SuggestResponse>(url));
+  }
+
+  /** Shopify product JSON, or null when the product no longer exists. */
+  async product(url: string): Promise<ProductJs | null> {
+    try {
+      return await this.get<ProductJs>(url);
+    } catch (e) {
+      if (e instanceof HTTPError && e.response.status === 404) return null;
+      throw e;
+    }
   }
 }
 

@@ -7,7 +7,7 @@ import { useCallback, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { db } from '@/lib/db';
 import { f2fLinks } from '@/lib/f2f/links';
-import type { Item } from '../types';
+import { categoryOf, type Item } from '../types';
 import { summarize } from '../summary';
 import { Stat } from '@/lib/ui/Stat';
 import { RunActions } from './RunActions';
@@ -76,8 +76,9 @@ export function RunDetailPage() {
   const counts = useMemo(
     () => ({
       all: all.length,
-      buylist: all.filter((i) => i.category === 'buylist').length,
-      bulk: all.filter((i) => i.category === 'bulk').length,
+      buylist: all.filter((i) => categoryOf(i) === 'buylist').length,
+      bulk: all.filter((i) => categoryOf(i) === 'bulk').length,
+      notBought: all.filter((i) => categoryOf(i) === 'not_bought').length,
     }),
     [all],
   );
@@ -105,7 +106,7 @@ export function RunDetailPage() {
   }
 
   const progress = t.prints ? (t.done / t.prints) * 100 : 0;
-  const reviewCount = t.notFound + t.loose + t.errors;
+  const reviewCount = t.notFound + t.loose + t.priceCheck + t.errors;
   const sortStatus: DataTableSortStatus<Item> = { columnAccessor: sort.key, direction: sort.dir };
 
   return (
@@ -247,7 +248,7 @@ export function RunDetailPage() {
           active={filters.problems}
           hint={filters.problems ? 'Click to show all cards again' : 'Click to show only cards that need review'}
           onClick={() => update({ ...filters, problems: !filters.problems, status: [] }, sort, 1)}
-          lines={[`${t.notFound} not found · ${t.loose} loose · ${t.errors} errors`]}
+          lines={[`${t.notFound} not found · ${t.loose} loose · ${t.errors} errors`, ...(t.priceCheck ? [`${t.priceCheck} to price-check on F2F`] : [])]}
         />
       </SimpleGrid>
 

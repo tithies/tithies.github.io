@@ -1,5 +1,6 @@
 import { parseBulkRates } from '@/features/f2f-buylist/bulk';
 import { evaluate, matchByNumber, matchPrint, type PrintRef } from '@/features/f2f-buylist/matcher';
+import { isScanListing } from '@/lib/f2f/api';
 import { docs } from './helpers';
 
 const batch = docs('f2f-batch.json');
@@ -70,6 +71,35 @@ describe('matchPrint + evaluate', () => {
     expect(matchByNumber({ ...wall, cn: '999' }, flavor).match).toBe('not_found');
   });
 
+  describe('scanned single copies (SIN-SCAN-…)', () => {
+    const scans = docs('f2f-scans.json');
+    const yshtola = (cn: string, finish: PrintRef['finish']) =>
+      print({ name: "Y'shtola, Night's Blessed", set: 'fic', setName: 'Final Fantasy Commander', cn, finish });
+
+    it('recognises them by SKU and by title', () => {
+      expect(scans.filter(isScanListing)).toHaveLength(5);
+      expect(isScanListing({ title: "Y'shtola, Night's Blessed - Borderless - Scan 13012", variants: [] })).toBe(true);
+      expect(isScanListing({ title: 'Sol Ring [59] [TMNT] [Surge Foil]', variants: [] })).toBe(false);
+    });
+
+    it('prefers the regular buylist product even when F2F lists the scans first', () => {
+      // Real case: FIC #215 is Surge Foil only; four scanned copies come before the product F2F buys at 1100.
+      const r = matchPrint(yshtola('215', 'foil'), scans);
+      expect(r).toMatchObject({ match: 'exact', doc: { handle: 'yshtola-nights-blessed-215-borderless-character-final-fantasy-commander-surge-foil' } });
+      expect(r.note).toBe('F2F lists this foil as "Surge Foil"');
+      expect(evaluate({ ...yshtola('215', 'foil'), ...meta, rarity: 'mythic' }, r, rates, 0.3)).toMatchObject({ category: 'buylist', buyCash: 1100, retail: 1799.99 });
+      expect(matchPrint(yshtola('207', 'foil'), scans).doc?.handle).toBe('yshtola-nights-blessed-207-borderless-character-final-fantasy-commander-foil');
+    });
+
+    it('falls back to a scan (flagged) when F2F has nothing else for the print', () => {
+      const onlyScans = scans.filter((d) => isScanListing(d) || d.cn !== '215');
+      const r = matchPrint(yshtola('215', 'foil'), onlyScans);
+      expect(r.match).toBe('exact');
+      expect(r.doc && isScanListing(r.doc)).toBe(true);
+      expect(r.note).toContain('individually scanned copies');
+    });
+  });
+
   it('treats missing prints as bulk (not found)', () => {
     const p = print({ name: 'Nope', set: 'xxx', setName: 'Nowhere', cn: '1', finish: 'nonFoil' });
     const r = matchPrint(p, batch);
@@ -84,5 +114,19 @@ describe('matchPrint + evaluate', () => {
     expect(r.match).toBe('exact');
     // F2F buys this one (0.10), so it is a buylist card, not bulk.
     expect(evaluate({ ...p, ...meta, rarity: 'common' }, r, rates, 0.3).category).toBe('buylist');
+  });
+
+  it("puts cards F2F doesn't buy at all (tokens, Unfinity, schemes) in their own category", () => {
+    const none = { match: 'not_found' as const, doc: null };
+    const token = evaluate({ set: 'totc', setType: 'token', finish: 'nonFoil', rarity: 'token', typeLine: 'Token Creature — Construct', isToken: true }, none, rates, 0.3);
+    expect(token).toMatchObject({ category: 'not_bought', buyCash: 0, buyCredit: 0 });
+    expect(token.bulkReason).toMatch(/tokens are not bought/i);
+    const unf = evaluate({ set: 'unf', setType: 'funny', finish: 'nonFoil', rarity: 'common', typeLine: 'Creature', isToken: false }, none, rates, 0.3);
+    expect(unf).toMatchObject({ category: 'not_bought', buyCash: 0 });
+    // No buy ÷ sell % for cards F2F doesn't buy, even when it sells them.
+    const unfListed = evaluate({ set: 'unf', setType: 'funny', finish: 'nonFoil', rarity: 'common', typeLine: 'Creature', isToken: false }, { match: 'exact', doc: { ...dfc[0], publishedF2FSell: false } }, rates, 0.3);
+    expect(unfListed).toMatchObject({ category: 'not_bought', pctCash: null, pctCredit: null });
+    const scheme = evaluate({ set: 'dsc', setType: 'commander', finish: 'nonFoil', rarity: 'common', typeLine: 'Scheme', isToken: false }, none, rates, 0.3);
+    expect(scheme.category).toBe('not_bought');
   });
 });

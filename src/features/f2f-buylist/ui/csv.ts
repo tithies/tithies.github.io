@@ -1,11 +1,12 @@
 import Papa from 'papaparse';
 import { f2fLinks } from '@/lib/f2f/links';
-import type { Item, Run } from '../types';
+import { categoryOf, matchOf, type Item, type Run } from '../types';
+import { pctOf } from './filtering';
 
 export function itemsToCsv(items: Item[]): string {
   return Papa.unparse(
     items.map((i) => ({
-      category: i.category ?? i.status,
+      category: categoryOf(i) ?? i.status,
       name: i.name,
       set: i.set.toUpperCase(),
       set_name: i.setName,
@@ -16,16 +17,16 @@ export function itemsToCsv(items: Item[]): string {
       f2f_buy_cash: i.buyCash ?? '',
       f2f_buy_credit: i.buyCredit ?? '',
       f2f_retail_nm: i.retail ?? '',
-      pct_cash: i.pctCash ?? '',
-      pct_credit: i.pctCredit ?? '',
+      pct_cash: pctOf(i, 'pctCash') ?? '',
+      pct_credit: pctOf(i, 'pctCredit') ?? '',
       line_cash: i.buyCash != null ? +(i.buyCash * i.qty).toFixed(4) : '',
       line_credit: i.buyCredit != null ? +(i.buyCredit * i.qty).toFixed(4) : '',
       f2f_nm_stock: i.stock ?? '',
       moxfield_market_usd: i.marketUsd ?? '',
-      match: i.match ?? '',
+      match: matchOf(i) ?? '',
       note: [i.matchNote, i.bulkReason, i.error].filter(Boolean).join(' | '),
       f2f_title: i.doc?.title ?? '',
-      f2f_sell_url: i.doc?.handle && i.category === 'buylist' ? f2fLinks.sellProduct(i.doc.handle) : '',
+      f2f_sell_url: i.doc?.handle && (categoryOf(i) === 'buylist' || i.match === 'price_check') ? f2fLinks.sellProduct(i.doc.handle) : '',
     })),
   );
 }

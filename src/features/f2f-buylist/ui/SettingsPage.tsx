@@ -47,7 +47,7 @@ export function SettingsPage() {
         <SimpleGrid cols={{ base: 1, sm: 3 }}>
           <NumberInput label="Min. gap between requests" suffix=" ms" min={500} max={30000} step={250} value={s.requestIntervalMs} onChange={(v) => set('requestIntervalMs', n(v, DEFAULT_SETTINGS.requestIntervalMs))} />
           <NumberInput label="Random extra delay (jitter)" suffix=" ms" min={0} max={10000} step={250} value={s.jitterMs} onChange={(v) => set('jitterMs', n(v, DEFAULT_SETTINGS.jitterMs))} />
-          <NumberInput label="Prints per request" min={5} max={100} value={s.batchSize} onChange={(v) => set('batchSize', n(v, DEFAULT_SETTINGS.batchSize))} />
+          <NumberInput label="Prints per request" description="Split automatically when F2F has over 100 results" min={5} max={100} value={s.batchSize} onChange={(v) => set('batchSize', n(v, DEFAULT_SETTINGS.batchSize))} />
         </SimpleGrid>
         <Text size="xs" c="dimmed" mt="xs">
           Requests go one at a time. On HTTP 429 Tithies waits for F2F's Retry-After, and pauses the run after 3 failures in a row.
@@ -71,7 +71,7 @@ export function SettingsPage() {
           <NumberInput label="Reuse F2F results for" description="F2F changes prices during the day · 0 = always fresh" suffix=" h" min={0} max={336} value={s.cacheTtlHours} onChange={(v) => set('cacheTtlHours', n(v, DEFAULT_SETTINGS.cacheTtlHours))} />
           <NumberInput label="Moxfield page size" description="Rows per Moxfield request (max 5000 = one request)" min={25} max={5000} step={100} value={s.moxfieldPageSize} onChange={(v) => set('moxfieldPageSize', n(v, DEFAULT_SETTINGS.moxfieldPageSize))} />
           <Switch mt="md" label="Fallback search by set + number for prints not found by name" checked={s.fallbackEnabled} onChange={(e) => set('fallbackEnabled', e.currentTarget.checked)} />
-          <NumberInput label="Max fallback requests per run" min={0} max={2000} value={s.fallbackCap} onChange={(v) => set('fallbackCap', n(v, DEFAULT_SETTINGS.fallbackCap))} disabled={!s.fallbackEnabled} />
+          <NumberInput label="Max fallback requests per run" description="Also the most cards checked on Shopify's search when both searches miss" min={0} max={2000} value={s.fallbackCap} onChange={(v) => set('fallbackCap', n(v, DEFAULT_SETTINGS.fallbackCap))} disabled={!s.fallbackEnabled} />
         </SimpleGrid>
         <Text size="xs" c="dimmed" mt="xs">
           The credit bonus is stored with each run when it starts, so changing it only affects new runs.

@@ -1,0 +1,26 @@
+{
+ "id": 14645069480308,
+ "title": "Avacyn, Guardian Angel [3] [Magic 2015] [Non-Foil]",
+ "handle": "avacyn-guardian-angel-3-magic-2015-non-foil",
+ "type": "Singles",
+ "available": true,
+ "featured_image": "//cdn.shopify.com/s/files/1/0574/4692/4324/files/127264e526814f223b98e84594d0a41521b11a8a_Asset_MTG_M15_3_ENG_NF_jpg.jpg?v=1737552424",
+ "variants": [
+  {
+   "id": 51735468933492,
+   "title": "NM",
+   "option1": "NM",
+   "sku": "M-M15-Avacyn_Gu-3-NM-NF",
+   "available": true,
+   "price": 249
+  },
+  {
+   "id": 51735468966260,
+   "title": "PL",
+   "option1": "PL",
+   "sku": "M-M15-Avacyn_Gu-3-PL-NF",
+   "available": true,
+   "price": 199
+  }
+ ]
+}

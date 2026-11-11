@@ -10,13 +10,15 @@ interface Props {
   filters: Filters;
   onChange: (f: Filters) => void;
   items: Item[];
-  counts: { all: number; buylist: number; bulk: number };
+  counts: { all: number; buylist: number; bulk: number; notBought: number };
 }
 
 export const STATUS_OPTIONS = [
   { value: 'exact', label: 'Exact match' },
   { value: 'loose', label: 'Loose match' },
+  { value: 'price_check', label: 'Check price manually' },
   { value: 'not_found', label: 'Not found on F2F' },
+  { value: 'unlisted', label: 'Not sold by F2F (oversized)' },
   { value: 'error', label: 'Error (lookup failed)' },
   { value: 'pending', label: 'Not checked yet' },
 ];
@@ -52,7 +54,7 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
     <Paper withBorder p="sm" radius="md">
       <Group gap="sm" wrap="wrap">
         <TextInput
-          placeholder="Search name, set, number…"
+          placeholder="Search name, set, number, reason…"
           leftSection={<IconSearch size={16} />}
           value={q}
           onChange={(e) => {
@@ -80,6 +82,7 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
             { value: 'all', label: `All (${counts.all})` },
             { value: 'buylist', label: `Buylist (${counts.buylist})` },
             { value: 'bulk', label: `Bulk (${counts.bulk})` },
+            { value: 'not_bought', label: `Not bought (${counts.notBought})` },
           ]}
         />
         <Button
@@ -135,6 +138,7 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
           </Stack>
           <Group gap="lg" align="flex-end" pb={6}>
             <Switch label="Needs review" checked={filters.problems} onChange={(e) => set('problems', e.currentTarget.checked)} />
+            <Switch label="Has a note under the name" checked={filters.noted} onChange={(e) => set('noted', e.currentTarget.checked)} />
           </Group>
         </SimpleGrid>
       </Collapse>

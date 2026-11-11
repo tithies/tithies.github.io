@@ -15,6 +15,13 @@ export const F2F_COLLECTIONS = {
   wholesaleBulk: '616828141940',
 } as const;
 
+/**
+ * F2F returns at most 100 hits per page, whatever `pageSize` asks for, and offsets later pages
+ * by 100 (verified 2026-11-11). Its sort (in stock, release date, created date) has many ties,
+ * and their order changes between requests, so paging through a result can skip docs.
+ */
+export const F2F_MAX_PAGE_SIZE = 100;
+
 /** Mirrors the site's own encoding: values joined by `$^` (OR), then encodeURIComponent twice. */
 export const encodeFacetValue = (values: string[]): string =>
   encodeURIComponent(encodeURIComponent(values.join('$^')));
@@ -88,7 +95,8 @@ export interface F2FVariant {
   condition: string;
   retail: number | null;
   buy: number | null;
-  stock: number;
+  /** null = unknown (Shopify's product JSON has no stock counts). */
+  stock: number | null;
   sku: string;
 }
 
@@ -107,6 +115,11 @@ export interface F2FDoc {
   publishedF2FSell: boolean;
   image: string | null;
   variants: F2FVariant[];
+  /**
+   * 'shopify': found by Shopify's own product search because F2F's search index doesn't have it.
+   * Such docs have retail prices but no buy price (see src/lib/f2f/shopify.ts).
+   */
+  source?: 'shopify';
 }
 
 const toPrice = (v: unknown): number | null => {
@@ -162,6 +175,14 @@ export function parseSearch(json: SearchResponse): { total: number; docs: F2FDoc
     docs: hits.filter((h) => h?._source).map((h) => trimDoc(h._id ?? '', h._source as RawDoc)),
   };
 }
+
+/**
+ * One-off listing of a single photographed copy ("… — ID 21301", "… - Scan 15788", SKU
+ * `SIN-SCAN-…`). These have a retail price but never a buy price, and F2F can list dozens of
+ * them for one print next to the regular product.
+ */
+export const isScanListing = (doc: Pick<F2FDoc, 'title' | 'variants'>): boolean =>
+  doc.variants.some((v) => /^SIN-SCAN-/i.test(v.sku)) || /\s[—-]\s(?:ID|Scan)\s\d+$/.test(doc.title);
 
 /** NM variant (falls back to the first variant). */
 export const nmVariant = (doc: F2FDoc): F2FVariant | null =>

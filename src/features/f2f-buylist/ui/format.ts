@@ -43,5 +43,6 @@ export const PHASE_LABEL: Record<RunPhase, string> = {
   bulk_rates: 'Fetching bulk rates',
   lookup: 'Batched lookup',
   fallback: 'Fallback search',
+  shop_search: 'Shopify search',
   done: 'Done',
 };

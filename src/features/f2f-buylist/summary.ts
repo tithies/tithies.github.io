@@ -1,4 +1,4 @@
-import { emptyTotals, type Item, type RunTotals } from './types';
+import { categoryOf, emptyTotals, matchOf, type Item, type RunTotals } from './types';
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const median = (xs: number[]) => {
@@ -20,10 +20,14 @@ export function summarize(items: Item[], entries = 0): RunTotals {
     if (it.status === 'error') t.errors++;
     if (it.status !== 'done') continue;
     t.done++;
-    if (it.match === 'not_found') t.notFound++;
-    if (it.match === 'loose') t.loose++;
+    const match = matchOf(it);
+    if (match === 'not_found') t.notFound++;
+    if (match === 'unlisted') t.unlisted++;
+    if (match === 'loose') t.loose++;
+    if (match === 'price_check') t.priceCheck++;
     const retail = it.retail != null ? it.qty * it.retail : null;
-    if (it.category === 'buylist') {
+    const category = categoryOf(it);
+    if (category === 'buylist') {
       t.buylistPrints++;
       t.buylistCopies += it.qty;
       t.buylistCash += it.qty * (it.buyCash ?? 0);
@@ -35,7 +39,7 @@ export function summarize(items: Item[], entries = 0): RunTotals {
       } else t.buylistNoRetail++;
       if (it.pctCash != null) pcts.push(it.pctCash);
       if (it.pctCredit != null) pctsCredit.push(it.pctCredit);
-    } else if (it.category === 'bulk') {
+    } else if (category === 'bulk') {
       t.bulkPrints++;
       t.bulkCopies += it.qty;
       t.bulkCash += it.qty * (it.buyCash ?? 0);

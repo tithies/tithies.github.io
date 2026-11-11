@@ -1,11 +1,11 @@
 import { ActionIcon, Badge, Group, Stack, Text, ThemeIcon, Tooltip } from '@mantine/core';
-import { IconAlertTriangle, IconBox, IconCash, IconClock, IconExternalLink, IconShoppingCart, IconTag } from '@tabler/icons-react';
+import { IconAlertTriangle, IconBan, IconBox, IconCash, IconClock, IconExternalLink, IconShoppingCart, IconTag } from '@tabler/icons-react';
 import type { DataTableColumn } from 'mantine-datatable';
 import { sizedImage } from '@/lib/f2f/api';
 import { CardThumb } from '@/lib/ui/CardThumb';
 import { f2fLinks, scryfallCardLink, scryfallImage } from '@/lib/f2f/links';
-import type { Item } from '../types';
-import { isProblem } from './filtering';
+import { categoryOf, matchOf, type Category, type Item } from '../types';
+import { isProblem, nameNote, pctOf } from './filtering';
 import { finishLabel, money, moneyUsd, pct, pctColor, RARITY_COLOR, rarityLabel } from './format';
 
 const num = (children: React.ReactNode, c?: string) => (
@@ -22,9 +22,16 @@ const ReviewIcon = () => (
 );
 
 /**
- * Green cash = F2F buylist, orange box = bulk, red warning = needs review (lookup error, loose
- * match or not found on F2F, exactly the rows counted by the "Needs review" card).
+ * Green cash = F2F buylist, orange box = bulk, grey ban = F2F doesn't buy it at all (tokens,
+ * Unfinity…), red warning = needs review (lookup error, loose match, price to check by hand or
+ * not found on F2F, exactly the rows counted by the "Needs review" card).
  */
+const CATEGORY_ICON: Record<Category, { color: string; icon: React.ReactNode }> = {
+  buylist: { color: 'teal', icon: <IconCash size={18} /> },
+  bulk: { color: 'orange', icon: <IconBox size={18} /> },
+  not_bought: { color: 'gray', icon: <IconBan size={18} /> },
+};
+
 export function CategoryIcon({ item }: { item: Item }) {
   if (item.status === 'error') {
     return (
@@ -37,20 +44,25 @@ export function CategoryIcon({ item }: { item: Item }) {
   }
   if (item.status !== 'done') {
     return (
-      <Tooltip label={item.status === 'fallback' ? 'Waiting for fallback search' : 'Waiting to be checked'}>
+      <Tooltip label={item.status === 'fallback' ? 'Waiting for fallback search' : item.status === 'shop_search' ? 'Waiting for Shopify search' : 'Waiting to be checked'}>
         <ThemeIcon color="gray" variant="light">
           <IconClock size={18} />
         </ThemeIcon>
       </Tooltip>
     );
   }
-  const buylist = item.category === 'buylist';
+  const category = categoryOf(item) ?? 'bulk';
   const review = isProblem(item);
   const lines = [
     review && 'Needs review',
-    buylist ? 'On F2F buylist' : `Bulk — ${item.bulkReason ?? 'not on the buylist'}`,
+    category === 'buylist' && 'On F2F buylist',
+    category === 'bulk' && `Bulk — ${item.bulkReason ?? 'not on the buylist'}`,
+    category === 'not_bought' && 'Not bought by F2F (not even as bulk)',
+    category === 'not_bought' && item.bulkReason,
     item.match === 'loose' && `Loose match: ${item.matchNote ?? ''}`,
-    item.match === 'not_found' && `Exact print not found on F2F${item.matchNote ? ` (${item.matchNote})` : ''}`,
+    item.match === 'price_check' && `Check the price manually: ${item.matchNote ?? ''}`,
+    matchOf(item) === 'not_found' && `Exact print not found on F2F${item.matchNote ? ` (${item.matchNote})` : ''}`,
+    matchOf(item) === 'unlisted' && "Not on F2F: F2F doesn't list oversized cards",
     item.match === 'exact' && item.matchNote,
     item.fromCache && 'From cache',
   ].filter(Boolean);
@@ -73,11 +85,22 @@ export function CategoryIcon({ item }: { item: Item }) {
           <ReviewIcon />
         </span>
       ) : (
-        <ThemeIcon color={buylist ? 'teal' : 'orange'} variant="filled">
-          {buylist ? <IconCash size={18} /> : <IconBox size={18} />}
+        <ThemeIcon color={CATEGORY_ICON[category].color} variant="filled">
+          {CATEGORY_ICON[category].icon}
         </ThemeIcon>
       )}
     </Tooltip>
+  );
+}
+
+/** The line under the card name; the "Has a note" filter finds exactly these rows. */
+function NameNoteLine({ item }: { item: Item }) {
+  const note = nameNote(item);
+  if (!note) return null;
+  return (
+    <Text size="xs" c={note.color} lineClamp={1} title={note.title}>
+      {note.text}
+    </Text>
   );
 }
 
@@ -96,7 +119,17 @@ function CardImage({ item }: { item: Item }) {
 function Links({ item }: { item: Item }) {
   const handle = item.doc?.handle;
   const buyHref = handle ? f2fLinks.shopProduct(handle) : f2fLinks.shopSearch(item.frontName);
-  const sellHref = item.category === 'buylist' && handle ? f2fLinks.sellProduct(handle) : f2fLinks.sellBulk;
+  const priceCheck = item.match === 'price_check';
+  const category = categoryOf(item);
+  const sellHref = (category === 'buylist' || priceCheck) && handle ? f2fLinks.sellProduct(handle) : f2fLinks.sellBulk;
+  const sellLabel = priceCheck
+    ? 'Check the buy price on F2F (sell page)'
+    : category === 'buylist'
+      ? 'Sell to F2F (buylist page)'
+      : category === 'not_bought'
+        ? "F2F doesn't buy this card, not even as bulk"
+        : 'Sell as bulk (F2F wholesale page)';
+  const notBought = category === 'not_bought' && !priceCheck;
   return (
     <Group gap={2} wrap="nowrap">
       <Tooltip label={handle ? 'Buy on F2F (shop page)' : 'Search on F2F shop'}>
@@ -104,10 +137,16 @@ function Links({ item }: { item: Item }) {
           <IconShoppingCart size={16} />
         </ActionIcon>
       </Tooltip>
-      <Tooltip label={item.category === 'buylist' ? 'Sell to F2F (buylist page)' : 'Sell as bulk (F2F wholesale page)'}>
-        <ActionIcon component="a" href={sellHref} target="_blank" variant="subtle" color={item.category === 'buylist' ? 'teal' : 'orange'} aria-label="Sell to F2F">
-          <IconTag size={16} />
-        </ActionIcon>
+      <Tooltip label={sellLabel}>
+        {notBought ? (
+          <ActionIcon variant="subtle" color="gray" disabled aria-label="Not bought by F2F">
+            <IconTag size={16} />
+          </ActionIcon>
+        ) : (
+          <ActionIcon component="a" href={sellHref} target="_blank" variant="subtle" color={category === 'buylist' ? 'teal' : priceCheck ? 'red' : 'orange'} aria-label="Sell to F2F">
+            <IconTag size={16} />
+          </ActionIcon>
+        )}
       </Tooltip>
       <Tooltip label="Scryfall">
         <ActionIcon component="a" href={scryfallCardLink(item.set, item.cn)} target="_blank" variant="subtle" color="gray" aria-label="Scryfall">
@@ -117,6 +156,8 @@ function Links({ item }: { item: Item }) {
     </Group>
   );
 }
+
+const CASH_COLOR: Record<Category, string | undefined> = { buylist: undefined, bulk: 'orange', not_bought: 'dimmed' };
 
 /** Header with a tooltip explaining the (short) column title. */
 const head = (title: string, help: string) => (
@@ -135,7 +176,7 @@ export interface ColumnMeta {
 
 /** Every column of the results table, in display order (also drives the "Columns" menu). */
 export const COLUMN_META: ColumnMeta[] = [
-  { accessor: 'category', label: 'Buylist / bulk icon', toggleable: false },
+  { accessor: 'category', label: 'Category icon', toggleable: false },
   { accessor: 'image', label: 'Image', toggleable: true },
   { accessor: 'name', label: 'Card', toggleable: false },
   { accessor: 'set', label: 'Set', toggleable: true },
@@ -171,16 +212,7 @@ export function buildColumns(hidden: ReadonlySet<string> = new Set()): DataTable
           <Text size="sm" fw={500}>
             {i.name}
           </Text>
-          {i.doc && i.doc.title && i.match !== 'exact' && (
-            <Text size="xs" c="dimmed" lineClamp={1} title={i.doc.title}>
-              F2F: {i.doc.title}
-            </Text>
-          )}
-          {i.matchNote && i.match === 'exact' && (
-            <Text size="xs" c="yellow" lineClamp={1} title={i.matchNote}>
-              {i.matchNote}
-            </Text>
-          )}
+          <NameNoteLine item={i} />
         </Stack>
       ),
     },
@@ -228,11 +260,11 @@ export function buildColumns(hidden: ReadonlySet<string> = new Set()): DataTable
     { accessor: 'qty', title: head('Qty', 'Copies you own (all conditions)'), ...tight, sortable: true, textAlign: 'right', render: (i) => num(i.qty) },
     {
       accessor: 'buyCash',
-      title: head('Cash', 'What F2F pays you per card, in cash (NM). Bulk cards use the wholesale bulk rate.'),
+      title: head('Cash', "What F2F pays you per card, in cash (NM). Bulk cards use the wholesale bulk rate; cards F2F doesn't buy are $0."),
       ...tight,
       sortable: true,
       textAlign: 'right',
-      render: (i) => num(money(i.buyCash), i.category === 'bulk' ? 'orange' : undefined),
+      render: (i) => num(money(i.buyCash), CASH_COLOR[categoryOf(i) ?? 'buylist']),
     },
     {
       accessor: 'buyCredit',
@@ -240,7 +272,7 @@ export function buildColumns(hidden: ReadonlySet<string> = new Set()): DataTable
       ...tight,
       sortable: true,
       textAlign: 'right',
-      render: (i) => num(money(i.buyCredit), i.category === 'bulk' ? 'orange' : undefined),
+      render: (i) => num(money(i.buyCredit), CASH_COLOR[categoryOf(i) ?? 'buylist']),
     },
     { accessor: 'retail', title: head('F2F sells', "F2F's own NM selling price for this card"), ...tight, sortable: true, textAlign: 'right', render: (i) => num(money(i.retail)) },
     {
@@ -250,8 +282,8 @@ export function buildColumns(hidden: ReadonlySet<string> = new Set()): DataTable
       sortable: true,
       textAlign: 'right',
       render: (i) => (
-        <Badge color={pctColor(i.pctCash)} variant="light" className="ti-num">
-          {pct(i.pctCash)}
+        <Badge color={pctColor(pctOf(i, 'pctCash'))} variant="light" className="ti-num">
+          {pct(pctOf(i, 'pctCash'))}
         </Badge>
       ),
     },
@@ -262,8 +294,8 @@ export function buildColumns(hidden: ReadonlySet<string> = new Set()): DataTable
       sortable: true,
       textAlign: 'right',
       render: (i) => (
-        <Badge color={pctColor(i.pctCredit)} variant="light" className="ti-num">
-          {pct(i.pctCredit)}
+        <Badge color={pctColor(pctOf(i, 'pctCredit'))} variant="light" className="ti-num">
+          {pct(pctOf(i, 'pctCredit'))}
         </Badge>
       ),
     },

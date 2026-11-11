@@ -62,6 +62,11 @@ export function parseBulkRates(docs: F2FDoc[], now = Date.now()): BulkRates {
   return { ...rates, fetchedAt: now, usedDefaults, sources };
 }
 
+/** Oversized Archenemy schemes / Planechase planes etc.: F2F neither lists nor buys them. */
+export const OVERSIZED_TYPE = /\b(scheme|plane|phenomenon|vanguard)\b/i;
+export const isOversized = (typeLine: string) => OVERSIZED_TYPE.test(typeLine);
+export const OVERSIZED_REASON = 'Oversized cards (Archenemy schemes, Planechase planes) are not sold or bought by F2F';
+
 /** Sets F2F explicitly excludes from every MTG bulk lot. */
 const EXCLUDED_SETS: Record<string, string> = { unf: 'Unfinity', ust: 'Unstable', und: 'Unsanctioned', unk: 'Unknown Event' };
 
@@ -93,9 +98,7 @@ export function bulkValue(input: BulkInput, rates: BulkRates): { value: number; 
   const excluded = EXCLUDED_SETS[input.set];
   if (excluded) return { value: 0, reason: `${excluded} is excluded from F2F bulk` };
   if (input.isToken || /\btoken\b/i.test(input.typeLine)) return { value: 0, reason: 'Tokens are not bought as bulk' };
-  if (/\b(scheme|plane|phenomenon|vanguard)\b/i.test(input.typeLine)) {
-    return { value: 0, reason: 'Oversized Archenemy / Planechase cards are not sold or bought by F2F' };
-  }
+  if (isOversized(input.typeLine)) return { value: 0, reason: OVERSIZED_REASON };
   if (/^basic\b.*\bland\b/i.test(input.typeLine)) {
     return foil
       ? { value: rates.foilBasic, reason: 'Bulk rate: foil basic land' }

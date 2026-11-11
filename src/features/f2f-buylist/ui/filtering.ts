@@ -1,14 +1,15 @@
 import { fold } from '@/lib/format';
 import { compareValues } from '@/lib/sort';
-import type { Item } from '../types';
+import { OVERSIZED_REASON } from '../bulk';
+import { categoryOf, matchOf, type Category, type Item } from '../types';
 
-export type CategoryFilter = 'all' | 'buylist' | 'bulk';
+export type CategoryFilter = 'all' | 'buylist' | 'bulk' | 'not_bought';
 export type StockFilter = 'any' | 'in' | 'out';
 /** One status per row: lookup error, not checked yet, or how well it matched F2F. */
-export type ItemState = 'exact' | 'loose' | 'not_found' | 'error' | 'pending';
+export type ItemState = 'exact' | 'loose' | 'price_check' | 'unlisted' | 'not_found' | 'error' | 'pending';
 
 export const itemState = (it: Item): ItemState =>
-  it.status === 'error' ? 'error' : it.status !== 'done' ? 'pending' : (it.match ?? 'pending');
+  it.status === 'error' ? 'error' : it.status !== 'done' ? 'pending' : (matchOf(it) ?? 'pending');
 
 export interface Filters {
   q: string;
@@ -24,6 +25,8 @@ export interface Filters {
   minQty: number | null;
   stock: StockFilter;
   problems: boolean;
+  /** Only rows with a note under the card name (see `nameNote`). */
+  noted: boolean;
 }
 
 export const EMPTY_FILTERS: Filters = {
@@ -40,6 +43,7 @@ export const EMPTY_FILTERS: Filters = {
   minQty: null,
   stock: 'any',
   problems: false,
+  noted: false,
 };
 
 export const SORT_KEYS = [
@@ -81,7 +85,7 @@ export function filtersFromParams(p: URLSearchParams): Filters {
   const stock = p.get('stock');
   return {
     q: p.get('q') ?? '',
-    category: cat === 'buylist' || cat === 'bulk' ? cat : 'all',
+    category: cat === 'buylist' || cat === 'bulk' || cat === 'not_bought' ? cat : 'all',
     sets: list(p.get('sets')),
     finishes: list(p.get('fin')),
     rarities: list(p.get('rar')),
@@ -94,6 +98,7 @@ export function filtersFromParams(p: URLSearchParams): Filters {
     minQty: numOrNull(p.get('minQty')),
     stock: stock === 'out' ? 'out' : stock === 'in' || stock === '1' ? 'in' : 'any',
     problems: p.get('problems') === '1',
+    noted: p.get('note') === '1',
   };
 }
 
@@ -124,6 +129,7 @@ export function writeParams(base: URLSearchParams, f: Filters, s: Sort, page: nu
   set('minQty', f.minQty);
   set('stock', f.stock === 'any' ? null : f.stock);
   set('problems', f.problems ? '1' : null);
+  set('note', f.noted ? '1' : null);
   set('sort', s.key === DEFAULT_SORT.key && s.dir === DEFAULT_SORT.dir ? null : s.key);
   set('dir', s.key === DEFAULT_SORT.key && s.dir === DEFAULT_SORT.dir ? null : s.dir);
   set('page', page > 1 ? page : null);
@@ -141,12 +147,36 @@ export const activeFilterCount = (f: Filters) =>
   (f.minPct != null || f.maxPct != null ? 1 : 0) +
   (f.minQty != null ? 1 : 0) +
   (f.stock !== 'any' ? 1 : 0) +
-  (f.problems ? 1 : 0);
+  (f.problems ? 1 : 0) +
+  (f.noted ? 1 : 0);
 
 // --- filtering & sorting -------------------------------------------------------------------
 
-/** Rows worth a second look: lookup errors, loose matches, prints F2F doesn't list. */
-export const isProblem = (it: Item) => ['error', 'loose', 'not_found'].includes(itemState(it));
+/** Rows worth a second look: lookup errors, loose matches, buy prices to check by hand, prints not found (oversized cards F2F never lists are left out). */
+export const isProblem = (it: Item) => ['error', 'loose', 'price_check', 'not_found'].includes(itemState(it));
+
+/** Buy ÷ sell %, or null for cards F2F doesn't buy (rows saved before 'not_bought' stored 0). */
+export const pctOf = (it: Item, key: 'pctCash' | 'pctCredit'): number | null => (categoryOf(it) === 'not_bought' ? null : (it[key] ?? null));
+
+export interface NameNote {
+  text: string;
+  /** Mantine color: red = check the price by hand, yellow = matched with a remark, dimmed = F2F's title. */
+  color: 'red' | 'yellow' | 'dimmed';
+  /** Full text for the hover title. */
+  title: string;
+}
+
+/**
+ * The short line under the card name in the table, or null. Kinds: a buy price to check on F2F,
+ * a remark on an exact match (F2F's own foil name, only scanned copies listed), or F2F's title
+ * when the match isn't exact.
+ */
+export function nameNote(it: Item): NameNote | null {
+  if (it.match === 'price_check') return { text: 'Check the buy price manually on F2F', color: 'red', title: it.matchNote ?? '' };
+  if (it.match === 'exact') return it.matchNote ? { text: it.matchNote, color: 'yellow', title: it.matchNote } : null;
+  if (it.doc?.title) return { text: `F2F: ${it.doc.title}`, color: 'dimmed', title: it.doc.title };
+  return null;
+}
 
 
 export function applyFilters(items: Item[], f: Filters): Item[] {
@@ -157,10 +187,13 @@ export function applyFilters(items: Item[], f: Filters): Item[] {
   const states = new Set(f.status);
   return items.filter((it) => {
     if (terms.length) {
-      const hay = fold(`${it.name} ${it.set} ${it.setName} ${it.cn} ${it.doc?.title ?? ''}`);
+      // Reasons too ("Unfinity is excluded…", "Tokens are not bought…", "Surge Foil"…). Older
+      // rows of oversized cards carry a reason without the word "scheme", so add today's.
+      const oversized = matchOf(it) === 'unlisted' ? OVERSIZED_REASON : '';
+      const hay = fold(`${it.name} ${it.set} ${it.setName} ${it.cn} ${it.doc?.title ?? ''} ${it.bulkReason ?? ''} ${it.matchNote ?? ''} ${it.error ?? ''} ${oversized}`);
       if (!terms.every((t) => hay.includes(t))) return false;
     }
-    if (f.category !== 'all' && it.category !== f.category) return false;
+    if (f.category !== 'all' && categoryOf(it) !== f.category) return false;
     if (sets.size && !sets.has(it.set)) return false;
     if (fins.size && !fins.has(it.finish)) return false;
     if (rars.size && !rars.has(it.rarity)) return false;
@@ -168,23 +201,31 @@ export function applyFilters(items: Item[], f: Filters): Item[] {
     const buy = it.buyCash ?? null;
     if (f.minBuy != null && (buy == null || buy < f.minBuy)) return false;
     if (f.maxBuy != null && (buy == null || buy > f.maxBuy)) return false;
-    if (f.minPct != null && (it.pctCash == null || it.pctCash < f.minPct)) return false;
-    if (f.maxPct != null && (it.pctCash == null || it.pctCash > f.maxPct)) return false;
+    const pctCash = pctOf(it, 'pctCash');
+    if (f.minPct != null && (pctCash == null || pctCash < f.minPct)) return false;
+    if (f.maxPct != null && (pctCash == null || pctCash > f.maxPct)) return false;
     if (f.minQty != null && it.qty < f.minQty) return false;
     const hasStock = (it.stock ?? 0) > 0;
     if (f.stock === 'in' && !hasStock) return false;
     if (f.stock === 'out' && hasStock) return false;
     if (f.problems && !isProblem(it)) return false;
+    if (f.noted && !nameNote(it)) return false;
     return true;
   });
 }
 
+const CATEGORY_ORDER: Record<Category, number> = { buylist: 0, bulk: 1, not_bought: 2 };
 const RARITY_ORDER: Record<string, number> = { common: 0, uncommon: 1, rare: 2, mythic: 3, special: 4, bonus: 5 };
 
 export function sortValue(it: Item, key: SortKey): string | number | null {
   switch (key) {
-    case 'category':
-      return it.category === 'buylist' ? 0 : it.category === 'bulk' ? 1 : null;
+    case 'category': {
+      const c = categoryOf(it);
+      return c ? CATEGORY_ORDER[c] : null;
+    }
+    case 'pctCash':
+    case 'pctCredit':
+      return pctOf(it, key);
     case 'name':
       return fold(it.name);
     case 'set':
