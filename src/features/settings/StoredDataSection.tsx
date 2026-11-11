@@ -1,5 +1,5 @@
-import { Alert, Badge, Button, Checkbox, Group, List, Modal, Paper, Stack, Table, Text } from '@mantine/core';
-import { IconAlertTriangle, IconCheck, IconDatabase, IconTrash } from '@tabler/icons-react';
+import { ActionIcon, Alert, Badge, Button, Checkbox, Group, List, Modal, Paper, Stack, Table, Text, Tooltip } from '@mantine/core';
+import { IconAlertTriangle, IconCheck, IconDatabase, IconRefresh, IconTrash } from '@tabler/icons-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import type { BulkRates } from '@/features/f2f-buylist/types';
@@ -8,11 +8,11 @@ import { META_COLLECTION, META_DECKS, META_SYNC, type CollectionMeta, type Decks
 import { timeAgo } from '@/lib/format';
 import { getSettings, settingsItem } from '@/lib/settings';
 import { SettingsSection } from '@/lib/ui/SettingsSection';
-import { clearStoredData, type DataGroup } from './stored-data';
+import { clearStoredData, DATA_GROUPS, measureStoredData, type DataGroup } from './stored-data';
 
 const n = (v: number) => v.toLocaleString('en-CA');
 const ago = (t?: number) => (t ? timeAgo(t) : 'never');
-const megabytes = (bytes: number) => (bytes >= 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1e3))} KB`);
+const megabytes = (bytes: number) => (bytes >= 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : bytes > 0 ? `${Math.max(1, Math.round(bytes / 1e3))} KB` : '0 KB');
 
 /** Counts and dates for every group, live (they follow runs and syncs while the page is open). */
 function useStats(ttlHours: number) {
@@ -61,15 +61,25 @@ export function StoredDataSection() {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [cleared, setCleared] = useState<string | null>(null);
+  /** Database files on disk, as the browser reports them (keeps cleared space until it compacts them). */
   const [usage, setUsage] = useState<number | null>(null);
+  /** What each group's data weighs: measured on demand, it reads every row. */
+  const [sizes, setSizes] = useState<Record<DataGroup, number> | null>(null);
+  const [measuring, setMeasuring] = useState(false);
   const stats = useStats(ttlHours ?? 1);
 
   useEffect(() => {
     void getSettings().then((s) => setTtlHours(s.cacheTtlHours));
     return settingsItem.watch(() => void getSettings().then((s) => setTtlHours(s.cacheTtlHours)));
   }, []);
-  const refreshUsage = () => void navigator.storage?.estimate?.().then((e) => setUsage(e.usage ?? null));
-  useEffect(refreshUsage, []);
+  const measure = () => {
+    setMeasuring(true);
+    void navigator.storage?.estimate?.().then((e) => setUsage(e.usage ?? null));
+    void measureStoredData()
+      .then(setSizes)
+      .finally(() => setMeasuring(false));
+  };
+  useEffect(measure, []);
 
   if (!stats || ttlHours == null) return null;
   const s = stats;
@@ -133,7 +143,7 @@ export function StoredDataSection() {
       await clearStoredData(chosen.map((r) => r.id));
       setCleared(chosen.map((r) => r.title).join(', '));
       setSelected(new Set());
-      refreshUsage();
+      measure();
     } finally {
       setBusy(false);
       setConfirming(false);
@@ -144,7 +154,7 @@ export function StoredDataSection() {
     <SettingsSection
       title="Stored data"
       icon={IconDatabase}
-      description={`Kept in this browser (IndexedDB)${usage != null ? `: about ${megabytes(usage)} in all` : ''}. Nothing is sent anywhere.`}
+      description="Kept in this browser (IndexedDB). Nothing is sent anywhere."
     >
       <Paper withBorder radius="md">
         <Table.ScrollContainer minWidth={760}>
@@ -165,6 +175,7 @@ export function StoredDataSection() {
                 </Table.Th>
                 <Table.Th>What</Table.Th>
                 <Table.Th>Contents</Table.Th>
+                <Table.Th ta="right">Size</Table.Th>
                 <Table.Th>If you clear it</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -197,6 +208,11 @@ export function StoredDataSection() {
                       ))
                     )}
                   </Table.Td>
+                  <Table.Td ta="right">
+                    <Text size="sm" className="ti-num" style={{ whiteSpace: 'nowrap' }}>
+                      {r.empty ? '0 KB' : sizes ? `≈ ${megabytes(sizes[r.id])}` : '…'}
+                    </Text>
+                  </Table.Td>
                   <Table.Td>
                     <Text size="sm" c="dimmed">
                       {r.effect}
@@ -212,10 +228,28 @@ export function StoredDataSection() {
             </Table.Tbody>
           </Table>
         </Table.ScrollContainer>
-        <Group justify="space-between" p="md" pt="xs">
-          <Text size="xs" c="dimmed">
-            Tick everything (the box at the top) to clear all of Tithies' data. Settings are kept: see "Reset settings" below.
-          </Text>
+        <Group justify="space-between" p="md" pt="xs" align="flex-start">
+          <Stack gap={2} style={{ flex: 1, minWidth: 240 }}>
+            <Group gap={6}>
+              <Text size="sm" className="ti-num">
+                Your data: {sizes ? <b>≈ {megabytes(DATA_GROUPS.reduce((sum, g) => sum + sizes[g], 0))}</b> : '…'}
+              </Text>
+              <Tooltip label="Measure again">
+                <ActionIcon variant="subtle" color="gray" size="sm" loading={measuring} onClick={measure} aria-label="Measure again">
+                  <IconRefresh size={14} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+            {usage != null && (
+              <Text size="xs" c="dimmed">
+                The browser reports {megabytes(usage)} on disk. It keeps the space of cleared data until it compacts its files, later and on its own, so that
+                figure goes down after a while.
+              </Text>
+            )}
+            <Text size="xs" c="dimmed">
+              Tick everything (the box at the top) to clear all of Tithies' data. Settings are kept: see "Reset settings" below.
+            </Text>
+          </Stack>
           <Group gap="sm">
             {cleared && (
               <Group gap={4}>

@@ -5,6 +5,7 @@
  * - Extension storage (chrome.storage.local) and the dashboard's localStorage: settings and
  *   preferences only. `resetAllSettings` empties both, so every setting falls back to its default.
  */
+import type { Table } from 'dexie';
 import { browser } from 'wxt/browser';
 import { db } from '@/lib/db';
 import { META_COLLECTION, META_DECKS, META_SYNC } from '@/lib/decks/types';
@@ -41,6 +42,37 @@ export async function clearStoredData(groups: Iterable<DataGroup>): Promise<void
       await db.runs.clear();
     }
   });
+}
+
+const jsonSize = (v: unknown) => JSON.stringify(v)?.length ?? 0;
+async function tableSize(table: Table): Promise<number> {
+  let bytes = 0;
+  await table.each((row) => {
+    bytes += jsonSize(row);
+  });
+  return bytes;
+}
+const metaSize = async (keys: string[]) => (await db.meta.bulkGet(keys)).reduce((sum, row) => sum + (row ? jsonSize(row) : 0), 0);
+
+/**
+ * What each group's data weighs (its rows as JSON, close to what IndexedDB stores). This is
+ * what clearing removes. The browser's own figure (navigator.storage.estimate) is the size of the
+ * database files: they keep the space of deleted rows until the browser compacts them, later.
+ * Reads every row, so call it on demand rather than on every change.
+ */
+export async function measureStoredData(): Promise<Record<DataGroup, number>> {
+  const [lookups, f2fMeta, decks, deckCards, decksMeta, collection, collectionMeta, runs, items] = await Promise.all([
+    tableSize(db.f2fCache),
+    metaSize(['bulkRates', 'f2fSets']),
+    tableSize(db.decks),
+    tableSize(db.deckCards),
+    metaSize([META_DECKS, META_SYNC]),
+    tableSize(db.moxCollection),
+    metaSize([META_COLLECTION]),
+    tableSize(db.runs),
+    tableSize(db.items),
+  ]);
+  return { f2fCache: lookups + f2fMeta, moxDecks: decks + deckCards + decksMeta, moxCollection: collection + collectionMeta, runs: runs + items };
 }
 
 /** What each known preference key holds, for the "Reset all settings" list. */

@@ -3,7 +3,7 @@ import { db, getMeta, putMeta } from '@/lib/db';
 import { META_COLLECTION, META_DECKS, META_SYNC } from '@/lib/decks/types';
 import { getSettings, overlayCollapsedItem, saveSettings } from '@/lib/settings';
 import { mismatchConfigItem } from '@/features/deck-mismatch/config';
-import { clearStoredData, listStoredPreferences, resetAllSettings } from '@/features/settings/stored-data';
+import { clearStoredData, listStoredPreferences, measureStoredData, resetAllSettings } from '@/features/settings/stored-data';
 
 // Rows only need their keys for these tests.
 const row = (v: object) => v as never;
@@ -50,8 +50,18 @@ describe('Settings → Stored data', () => {
     expect(await counts()).toMatchObject({ runs: 1, items: 1, collection: 0, collectionMeta: false });
   });
 
+  it('measures each group, down to zero once cleared', async () => {
+    const before = await measureStoredData();
+    expect(Object.values(before).every((bytes) => bytes > 0)).toBe(true);
+    await clearStoredData(['moxDecks']);
+    const after = await measureStoredData();
+    expect(after.moxDecks).toBe(0);
+    expect(after.f2fCache).toBe(before.f2fCache);
+  });
+
   it('clears everything', async () => {
     await clearStoredData(['f2fCache', 'moxDecks', 'moxCollection', 'runs']);
+    expect(await measureStoredData()).toEqual({ f2fCache: 0, moxDecks: 0, moxCollection: 0, runs: 0 });
     expect(await counts()).toEqual({ runs: 0, items: 0, f2fCache: 0, bulkRates: false, decks: 0, deckCards: 0, decksMeta: false, collection: 0, collectionMeta: false });
     expect(await db.meta.count()).toBe(0);
   });
