@@ -95,7 +95,7 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
           onChange={(v) => set('category', v as Filters['category'])}
           data={[
             { value: 'all', label: <CategoryLabel icon={<IconCards size={16} />} text={`All (${counts.all})`} /> },
-            { value: 'buylist', label: <CategoryLabel icon={<IconCash size={16} color="var(--mantine-color-teal-5)" />} text={`Buylist (${counts.buylist})`} /> },
+            { value: 'buylist', label: <CategoryLabel icon={<IconCash size={16} color="var(--mantine-color-teal-5)" />} text={`F2F buys (${counts.buylist})`} /> },
             { value: 'bulk', label: <CategoryLabel icon={<IconBox size={16} color="var(--mantine-color-orange-5)" />} text={`Bulk (${counts.bulk})`} /> },
             { value: 'not_bought', label: <CategoryLabel icon={<IconBan size={16} color="var(--mantine-color-gray-5)" />} text={`Not bought (${counts.notBought})`} /> },
           ]}

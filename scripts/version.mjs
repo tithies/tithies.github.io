@@ -7,8 +7,8 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** Paths whose changes produce a new extension build. */
-export const EXTENSION_PATHS = ['src', 'wxt.config.ts', 'package.json', 'package-lock.json', 'postcss.config.cjs'];
+/** Paths whose changes produce a new extension build (public/ holds the icons and other static files). */
+export const EXTENSION_PATHS = ['src', 'public', 'wxt.config.ts', 'package.json', 'package-lock.json', 'postcss.config.cjs'];
 
 /** "0.1.0" + 7 commits → "0.1.7" (Chrome versions: 1–4 dot-separated integers, each ≤ 65535). */
 export function toExtensionVersion(baseVersion, commits, dirty = false) {

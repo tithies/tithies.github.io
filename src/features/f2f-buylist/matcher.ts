@@ -68,7 +68,7 @@ const docRank = (d: F2FDoc) => (isScanListing(d) ? 0 : 4) + (d.publishedF2FSell 
 /** Best candidates first (stable, so F2F's order breaks ties). */
 const byRank = (docs: F2FDoc[]) => [...docs].sort((a, b) => docRank(b) - docRank(a));
 
-const SCAN_NOTE = 'F2F only lists individually scanned copies of this print (not on the buylist)';
+const SCAN_NOTE = "F2F only lists individually scanned copies of this print, and doesn't buy it individually";
 const withScanNote = (doc: F2FDoc, note?: string) => ({
   doc,
   note: isScanListing(doc) ? (note ? `${note}; ${SCAN_NOTE}` : SCAN_NOTE) : note,
@@ -182,7 +182,7 @@ export function evaluate(
     category = b.value > 0 ? 'bulk' : 'not_bought';
     buyCash = b.value;
     const reason = `${b.reason.charAt(0).toLowerCase()}${b.reason.slice(1)}`;
-    if (!result.doc) bulkReason = `Not on F2F's buylist — ${reason}`;
+    if (!result.doc) bulkReason = `F2F doesn't buy it individually — ${reason}`;
     else if (result.doc.source === 'shopify') bulkReason = `Buy price unknown (check it on F2F) — ${reason}`;
     else bulkReason = b.reason;
   }

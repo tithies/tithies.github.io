@@ -15,7 +15,7 @@ const num = (children: React.ReactNode, c?: string) => (
 );
 
 /**
- * Green cash = F2F buylist, orange box = bulk, grey ban = F2F doesn't buy it at all (tokens,
+ * Green cash = F2F buys it at a card price, orange box = bulk, grey ban = F2F doesn't buy it at all (tokens,
  * Unfinity…). Rows still being looked up show a grey clock, failed lookups a grey retry icon.
  * "Needs review" isn't an icon: those rows are tinted red (see `reviewRowClass`).
  */
@@ -55,8 +55,8 @@ export function CategoryIcon({ item }: { item: Item }) {
   const review = isProblem(item);
   const lines = [
     review && 'Needs review',
-    category === 'buylist' && 'On F2F buylist',
-    category === 'bulk' && `Bulk — ${item.bulkReason ?? 'not on the buylist'}`,
+    category === 'buylist' && 'F2F buys this card',
+    category === 'bulk' && `Bulk — ${item.bulkReason ?? "F2F doesn't buy it individually"}`,
     category === 'not_bought' && 'Not bought by F2F (not even as bulk)',
     category === 'not_bought' && item.bulkReason,
     item.match === 'loose' && `Loose match: ${item.matchNote ?? ''}`,
@@ -119,7 +119,7 @@ function Links({ item }: { item: Item }) {
   const sellLabel = priceCheck
     ? 'Check the buy price on F2F (sell page)'
     : category === 'buylist'
-      ? 'Sell to F2F (buylist page)'
+      ? 'Sell to F2F (sell page)'
       : category === 'not_bought'
         ? "F2F doesn't buy this card, not even as bulk"
         : 'Sell as bulk (F2F wholesale page)';

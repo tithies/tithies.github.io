@@ -40,3 +40,6 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Settings> 
 /** Dashboard table columns the user has hidden (F2F stock is hidden by default). */
 export const DEFAULT_HIDDEN_COLUMNS = ['stock'];
 export const hiddenColumnsItem = storage.defineItem<string[]>('local:f2fHiddenColumns', { fallback: DEFAULT_HIDDEN_COLUMNS });
+
+/** Moxfield panel minimised or not. Survives reloads and is shared by every Moxfield tab. */
+export const overlayCollapsedItem = storage.defineItem<boolean>('local:overlayCollapsed', { fallback: false });

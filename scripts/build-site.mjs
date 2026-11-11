@@ -38,6 +38,10 @@ function repoUrl() {
   return 'https://github.com';
 }
 
+// The page's own address, for the absolute URLs link previews need (og:url, og:image).
+const siteUrl = readFileSync(join(root, 'src', 'lib', 'release-url.ts'), 'utf8').match(/RELEASE_PAGE_URL = '([^']+)'/)?.[1];
+if (!siteUrl) throw new Error('RELEASE_PAGE_URL not found in src/lib/release-url.ts');
+
 const versionedFile = `tithies-${version}.zip`;
 const sha256 = createHash('sha256').update(zip).digest('hex');
 const publishedAt = new Date().toISOString();
@@ -57,6 +61,7 @@ const values = {
   EXTENSION_ID: extensionId || '(set at install)',
   VERSIONED_FILE: versionedFile,
   REPO_URL: repoUrl(),
+  SITE_URL: siteUrl,
 };
 const indexPath = join(out, 'index.html');
 const html = readFileSync(indexPath, 'utf8').replace(/\{\{(\w+)\}\}/g, (m, k) => {

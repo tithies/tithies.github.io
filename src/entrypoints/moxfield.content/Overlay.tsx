@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+// Inlined as a data: URL. A file URL would need web_accessible_resources, which lets any page detect the extension.
+import iconUrl from '@/assets/tithies-icon.webp?inline';
 import { bridge, type CaptureInfo } from '@/lib/page-bridge';
 import { describeQuery, groupPrints, isEligible } from '@/lib/moxfield/normalize';
 import { onMessage, sendMessage } from '@/lib/messaging';
-import { getSettings } from '@/lib/settings';
+import { getSettings, overlayCollapsedItem as collapsedItem } from '@/lib/settings';
 import type { RunProgress } from '@/features/f2f-buylist/types';
 
 type Phase =
@@ -18,7 +20,8 @@ const ACTIVE = new Set(['queued', 'running']);
 export function Overlay() {
   const [capture, setCapture] = useState<CaptureInfo>({ hasCapture: false });
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
-  const [collapsed, setCollapsed] = useState(false);
+  // null until read from storage, so a minimised panel doesn't flash open on page load.
+  const [collapsed, setCollapsed] = useState<boolean | null>(null);
   const [summary, setSummary] = useState<string>('');
   const runIdRef = useRef<number | null>(null);
 
@@ -46,6 +49,11 @@ export function Overlay() {
       offs.forEach((off) => off());
       clearInterval(poll);
     };
+  }, []);
+
+  useEffect(() => {
+    void collapsedItem.getValue().then(setCollapsed);
+    return collapsedItem.watch((value) => setCollapsed(value ?? false));
   }, []);
 
   useEffect(() => {
@@ -84,10 +92,16 @@ export function Overlay() {
   const control = (action: 'pause' | 'resume') =>
     runIdRef.current != null && void sendMessage('controlRun', { runId: runIdRef.current, action });
 
+  const minimise = (value: boolean) => {
+    setCollapsed(value);
+    void collapsedItem.setValue(value);
+  };
+
+  if (collapsed === null) return null;
   if (collapsed) {
     return (
-      <button className="ti-fab" title="Tithies" onClick={() => setCollapsed(false)}>
-        F2F
+      <button className="ti-fab" title="Show the Tithies panel" aria-label="Show the Tithies panel" onClick={() => minimise(false)}>
+        <img src={iconUrl} alt="" />
       </button>
     );
   }
@@ -122,8 +136,11 @@ export function Overlay() {
   return (
     <div className="ti-card">
       <div className="ti-header">
-        <span className="ti-title">Tithies · F2F buylist</span>
-        <button className="ti-icon" title="Minimise" onClick={() => setCollapsed(true)}>
+        <span className="ti-title">
+          <img className="ti-logo" src={iconUrl} alt="" />
+          Tithies · Sell to F2F
+        </span>
+        <button className="ti-icon" title="Minimise" onClick={() => minimise(true)}>
           –
         </button>
       </div>
@@ -138,7 +155,7 @@ export function Overlay() {
       )}
       <div className="ti-actions">
         <button className="ti-btn ti-primary" disabled={!capture.hasCapture || busy} onClick={start}>
-          Check F2F buylist
+          Check selling prices on F2F
         </button>
         {phase.kind === 'run' && ACTIVE.has(phase.progress.status) && (
           <button className="ti-btn" onClick={() => control('pause')}>

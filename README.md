@@ -1,18 +1,20 @@
+<img src="site/img/medallion.webp" width="140" align="right" alt="Tithies medallion" />
+
 # Tithies
 
 A toolbox for Magic: The Gathering collectors: a Chrome extension (MV3) that adds tools around your [Moxfield](https://moxfield.com) collection and decks, and connects them to shops such as [Face to Face Games](https://facetofacegames.com) (F2F). Each tool is a feature below; more are added over time.
 
 **Install:** download it and follow the 5-step guide on **https://tithies.github.io/** (Chrome, Edge, Brave; not on the Chrome Web Store).
 
-## Feature 1 — F2F buylist checker
+## Feature 1 — Selling: what F2F pays for your cards
 
 1. Open **moxfield.com/collection** and apply any filters you want (set, rarity, search…).
-2. In the **Tithies** panel (bottom-right), click **Check F2F buylist**.
+2. In the **Tithies** panel (bottom-right), click **Check selling prices on F2F**.
 3. Tithies reads exactly the cards in that filtered view (English, non-proxy only). It then looks up each exact print on F2F: same set, collector number and finish, NM condition.
 4. Open the dashboard (toolbar icon, or **Open results** in the panel) to see:
    - every card, with an image, quantity, F2F buy price (cash and +30 % store credit), F2F retail price, and **buy ÷ sell %** for cash and for credit;
-   - a coloured icon: **green cash = on F2F's buylist**, **orange box = bulk** (F2F doesn't buy it, so it's valued at the [wholesale bulk](https://facetofacegames.com/collections/wholesale-bulk?site=sell) rate). A red dot means the match needs review;
-   - **Buy** (F2F shop page) and **Sell** (F2F buylist page, or the bulk page) links for each card;
+   - a coloured icon: **green cash = F2F buys it**, **orange box = bulk** (F2F doesn't buy it, so it's valued at the [wholesale bulk](https://facetofacegames.com/collections/wholesale-bulk?site=sell) rate). A red dot means the match needs review;
+   - **Buy** (F2F shop page) and **Sell** (F2F sell page, or the bulk page) links for each card;
    - filters (name, category, set, finish, rarity, match, price / % ranges, stock), sorting on every column, a page-size selector (default 100) and CSV export;
    - the history of every run.
 
@@ -29,7 +31,7 @@ Runs are stored in IndexedDB and survive browser restarts. A run interrupted by 
 - **F2F.** Tithies uses the same public search endpoint as F2F's "sell your cards" mode (`/apps/prod-indexer/buy/search/...`). Each product variant includes both `price` (what F2F sells it for) and `sellPrice` (what F2F pays you). Up to 40 prints are looked up per request (name × collector number × English). Requests go one at a time, at least 1.5 s apart plus random jitter. Tithies honours `Retry-After` on HTTP 429 and pauses after 3 failures in a row. Results are cached for 1 h (setting); "not found" results are always looked up again.
 - **Shop/sell mode.** F2F keeps a cart attribute `site=shop|sell`. Sell links use F2F's own `?site=sell`. Buy links use `?tithies=shop`, which a tiny content script turns back into shop mode.
 
-All delays, the batch size, the cache TTL, the credit bonus and the fallback search can be changed under **Settings**.
+All delays, the batch size, the cache TTL, the credit bonus and the fallback search can be changed under **Settings → Selling** (saved as you type). **Settings → Stored data** shows everything Tithies keeps in the browser (F2F lookups, synced Moxfield decks and collection, runs) and clears any part of it, or all of it; **Reset settings** puts every setting and preference back to its default.
 
 ## Feature 2 — Deck ↔ collection mismatches
 
@@ -68,7 +70,7 @@ Load it in Chrome: `chrome://extensions` → enable **Developer mode** → **Loa
 
 Every push to `master` runs `.github/workflows/pages.yml`: typecheck, tests, `npm run site`, then deploy to GitHub Pages. The site is the download page in `site/`, plus `tithies.zip`, `tithies-<version>.zip` and `version.json`.
 
-- **To release:** just push to `master`. The version is automatic (`scripts/version.mjs`): `<major>.<minor>` from `package.json` plus the number of commits that changed the extension (`src/`, `wxt.config.ts`, dependencies). Pushes that only touch the README, tests or `site/` keep the version, so they refresh the page without announcing an update. Bump `major`/`minor` in `package.json` by hand for big changes. The dashboard reads `version.json` at most once a day and shows a "new version available" banner when it's newer than the installed version.
+- **To release:** just push to `master`. The version is automatic (`scripts/version.mjs`): `<major>.<minor>` from `package.json` plus the number of commits that changed the extension (`src/`, `public/`, `wxt.config.ts`, dependencies). Pushes that only touch the README, tests or `site/` keep the version, so they refresh the page without announcing an update. Bump `major`/`minor` in `package.json` by hand for big changes. The dashboard reads `version.json` at most once a day and shows a "new version available" banner when it's newer than the installed version.
 - **One-time setup:** the repository is `tithies/tithies.github.io` (a free GitHub organization; that repository name puts the page at the domain root). In the repository, go to **Settings → Pages → Source** and pick **GitHub Actions**.
 - **Preview locally:** `npm run site` builds the site into `site-dist/`.
 - **Fixed extension ID:** the manifest `key` (in `wxt.config.ts`) pins the ID to `cihnokdnhnhjamllchdmnehblkekcjbj` wherever the folder lives. That's what lets users update by replacing files without losing data. The matching private key is kept outside the repo, and is only needed to pack a `.crx` or publish to a store.

@@ -6,7 +6,18 @@
   <title>Tithies: a toolbox for Magic: The Gathering collectors</title>
   <meta name="description" content="Tithies is a free Chrome extension with handy tools for Magic: The Gathering collectors: check what Face to Face Games pays for your Moxfield collection, find mismatches between your decks and your collection, and more to come." />
   <meta name="color-scheme" content="dark light" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='3' width='19' height='26' rx='3' fill='%231971c2' transform='rotate(-8 14 16)'/%3E%3Crect x='9' y='4' width='19' height='26' rx='3' fill='%2337b24d' transform='rotate(8 18 17)'/%3E%3C/svg%3E" />
+  <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Tithies" />
+  <meta property="og:title" content="Tithies: a toolbox for Magic: The Gathering collectors" />
+  <meta property="og:description" content="Tithies is a free Chrome extension with handy tools for Magic: The Gathering collectors: check what Face to Face Games pays for your Moxfield collection, find mismatches between your decks and your collection, and more to come." />
+  <meta property="og:url" content="{{SITE_URL}}" />
+  <meta property="og:image" content="{{SITE_URL}}img/og.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="The Tithies emblem: a sorceress holding a bag of gold, inside a golden ring of runes" />
+  <meta name="twitter:card" content="summary_large_image" />
   <style>
     :root {
       --bg: #141517;
@@ -71,12 +82,20 @@
     .top .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 16px; }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.2rem; color: var(--text); }
     .brand:hover { text-decoration: none; }
+    .brand img { display: block; }
+    .inline-icon { width: 1.3em; height: 1.3em; vertical-align: -0.3em; }
     .nav { display: flex; gap: 20px; font-size: 0.95rem; }
     .nav a { color: var(--muted); }
     @media (max-width: 640px) { .nav { display: none; } }
 
-    /* hero */
-    .hero { padding: 72px 0 48px; text-align: center; }
+    /* hero: the emblem art as a faded backdrop */
+    .hero-band { position: relative; overflow: hidden; isolation: isolate; }
+    .hero-band::before, .hero-band::after { content: ''; position: absolute; inset: 0; z-index: -1; }
+    .hero-band::before { background: url(img/banner.webp) center 200% / cover no-repeat; opacity: 0.55; }
+    .hero-band::after { background: radial-gradient(ellipse 60% 75% at 50% 45%, color-mix(in srgb, var(--bg) 82%, transparent), color-mix(in srgb, var(--bg) 65%, transparent) 70%), linear-gradient(to bottom, transparent 55%, var(--bg)); }
+    /* Tall top padding: the emblem art shows above the title. */
+    .hero { padding: 515px 0 56px; text-align: center; }
+    @media (max-width: 640px) { .hero { padding-top: 228px; } }
     .hero h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); letter-spacing: -0.02em; }
     .hero .lead { font-size: 1.2rem; color: var(--muted); max-width: 680px; margin: 0 auto 28px; }
     .cta { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
@@ -97,10 +116,13 @@
     .feature:last-child { margin-bottom: 0; }
     .feature .text { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 40px; align-items: start; }
     .feature .text > :not(ul) { grid-column: 1; }
-    .feature .text > ul { grid-column: 2; grid-row: 1 / span 3; padding-top: 30px; }
+    /* The checklist starts level with the paragraph (row 3, after the tag and the title). */
+    .feature .text > ul { grid-column: 2; grid-row: 3; }
+    /* The panel drawing spans both columns, centered above the screenshot. */
+    .feature .text > .panel-demo { grid-column: 1 / -1; justify-content: center; }
     @media (max-width: 860px) {
       .feature .text { grid-template-columns: 1fr; }
-      .feature .text > ul { grid-column: 1; grid-row: auto; padding-top: 0; }
+      .feature .text > ul { grid-column: 1; grid-row: auto; }
     }
     .tools-intro { max-width: 720px; margin-bottom: 40px; }
     .tag { display: inline-block; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
@@ -122,9 +144,11 @@
       width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
       background: var(--accent-strong); color: #fff; font-weight: 700;
     }
-    .step-body { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; min-width: 0; }
-    @media (max-width: 760px) { .step-body { grid-template-columns: 1fr; } }
-    .step p:last-child { margin-bottom: 0; }
+    .step-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; min-width: 0; }
+    @media (max-width: 760px) { .step-body { grid-template-columns: minmax(0, 1fr); } }
+    .step p:last-child, .step ul:last-child { margin-bottom: 0; }
+    .step ul { margin: 0 0 12px; padding-left: 20px; }
+    .step li { margin-bottom: 8px; }
     .copy { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .copy button {
       font: inherit; font-size: 0.85rem; padding: 4px 10px; border-radius: 6px; cursor: pointer;
@@ -132,7 +156,7 @@
     }
 
     /* drawn bits of Chrome's extensions page */
-    .mock { background: #202124; color: #e8eaed; border: 1px solid #3c4043; border-radius: 10px; padding: 14px 16px; font: 13px/1.4 system-ui, 'Segoe UI', Roboto, sans-serif; min-width: 240px; }
+    .mock { background: #202124; color: #e8eaed; border: 1px solid #3c4043; border-radius: 10px; padding: 14px 16px; font: 13px/1.4 system-ui, 'Segoe UI', Roboto, sans-serif; min-width: min(240px, 100%); }
     .mock .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
     .toggle { width: 34px; height: 14px; border-radius: 7px; background: #8ab4f8; position: relative; opacity: 0.85; }
     .toggle::after { content: ''; position: absolute; right: -2px; top: -3px; width: 20px; height: 20px; border-radius: 50%; background: #8ab4f8; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
@@ -140,15 +164,23 @@
     .mock .chip { border: 1px solid #5f6368; border-radius: 6px; padding: 5px 10px; color: #8ab4f8; }
     .mock .chip.hl { outline: 2px solid var(--orange); outline-offset: 2px; }
     .folder { margin-top: 10px; display: flex; align-items: center; gap: 8px; color: #bdc1c6; font-size: 12px; }
+    .mock.toolbar { display: flex; align-items: center; gap: 14px; width: 320px; max-width: 100%; padding: 10px 14px 10px 10px; }
+    .omnibox { flex: 1; min-width: 0; background: #282a2d; border-radius: 16px; padding: 6px 14px; color: #bdc1c6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toolbar svg { flex-shrink: 0; color: #c4c7c5; }
+    .toolbar .pinned { flex-shrink: 0; border-radius: 50%; outline: 2px solid var(--orange); outline-offset: 3px; }
 
     /* the Tithies panel, drawn with the extension's own styles */
-    .ti-card { width: 300px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #c9c9c9; background: #1f1f1f; border: 1px solid #373a40; border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.45); }
+    .ti-card { width: 330px; max-width: 100%; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #c9c9c9; background: #1f1f1f; border: 1px solid #373a40; border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.45); }
     .ti-header { display: flex; align-items: center; justify-content: space-between; }
-    .ti-title { font-weight: 700; color: #fff; }
+    .ti-title { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #fff; }
     .ti-dim { color: #909296; font-size: 12px; }
     .ti-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
     .ti-btn { padding: 6px 10px; border-radius: 6px; border: 1px solid #373a40; background: #2c2e33; color: #c9c9c9; }
     .ti-primary { background: #1971c2; border-color: #1971c2; color: #fff; }
+    .panel-demo { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
+    .panel-demo figure { margin: 0; display: grid; justify-items: center; gap: 6px; }
+    .panel-demo figure img { border-radius: 50%; box-shadow: 0 8px 28px rgba(0,0,0,.45); }
+    .panel-demo figcaption { font-size: 0.8rem; color: var(--muted); }
 
     /* update + faq */
     .callout { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--accent-strong); border-radius: 12px; padding: 20px 24px; }
@@ -168,7 +200,7 @@
   <header class="top">
     <div class="wrap">
       <a class="brand" href="#">
-        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="3" width="19" height="26" rx="3" fill="#1971c2" transform="rotate(-8 14 16)" /><rect x="9" y="4" width="19" height="26" rx="3" fill="#37b24d" transform="rotate(8 18 17)" /></svg>
+        <img src="img/icon.webp" width="36" height="36" alt="" />
         Tithies
       </a>
       <nav class="nav">
@@ -182,6 +214,7 @@
   </header>
 
   <main>
+    <div class="hero-band">
     <div class="wrap hero">
       <h1>Handy tools for<br />Magic: The Gathering collectors</h1>
       <p class="lead">Tithies is a free Chrome extension that adds a toolbox to your browser, built around your Moxfield collection and decks. Check what Face to Face Games would pay for your cards, find mismatches between your decks and your collection, and more tools to come. Everything runs in your browser.</p>
@@ -194,6 +227,7 @@
       </div>
       <p class="meta muted small">For Chrome, Edge, Brave and other Chromium browsers. It isn't on the Chrome Web Store: you add it yourself, which takes about a minute.</p>
     </div>
+    </div>
 
     <section id="features">
       <div class="wrap">
@@ -202,29 +236,38 @@
           <p class="muted">Every tool lives in the Tithies dashboard, next to the others, and shares the same Moxfield connection. New tools are added over time: you get them by updating (see below), with nothing else to set up.</p>
         </div>
 
-        <div class="feature">
+        <div class="feature" id="tool-selling">
           <div class="text">
             <span class="tag">Tool 1</span>
-            <h2>F2F buylist checker</h2>
-            <p class="muted">Open your collection on Moxfield, apply any filters, and click <b>Check F2F buylist</b>. Tithies looks up each exact print (set, collector number and finish) on Face to Face Games.</p>
+            <h2>What F2F pays for your cards</h2>
+            <p class="muted">Open <a href="https://moxfield.com/collection" target="_blank" rel="noopener">your Moxfield collection</a> while logged in and apply any filters. The Tithies panel appears in the bottom-right corner: click <b>Check selling prices on F2F</b>. Tithies looks up each exact print (set, collector number and finish) on Face to Face Games, and the results are in the dashboard under <b>Selling → Runs</b>.</p>
             <ul>
               <li>Cash and store-credit offers, and F2F's own selling price</li>
               <li>What share of F2F's price they pay you, per card and overall</li>
               <li>Cards F2F doesn't buy, valued at its bulk rates</li>
               <li>Filters, sorting, CSV export and links to buy or sell on F2F</li>
             </ul>
+            <div class="panel-demo" aria-hidden="true">
+              <div class="ti-card">
+                <div class="ti-header"><span class="ti-title"><img src="img/icon.webp" width="28" height="28" alt="" />Tithies · Sell to F2F</span><span class="ti-dim" style="font-size:18px">–</span></div>
+                <div class="ti-dim">Filters: Whole collection</div>
+                <div class="ti-actions"><span class="ti-btn ti-primary">Check selling prices on F2F</span><span class="ti-btn">Dashboard</span></div>
+                <div class="ti-dim">English, non-proxy cards only · NM prices</div>
+              </div>
+              <figure><img src="img/icon.webp" width="56" height="56" alt="" /><figcaption>Minimised</figcaption></figure>
+            </div>
           </div>
           <a class="shot" href="img/f2f-results.webp" target="_blank" rel="noopener">
             <div class="bar"><i></i><i></i><i></i></div>
-            <img src="img/f2f-results.webp" width="1893" height="952" loading="lazy" alt="Tithies dashboard: results of an F2F buylist check, with buy prices, sell prices and percentages for each card" />
+            <img src="img/f2f-results.webp" width="1893" height="952" loading="lazy" alt="Tithies dashboard: results of an F2F selling price check, with what F2F pays, what it sells each card for, and percentages" />
           </a>
         </div>
 
-        <div class="feature">
+        <div class="feature" id="tool-decks">
           <div class="text">
             <span class="tag">Tool 2</span>
             <h2>Deck ↔ collection mismatches</h2>
-            <p class="muted">Every card in your decks should also be in your collection, and every collection card in a deck. Tithies lists every exact print where they disagree, with quantities.</p>
+            <p class="muted">Every card in your decks should also be in your collection, and every collection card in a deck. Tithies lists every exact print where they disagree, with quantities. It's in the dashboard under <b>Decks → Mismatches</b>; the first time, Tithies syncs your Moxfield decks, which takes a few minutes.</p>
             <ul>
               <li>Deck copies missing from the collection, and collection copies in no deck</li>
               <li>Choose decks and whole Moxfield folders; new decks are included automatically</li>
@@ -308,14 +351,17 @@
             <div class="step-body">
               <div>
                 <h3>Pin it and go</h3>
-                <p>Click the puzzle-piece icon next to the address bar and pin <b>Tithies</b>; its icon opens the dashboard.</p>
-                <p>Then open <a href="https://moxfield.com/collection" target="_blank" rel="noopener">moxfield.com/collection</a> while logged in: the Tithies panel appears in the bottom-right corner. The deck tools are in the dashboard under <b>Decks → Mismatches</b>.</p>
+                <p>Click the puzzle-piece icon next to the address bar and pin <b>Tithies</b>. You then use it from:</p>
+                <ul>
+                  <li><b>Its toolbar icon</b> <img class="inline-icon" src="img/icon.webp" width="21" height="21" alt="" />, which opens the dashboard. Every tool is in its menu, with its results and settings: <b>Selling</b> and <b>Decks</b>.</li>
+                  <li><b>The Tithies panel</b>, in the bottom-right corner of <a href="https://moxfield.com/collection" target="_blank" rel="noopener">moxfield.com/collection</a> when you're logged in. It checks the cards in view (see <a href="#tool-selling">tool 1</a>).</li>
+                  <li><b>The update banner</b> at the top of the dashboard, when a new version is out (see <a href="#update">Updating</a>).</li>
+                </ul>
               </div>
-              <div class="ti-card" aria-hidden="true">
-                <div class="ti-header"><span class="ti-title">Tithies · F2F buylist</span><span class="ti-dim" style="font-size:18px">–</span></div>
-                <div class="ti-dim">Filters: Whole collection</div>
-                <div class="ti-actions"><span class="ti-btn ti-primary">Check F2F buylist</span><span class="ti-btn">Dashboard</span></div>
-                <div class="ti-dim">English, non-proxy cards only · NM prices</div>
+              <div class="mock toolbar" aria-hidden="true">
+                <span class="omnibox">moxfield.com/collection</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h1a2 2 0 0 0 0 -4h-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1" /></svg>
+                <img class="pinned" src="img/icon.webp" width="24" height="24" alt="" />
               </div>
             </div>
           </div>
@@ -344,7 +390,7 @@
           <summary>What does Tithies access, and where does my data go?</summary>
           <ul>
             <li><b>Moxfield</b>: Tithies reads your collection and decks through your open Moxfield tab, using your own session. Your login never leaves that page. If no Moxfield tab is open, Tithies opens one for a few seconds and closes it afterwards.</li>
-            <li><b>Face to Face Games</b>: F2F's public buylist search, one request at a time.</li>
+            <li><b>Face to Face Games</b>: the public search behind F2F's "sell your cards" page, one request at a time.</li>
             <li><b>This page</b>: once a day, the dashboard reads <code>version.json</code> here to tell you about updates.</li>
           </ul>
           <p>That's all today. There's no Tithies server and no tracking: results stay in your browser. If a future tool contacts another site, this list will say so before the update is published.</p>

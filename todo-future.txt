@@ -1,7 +1,3 @@
-I added some icons and images, copy them in the right folders and use them, both in website and extension. Dont forget website favicon and extension icon as well.  Also in collection page in moxfield, when the little popup is miniminzed, show icon instead of "F2F". Show icon in the popup as well. Remember if it is minimized when we refresh. Default is not minimized. Reword "check f2f buylist" to "check selling prices on f2f"
-
-in pages where the are tables, the header of table should be sticky when it reach top, so that when scrolling, it still show in the page.
-
 new feature: if a user has multiple account, tithies should support this and not mix data from different moxfield accounts. In runs page, we can add a column to know which account was used. In detail we can add also the account source.
 In mismatch page, add a selector to know which account to use.
 Accounts list should probably be accumulated while interacting with tithies.
@@ -11,15 +7,9 @@ new page: show list of all cards in collection that are not used in any deck. Sa
 
 in "runs" page: same as the new page: should have options in filters to exclude cards already in decks. Algorithm is same as the new page basically. And settings are also not shared.
 
-Rename "F2F buylist" to "Selling".
-
-Settings should probably not belong to any parent menu.
+Settings should probably not belong to parent menu
 
 in collection mismatches, there is "likely wrong print only", what does it mean ?
-
-in runs page, for items with a message under the card name, maybe have a filter to show them only.
-
-Maybe add a filter for the foil variations like "surge foil" or "ripple foil". Its data could be calculated from the list.
 
 Make the dashboard darker in dark mode.
 
@@ -38,8 +28,5 @@ fix: save button doesnt react when clicking restore defaults button. Also dont h
 feature: have a "global" restore defaults in other pages that have their own settings as well
 
 feature: in settings, the panel where we can clear cache, display more details about what is in the cache. Also seems we cant delete all cache there is, just some. Maybe have multiple checkbox to specify what should be deleted
-
-
-Some settings are saved in indexeddb, some in local storage, some in extension storage. Explain details and why. Also are there other places any data is saved ?
 
 new feature Scanner cards: upload list of images, it scans all cards in it and list them. Then we can just like the buylist page, add to collection directly

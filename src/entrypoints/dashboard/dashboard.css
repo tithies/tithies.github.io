@@ -1,5 +1,37 @@
+/* Depth: page background darkest, header and menu a bit lighter, cards lightest (they use
+   --mantine-color-body), each with its own shadow. */
+:root {
+  --ti-canvas: #f1f3f5;
+  --ti-navbar: #f8f9fa;
+  --ti-header-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 14px rgba(16, 24, 40, 0.06);
+  --ti-navbar-shadow: 1px 0 10px rgba(16, 24, 40, 0.04);
+  --ti-card-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 14px rgba(16, 24, 40, 0.05);
+}
+[data-mantine-color-scheme='dark'] {
+  --ti-canvas: var(--mantine-color-dark-9);
+  --ti-navbar: var(--mantine-color-dark-8);
+  --ti-header-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.03), 0 4px 18px rgba(0, 0, 0, 0.6);
+  --ti-navbar-shadow: 4px 0 18px rgba(0, 0, 0, 0.4);
+  --ti-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025), 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
 body {
-  background: var(--mantine-color-body);
+  background: var(--ti-canvas);
+}
+.mantine-AppShell-main {
+  background: var(--ti-canvas);
+}
+/* Same colour as the menu; above it, so its shadow falls on it. */
+.mantine-AppShell-header {
+  z-index: calc(var(--app-shell-header-z-index, 100) + 2);
+  background: var(--ti-navbar);
+  box-shadow: var(--ti-header-shadow);
+}
+.mantine-AppShell-navbar {
+  background: var(--ti-navbar);
+  box-shadow: var(--ti-navbar-shadow);
+}
+.mantine-Paper-root[data-with-border] {
+  box-shadow: var(--ti-card-shadow);
 }
 .ti-num {
   font-variant-numeric: tabular-nums;

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { DeckTreePicker } from '@/lib/decks/DeckTreePicker';
 import { cancelMoxfieldSync, startMoxfieldSync, useCollectionMeta, useDeckData, useDecks, useDecksMeta, useMoxSync } from '@/lib/decks/hooks';
+import { GettingStarted } from '@/lib/ui/GettingStarted';
 import { markDecksSeen } from '@/lib/decks/sync';
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
 import { timeAgo } from '@/lib/format';
@@ -37,40 +38,37 @@ function FirstSync({ decks }: { decks: DeckRow[] }) {
   const running = sync?.status === 'running';
   const partial = decks.filter((d) => d.cardsUpdatedAt).length;
   return (
-    <Paper withBorder p="lg" radius="md" maw={720}>
-      <Stack>
-        <Title order={4}>First, sync your Moxfield decks</Title>
-        <Text size="sm">
-          Tithies reads your deck list, then every deck's cards, and keeps them here. Later syncs only read decks you changed or added
-          (using each deck's last-updated time), so they take seconds.
+    <GettingStarted title="First, sync your Moxfield decks">
+      <Text size="sm">
+        Tithies reads your deck list, then every deck's cards, and keeps them here. Later syncs only read decks you changed or added
+        (using each deck's last-updated time), so they take seconds.
+      </Text>
+      <Text size="sm" c="dimmed">
+        You must be logged in to Moxfield in this browser. If no logged-in Moxfield tab is open, Tithies opens one (shown for a few seconds while Moxfield starts, then it switches back here) and closes it at the end.
+        Requests go one at a time, about one per second, so a first sync of ~270 decks takes about 6 minutes. You can leave this page meanwhile.
+      </Text>
+      {partial > 0 && !running && (
+        <Text size="sm" c="yellow">
+          {partial} of {decks.length} decks were already read by an earlier, unfinished sync; syncing again continues from there.
         </Text>
-        <Text size="sm" c="dimmed">
-          You must be logged in to Moxfield in this browser. If no logged-in Moxfield tab is open, Tithies opens one (shown for a few seconds while Moxfield starts, then it switches back here) and closes it at the end.
-          Requests go one at a time, about one per second, so a first sync of ~270 decks takes about 6 minutes. You can leave this page meanwhile.
-        </Text>
-        {partial > 0 && !running && (
-          <Text size="sm" c="yellow">
-            {partial} of {decks.length} decks were already read by an earlier, unfinished sync; syncing again continues from there.
-          </Text>
-        )}
-        <SyncProgress state={sync} />
-        {error && (
-          <Alert color="red" icon={<IconAlertTriangle size={18} />}>
-            {error}
-          </Alert>
-        )}
-        <Group>
-          <Button leftSection={<IconRefresh size={16} />} loading={running} onClick={() => void start(false)}>
-            Sync decks
+      )}
+      <SyncProgress state={sync} />
+      {error && (
+        <Alert color="red" icon={<IconAlertTriangle size={18} />}>
+          {error}
+        </Alert>
+      )}
+      <Group>
+        <Button leftSection={<IconRefresh size={16} />} loading={running} onClick={() => void start(false)}>
+          Sync decks
+        </Button>
+        {running && (
+          <Button variant="default" leftSection={<IconPlayerStop size={16} />} onClick={() => void cancelMoxfieldSync()}>
+            Cancel
           </Button>
-          {running && (
-            <Button variant="default" leftSection={<IconPlayerStop size={16} />} onClick={() => void cancelMoxfieldSync()}>
-              Cancel
-            </Button>
-          )}
-        </Group>
-      </Stack>
-    </Paper>
+        )}
+      </Group>
+    </GettingStarted>
   );
 }
 

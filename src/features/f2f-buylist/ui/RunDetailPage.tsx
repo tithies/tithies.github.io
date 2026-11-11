@@ -173,7 +173,7 @@ export function RunDetailPage() {
           onClick={() => update({ ...filters, category: filters.category === 'buylist' ? 'all' : 'buylist' }, sort, 1)}
         />
         <Stat
-          label="Buylist value"
+          label="Value of cards F2F buys"
           lines={[
             <Tooltip
               key="retail"
@@ -198,7 +198,7 @@ export function RunDetailPage() {
             ]}
           />
         </Stat>
-        <Stat label="Buy / sell %" lines={['per card, buylist cards']}>
+        <Stat label="Buy / sell %" lines={['per card, cards F2F buys']}>
           <CashCreditTable
             rows={[
               { label: 'Median', cash: pct(t.medianPctCash), credit: pct(t.medianPctCredit) },

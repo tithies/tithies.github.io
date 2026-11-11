@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "postinstall": "wxt prepare",
-    "site": "wxt zip && node scripts/build-site.mjs"
+    "site": "wxt zip && node scripts/build-site.mjs",
+    "site:serve": "npm run site && vite preview --outDir site-dist --port 8765 --strictPort --host"
   },
   "dependencies": {
     "@mantine/core": "^9.8.0",

@@ -21,14 +21,24 @@
   flex-direction: column;
   gap: 6px;
 }
+/* Minimised: the round Tithies medallion (its corners are transparent). */
 .ti-fab {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: none;
   border-radius: 50%;
-  font-weight: 700;
+  background: transparent;
   cursor: pointer;
-  color: #fff;
-  background: #1971c2;
+  transition: transform 0.15s ease;
+}
+.ti-fab:hover {
+  transform: scale(1.08);
+}
+.ti-fab img {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .ti-header {
   display: flex;
@@ -36,8 +46,16 @@
   justify-content: space-between;
 }
 .ti-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 700;
   color: #fff;
+}
+.ti-logo {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
 }
 .ti-icon {
   background: none;
