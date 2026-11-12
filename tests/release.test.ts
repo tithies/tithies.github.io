@@ -19,22 +19,59 @@ describe('Release check', () => {
     expect(parseReleaseInfo(null)).toBeNull();
   });
 
-  it('fetches at most once a day and survives being offline', async () => {
+  const hour = 3600_000;
+  const t0 = Date.UTC(2026, 10, 10);
+  const release = (version = '0.2.0') => ({ version, file: 'tithies.zip', size: 1, sha256: 'x', publishedAt: '2026-11-10' });
+
+  it('fetches at most every 6 hours and survives being offline', async () => {
     let calls = 0;
-    const ok = async () => {
+    const ok = (async () => {
       calls++;
-      return json({ version: '0.2.0', file: 'tithies.zip', size: 1, sha256: 'x', publishedAt: '2026-11-10' });
-    };
-    const day = 24 * 3600_000;
-    const t0 = Date.UTC(2026, 10, 10);
-    expect((await getLatestRelease(ok as typeof fetch, t0)).latest?.version).toBe('0.2.0');
-    await getLatestRelease(ok as typeof fetch, t0 + day / 2);
+      return json(release());
+    }) as typeof fetch;
+    const first = await getLatestRelease({ fetchImpl: ok, now: t0 });
+    expect(first).toMatchObject({ ok: true, checkedAt: t0, latest: { version: '0.2.0' } });
+    await getLatestRelease({ fetchImpl: ok, now: t0 + 5 * hour });
     expect(calls).toBe(1);
-    const offline = async () => {
+    await getLatestRelease({ fetchImpl: ok, now: t0 + 7 * hour });
+    expect(calls).toBe(2);
+    const offline = (async () => {
       throw new TypeError('Failed to fetch');
-    };
-    // A failed check keeps the last known release.
-    expect((await getLatestRelease(offline as typeof fetch, t0 + day * 2)).latest?.version).toBe('0.2.0');
+    }) as typeof fetch;
+    // A failed check is recorded and keeps the last known release.
+    expect(await getLatestRelease({ fetchImpl: offline, now: t0 + 14 * hour })).toMatchObject({ ok: false, checkedAt: t0 + 14 * hour, latest: { version: '0.2.0' } });
+    const notFound = (async () => json({}, 404)) as typeof fetch;
+    expect((await getLatestRelease({ fetchImpl: notFound, now: t0 + 21 * hour })).ok).toBe(false);
+  });
+
+  it('checks now when forced, and shows a hidden version again', async () => {
+    let calls = 0;
+    const ok = (async () => {
+      calls++;
+      return json(release('0.3.0'));
+    }) as typeof fetch;
+    await getLatestRelease({ fetchImpl: ok, now: t0 });
+    await updateCheckItem.setValue({ ...(await updateCheckItem.getValue()), dismissed: '0.3.0' });
+    // Not due yet: the cached answer, still hidden.
+    expect((await getLatestRelease({ fetchImpl: ok, now: t0 + hour })).dismissed).toBe('0.3.0');
+    const forced = await getLatestRelease({ force: true, fetchImpl: ok, now: t0 + hour });
+    expect(calls).toBe(2);
+    expect(forced).toMatchObject({ ok: true, checkedAt: t0 + hour, latest: { version: '0.3.0' } });
+    expect(forced.dismissed).toBeUndefined();
+    expect((await updateCheckItem.getValue()).dismissed).toBeUndefined();
+  });
+
+  it('shares one fetch between calls made while it runs', async () => {
+    let calls = 0;
+    const slow = (async () => {
+      calls++;
+      await new Promise((r) => setTimeout(r, 10));
+      return json(release());
+    }) as typeof fetch;
+    const [a, b] = await Promise.all([getLatestRelease({ fetchImpl: slow, now: t0 }), getLatestRelease({ force: true, fetchImpl: slow, now: t0 })]);
+    expect(calls).toBe(1);
+    expect(a.latest?.version).toBe('0.2.0');
+    expect(b.latest?.version).toBe('0.2.0');
   });
 });
 

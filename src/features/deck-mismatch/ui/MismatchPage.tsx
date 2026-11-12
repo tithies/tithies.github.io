@@ -340,21 +340,21 @@ export function MismatchPage() {
                 label="Missing from collection"
                 value={`${s.missingCopies} copies`}
                 color={config.showMissing ? 'red' : 'dimmed'}
-                lines={[`${s.missingPrints} prints`, !config.showMissing && 'Hidden: click to show'].filter(Boolean) as string[]}
+                lines={[`${s.missingPrints} prints`, !config.showMissing && 'Hidden from the table'].filter(Boolean) as string[]}
                 onClick={() => update({ showMissing: !config.showMissing })}
                 active={config.showMissing}
                 activeSuffix=" · shown"
-                hint={config.showMissing ? 'Hide these rows' : 'Show these rows'}
+                action={config.showMissing ? 'Hide these rows' : 'Show these rows'}
               />
               <Stat
                 label="Not in any deck"
                 value={`${s.unassignedCopies} copies`}
                 color={config.showUnassigned ? 'orange' : 'dimmed'}
-                lines={[`${s.unassignedPrints} prints`, !config.showUnassigned && 'Hidden: click to show'].filter(Boolean) as string[]}
+                lines={[`${s.unassignedPrints} prints`, !config.showUnassigned && 'Hidden from the table'].filter(Boolean) as string[]}
                 onClick={() => update({ showUnassigned: !config.showUnassigned })}
                 active={config.showUnassigned}
                 activeSuffix=" · shown"
-                hint={config.showUnassigned ? 'Hide these rows' : 'Show these rows'}
+                action={config.showUnassigned ? 'Hide these rows' : 'Show these rows'}
               />
               <Stat
                 label="Likely wrong print"
@@ -363,7 +363,7 @@ export function MismatchPage() {
                 lines={['Same card is mismatched the other way in another print or finish']}
                 onClick={toggleHinted}
                 active={hintedOnly}
-                hint={hintedOnly ? 'Show every row' : 'Show only these rows'}
+                action={hintedOnly ? 'Show every row' : 'Show only these rows'}
               />
               <Stat
                 label="Compared"

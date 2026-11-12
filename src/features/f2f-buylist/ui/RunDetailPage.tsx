@@ -207,7 +207,7 @@ export function RunDetailPage() {
           color="teal"
           icon={<IconCash color="var(--mantine-color-teal-5)" />}
           active={filters.category === 'buylist'}
-          hint={filters.category === 'buylist' ? 'Click to show all cards again' : 'Click to show only cards F2F buys'}
+          action={filters.category === 'buylist' ? 'Show all cards again' : 'Show only cards F2F buys'}
           onClick={() => update({ ...filters, category: filters.category === 'buylist' ? 'all' : 'buylist' }, sort, 1)}
         />
         <Stat
@@ -251,7 +251,7 @@ export function RunDetailPage() {
           color="orange"
           icon={<IconBox color="var(--mantine-color-orange-5)" />}
           active={filters.category === 'bulk'}
-          hint={filters.category === 'bulk' ? 'Click to show all cards again' : 'Click to show only bulk cards'}
+          action={filters.category === 'bulk' ? 'Show all cards again' : 'Show only bulk cards'}
           onClick={() => update({ ...filters, category: filters.category === 'bulk' ? 'all' : 'bulk' }, sort, 1)}
         />
         <Stat
@@ -286,7 +286,7 @@ export function RunDetailPage() {
           color={reviewCount ? 'red' : undefined}
           icon={<IconAlertTriangle color="var(--mantine-color-red-6)" />}
           active={filters.problems}
-          hint={filters.problems ? 'Click to show all cards again' : 'Click to show only cards that need review'}
+          action={filters.problems ? 'Show all cards again' : 'Show only cards that need review'}
           onClick={() => update({ ...filters, problems: !filters.problems, status: [] }, sort, 1)}
           lines={[`${t.notFound} not found · ${t.loose} loose · ${t.errors} errors`, ...(t.priceCheck ? [`${t.priceCheck} to price-check on F2F`] : [])]}
         />

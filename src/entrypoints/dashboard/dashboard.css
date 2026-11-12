@@ -235,6 +235,72 @@ body .mantine-Menu-item:where(:hover, :focus, [data-menu-active]):where(:not(:di
   font-variant-numeric: tabular-nums;
 }
 
+/* Clickable stat cards (Stat with onClick): the last line says what a click does, in the link
+   colour; on hover the card lifts, takes a primary tint and border. While on (a filter applied,
+   rows shown) it keeps a primary ring. */
+.ti-stat {
+  display: flex;
+  flex-direction: column;
+}
+.ti-stat-button {
+  display: block;
+  border-radius: var(--mantine-radius-md);
+}
+/* (Two classes: beats the card shadow rule on .mantine-Paper-root[data-with-border].) */
+.ti-stat-button .ti-stat-clickable {
+  --ti-stat-ring: 0 0 0 0 transparent;
+  box-shadow: var(--ti-card-shadow), var(--ti-stat-ring);
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+.ti-stat-clickable[data-active] {
+  --ti-stat-ring: 0 0 0 1px var(--mantine-primary-color-filled);
+  border-color: var(--mantine-primary-color-filled);
+}
+.ti-stat-action {
+  color: var(--mantine-color-anchor);
+}
+.ti-stat-button:hover .ti-stat-clickable {
+  transform: translateY(-2px);
+  border-color: var(--mantine-color-anchor);
+  box-shadow: var(--ti-card-shadow), var(--ti-stat-ring), 0 8px 22px rgba(16, 24, 40, 0.18);
+  background-color: color-mix(in srgb, color-mix(in srgb, var(--mantine-color-body), var(--mantine-primary-color-filled) 10%) var(--ti-glass), transparent);
+}
+.ti-stat-button:hover .ti-stat-action {
+  text-decoration: underline;
+}
+.ti-stat-button:active .ti-stat-clickable {
+  transform: translateY(0);
+}
+.ti-stat-button:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+/* Header update check: the refresh icon turns while a check runs. */
+@keyframes ti-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ti-spin {
+  animation: ti-spin 0.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ti-stat-clickable {
+    transition: none;
+  }
+  .ti-stat-button:hover .ti-stat-clickable {
+    transform: none;
+  }
+  .ti-spin {
+    animation-duration: 2.4s;
+  }
+}
+
 /* Data tables: make the active sort column obvious (default arrow inherits the dim header color). */
 .mantine-datatable-header-cell-sortable-icon {
   color: var(--mantine-primary-color-filled);

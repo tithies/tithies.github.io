@@ -5,6 +5,7 @@ import { Link, Outlet, useLocation } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { AccountSelector } from '@/lib/ui/AccountSelector';
 import { UpdateBanner } from '@/lib/ui/UpdateBanner';
+import { UpdateCheckButton } from '@/lib/ui/UpdateCheck';
 import iconUrl from '@/assets/tithies-icon.webp';
 
 /** Each feature contributes a section to the navbar. Its settings go in a section of the global Settings page. */
@@ -43,6 +44,7 @@ export function Layout() {
             </Text>
           </Group>
           <Group gap="sm" wrap="nowrap">
+            <UpdateCheckButton />
             <AccountSelector />
             <Tooltip label={scheme === 'dark' ? 'Light theme' : 'Dark theme'}>
               <ActionIcon variant="default" size="lg" onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')} aria-label="Toggle color scheme">

@@ -1,28 +1,20 @@
 import { Alert, Anchor, Button, Group, Text } from '@mantine/core';
 import { IconDownload, IconSparkles } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
-import { compareVersions, downloadUrl, getLatestRelease, RELEASE_PAGE_URL, updateCheckItem, type ReleaseInfo } from '@/lib/release';
+import { compareVersions, downloadUrl, RELEASE_PAGE_URL, updateCheckItem } from '@/lib/release';
+import { useUpdateState } from './UpdateCheck';
 
-/** Banner shown on every dashboard page when a newer Tithies is published. */
+/**
+ * Banner shown on every dashboard page when a newer Tithies is published. The header's
+ * UpdateCheckButton runs the checks; this shows their stored result.
+ */
 export function UpdateBanner() {
   const current = browser.runtime.getManifest().version;
-  const [latest, setLatest] = useState<ReleaseInfo | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    void getLatestRelease().then((s) => {
-      if (alive && s.latest && compareVersions(s.latest.version, current) > 0 && s.dismissed !== s.latest.version) setLatest(s.latest);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [current]);
-
-  if (!latest) return null;
+  const state = useUpdateState();
+  const latest = state?.latest;
+  if (!latest || compareVersions(latest.version, current) <= 0 || state.dismissed === latest.version) return null;
 
   const dismiss = async () => {
-    setLatest(null);
     await updateCheckItem.setValue({ ...(await updateCheckItem.getValue()), dismissed: latest.version });
   };
 

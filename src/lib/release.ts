@@ -1,6 +1,7 @@
 /**
  * "New version available" check. Unpacked extensions never update themselves, so the dashboard
- * reads the published `version.json` (GitHub Pages, at most once a day) and compares versions.
+ * reads the published `version.json` (GitHub Pages, at most every 6 hours, or when the user
+ * clicks "Checked … ago" in the header) and compares versions.
  */
 import { storage } from '#imports';
 import { RELEASE_PAGE_URL, RELEASE_VERSION_URL } from './release-url';
@@ -19,12 +20,14 @@ export interface ReleaseInfo {
 
 export interface UpdateCheckState {
   checkedAt: number;
+  /** False when the last check couldn't read `version.json` (offline, page down…). */
+  ok?: boolean;
   latest?: ReleaseInfo;
   /** A newer version the user chose to hide the banner for. */
   dismissed?: string;
 }
 
-const CHECK_EVERY_MS = 24 * 3600_000;
+export const CHECK_EVERY_MS = 6 * 3600_000;
 
 export const updateCheckItem = storage.defineItem<UpdateCheckState>('local:updateCheck', { fallback: { checkedAt: 0 } });
 
@@ -53,21 +56,44 @@ export function parseReleaseInfo(raw: unknown): ReleaseInfo | null {
   };
 }
 
+export interface CheckOptions {
+  /** Check now, even if the last check is recent (the header's manual check). */
+  force?: boolean;
+  fetchImpl?: typeof fetch;
+  now?: number;
+}
+
+let inFlight: Promise<UpdateCheckState> | null = null;
+
 /**
- * Latest published release, from the cache when it's less than a day old. Network or parse errors
- * keep the previous answer and wait a day before trying again (never blocks the dashboard).
+ * Latest published release, from the cache when the last check is less than CHECK_EVERY_MS old.
+ * Network or parse errors keep the previous answer, are recorded (`ok: false`) and wait as long
+ * before the next automatic try; they never block the dashboard. Calls made while a check runs
+ * share it. A forced check also brings back the banner of a version the user had hidden: they
+ * asked.
  */
-export async function getLatestRelease(fetchImpl: typeof fetch = fetch, now = Date.now()): Promise<UpdateCheckState> {
+export async function getLatestRelease({ force = false, fetchImpl = fetch, now = Date.now() }: CheckOptions = {}): Promise<UpdateCheckState> {
   const state = await updateCheckItem.getValue();
-  if (state.checkedAt > 0 && now - state.checkedAt < CHECK_EVERY_MS) return state;
-  let latest = state.latest;
+  if (!force && state.checkedAt > 0 && now - state.checkedAt < CHECK_EVERY_MS) return state;
+  inFlight ??= fetchLatest(fetchImpl, now).finally(() => (inFlight = null));
+  const next = await inFlight;
+  if (!force || next.dismissed === undefined) return next;
+  const shown: UpdateCheckState = { ...next, dismissed: undefined };
+  await updateCheckItem.setValue(shown);
+  return shown;
+}
+
+async function fetchLatest(fetchImpl: typeof fetch, now: number): Promise<UpdateCheckState> {
+  let latest: ReleaseInfo | null = null;
   try {
     const res = await fetchImpl(RELEASE_VERSION_URL, { cache: 'no-store' });
-    if (res.ok) latest = parseReleaseInfo(await res.json()) ?? latest;
+    if (res.ok) latest = parseReleaseInfo(await res.json());
   } catch {
     /* offline or page not published yet */
   }
-  const next: UpdateCheckState = { ...state, checkedAt: now, latest };
+  // Read after the fetch: the banner may have been dismissed meanwhile.
+  const state = await updateCheckItem.getValue();
+  const next: UpdateCheckState = { ...state, checkedAt: now, ok: latest != null, latest: latest ?? state.latest };
   await updateCheckItem.setValue(next);
   return next;
 }

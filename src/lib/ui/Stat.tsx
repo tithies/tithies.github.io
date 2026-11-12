@@ -1,4 +1,5 @@
-import { Group, Paper, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
+import { Group, Paper, Stack, Text, UnstyledButton } from '@mantine/core';
+import { IconHandClick } from '@tabler/icons-react';
 
 export interface StatProps {
   label: string;
@@ -9,24 +10,23 @@ export interface StatProps {
   lines?: React.ReactNode[];
   color?: string;
   icon?: React.ReactNode;
-  /** Makes the whole card a toggle button. */
+  /** Makes the whole card a toggle button (e.g. a filter). */
   onClick?: () => void;
   active?: boolean;
   /** Added to the label while active (default " · filtered"). */
   activeSuffix?: string;
-  hint?: string;
+  /** What a click does now ("Show only bulk cards"), shown at the bottom of a clickable card. */
+  action?: string;
 }
 
-/** Dashboard stat card; with `onClick` it becomes a toggle (e.g. a filter). */
-export function Stat({ label, value, children, lines = [], color, icon, onClick, active, activeSuffix = ' · filtered', hint }: StatProps) {
+/**
+ * Dashboard stat card; with `onClick` it becomes a toggle (e.g. a filter). A clickable card says
+ * what a click does on its last line and lifts on hover (see .ti-stat-clickable in dashboard.css),
+ * so it doesn't look like the cards that only show numbers.
+ */
+export function Stat({ label, value, children, lines = [], color, icon, onClick, active, activeSuffix = ' · filtered', action }: StatProps) {
   const body = (
-    <Paper
-      withBorder
-      p="sm"
-      radius="md"
-      h="100%"
-      style={active ? { borderColor: 'var(--mantine-primary-color-filled)', boxShadow: '0 0 0 1px var(--mantine-primary-color-filled)' } : undefined}
-    >
+    <Paper withBorder p="sm" radius="md" h="100%" className={onClick ? 'ti-stat ti-stat-clickable' : 'ti-stat'} mod={{ active: !!active }}>
       <Group justify="space-between" align="flex-start" wrap="nowrap">
         <Stack gap={2}>
           <Text size="xs" c={active ? 'blue' : 'dimmed'} tt="uppercase" fw={600}>
@@ -47,14 +47,20 @@ export function Stat({ label, value, children, lines = [], color, icon, onClick,
         </Stack>
         {icon}
       </Group>
+      {onClick && action && (
+        <Group gap={6} wrap="nowrap" mt="auto" pt="xs" className="ti-stat-action">
+          <IconHandClick size={15} stroke={1.8} />
+          <Text size="xs" fw={600}>
+            {action}
+          </Text>
+        </Group>
+      )}
     </Paper>
   );
   if (!onClick) return body;
   return (
-    <Tooltip label={hint} disabled={!hint} openDelay={400}>
-      <UnstyledButton onClick={onClick} h="100%" w="100%" style={{ textAlign: 'left' }} aria-pressed={active}>
-        {body}
-      </UnstyledButton>
-    </Tooltip>
+    <UnstyledButton onClick={onClick} h="100%" w="100%" className="ti-stat-button" style={{ textAlign: 'left' }} aria-pressed={active}>
+      {body}
+    </UnstyledButton>
   );
 }
