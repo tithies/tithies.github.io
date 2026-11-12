@@ -33,6 +33,8 @@ interface ProtocolMap {
   siteSessionChanged(data: { type: SiteType; hasAuth: boolean; identity: SiteIdentity | null }): void;
   /** dashboard → background: drop sessions of tabs that are gone or left the site. */
   pruneSessions(): void;
+  /** dashboard → background: stop everything working for the account, then delete all of its data. */
+  forgetAccount(data: { accountKey: AccountKey }): void;
 }
 
 export const { sendMessage, onMessage } = defineExtensionMessaging<ProtocolMap>();

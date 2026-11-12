@@ -1,6 +1,8 @@
-import { defineBackground } from '#imports';
+import { defineBackground, storage } from '#imports';
 import { browser } from 'wxt/browser';
 import { findRun } from '@/lib/accounts/data';
+import { forgetAccount } from '@/lib/accounts/forget';
+import { parseAccountKey, type AccountKey } from '@/lib/accounts/types';
 import { migrateStorage } from '@/lib/accounts/migrate';
 import { AccountSyncJob } from '@/lib/decks/job';
 import { holdAwake } from '@/lib/keepalive';
@@ -39,12 +41,35 @@ export default defineBackground(() => {
       const site = siteOf(type);
       const job = new AccountSyncJob(site, {
         createTransport: ({ expect, ...ctl }) => new TabTransport(site, { ...ctl, expect }),
+        // The pace set in Settings (read at each sync start).
+        clientOptions: async () => {
+          if (type !== 'moxfield') return {};
+          const s = await getSettings();
+          return { intervalMs: s.moxfieldIntervalMs, jitterMs: s.moxfieldJitterMs, maxIntervalMs: Math.max(site.pacing.maxIntervalMs, s.moxfieldIntervalMs) };
+        },
         onActiveChange: (active) => holdAwake(`${type}-sync`, active),
       });
       return [type, job];
     }),
   ) as Record<SiteType, AccountSyncJob>;
   for (const job of Object.values(syncJobs)) void job.markStale();
+
+  onMessage('forgetAccount', async ({ data }) => {
+    if (!parseAccountKey(data?.accountKey)) throw new Error('Unknown account.');
+    const key = data.accountKey as AccountKey;
+    await forgetAccount(key, {
+      stopRuns: async (runIds) => {
+        for (const runId of runIds) await controlRun(runId, 'cancel');
+        // The runner stops at its next check; wait until it has left these runs (at most 30 s).
+        const end = Date.now() + 30_000;
+        while (runner.activeRunId != null && runIds.includes(runner.activeRunId) && Date.now() < end) await new Promise((r) => setTimeout(r, 100));
+      },
+      syncJobs: Object.values(syncJobs),
+      removeStorage: async (keys) => {
+        for (const k of keys) await storage.removeItem(k as `local:${string}`);
+      },
+    });
+  });
 
   const openDashboard = (runId?: number) =>
     browser.tabs.create({ url: browser.runtime.getURL('/dashboard.html') + (runId ? `#/f2f/runs/${runId}` : '#/f2f/runs') });

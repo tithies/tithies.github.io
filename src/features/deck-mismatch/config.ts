@@ -1,6 +1,7 @@
 import { storage } from '#imports';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
+import { ACCOUNT_STORAGE_PREFIXES } from '@/lib/accounts/storage-keys';
 
 /** Every field falls back to its default on its own, so one bad stored value never resets the rest. */
 export const mismatchConfigSchema = z.object({
@@ -24,7 +25,7 @@ export const parseMismatchConfig = (raw: unknown): MismatchConfig =>
   mismatchConfigSchema.parse(raw && typeof raw === 'object' ? raw : {});
 
 /** Extension-storage key of one account's Mismatches options. */
-export const mismatchConfigKey = (accountKey: string) => `local:deckMismatchConfig:${accountKey}` as const;
+export const mismatchConfigKey = (accountKey: string) => `${ACCOUNT_STORAGE_PREFIXES.deckMismatchConfig}${accountKey}` as const;
 
 /** One account's saved options; every `update` is saved at once. `config` is null while loading (or without account). */
 export function useMismatchConfig(accountKey: string | null) {

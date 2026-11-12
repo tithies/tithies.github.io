@@ -7,7 +7,8 @@ import { cancelSync, startSync, useCollectionMeta, useDeckData, useDecks, useDec
 import { GettingStarted } from '@/lib/ui/GettingStarted';
 import { markDecksSeen } from '@/lib/decks/sync';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
-import { accountData } from '@/lib/accounts/data';
+import { accountData, addAccountFromAction } from '@/lib/accounts/data';
+import { AccountHint } from '@/lib/ui/AccountHint';
 import type { AccountKey } from '@/lib/accounts/types';
 import type { SiteProvider } from '@/lib/sites/provider';
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
@@ -35,27 +36,46 @@ const BASE_BOARDS = ['commanders', 'mainboard', 'sideboard', 'maybeboard'];
  */
 function useStartSync() {
   const { key, site } = usePageAccount();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; busy: boolean } | null>(null);
   const [starting, setStarting] = useState(false);
   const start = async (collection: boolean) => {
     setError(null);
     setStarting(true);
     try {
       const res = await startSync(site.type, key, collection);
-      if (!res.ok && res.code !== 'cancelled') setError(res.error);
+      if (!res.ok && res.code !== 'cancelled') setError({ message: res.error, busy: res.code === 'busy' });
     } catch (e) {
-      setError(`Couldn't start the sync: ${e instanceof Error ? e.message : String(e)}`);
+      setError({ message: `Couldn't start the sync: ${e instanceof Error ? e.message : String(e)}`, busy: false });
     } finally {
       setStarting(false);
     }
   };
-  return { start, error, starting };
+  return { start, error, starting, clearError: () => setError(null) };
 }
+
+/** Why a sync couldn't start; when another account's sync is running, offer to cancel it. */
+function StartError({ error, site, onCancelled }: { error: { message: string; busy: boolean }; site: SiteProvider; onCancelled: () => void }) {
+  return (
+    <Alert color={error.busy ? 'yellow' : 'red'} icon={<IconAlertTriangle size={18} />}>
+      <Group justify="space-between" gap="xs">
+        <Text size="sm">{error.message}</Text>
+        {error.busy && (
+          <Button size="xs" variant="light" color="yellow" onClick={() => void cancelSync(site.type).then(onCancelled)}>
+            Cancel the other sync
+          </Button>
+        )}
+      </Group>
+    </Alert>
+  );
+}
+
+/** Switching after a sync stopped because the site is logged in as someone else (an action: adds the account if needed). */
+const switchTo = (site: SiteProvider) => (who: { userId: string; userName: string }) => void addAccountFromAction(site.type, who);
 
 function FirstSync({ decks }: { decks: DeckRow[] }) {
   const { key, site } = usePageAccount();
   const sync = useSyncState(key);
-  const { start, error, starting } = useStartSync();
+  const { start, error, starting, clearError } = useStartSync();
   const running = sync?.status === 'running' || starting;
   const partial = decks.filter((d) => d.cardsUpdatedAt).length;
   return (
@@ -73,12 +93,8 @@ function FirstSync({ decks }: { decks: DeckRow[] }) {
           {partial} of {decks.length} decks were already read by an earlier, unfinished sync; syncing again continues from there.
         </Text>
       )}
-      <SyncProgress state={sync} site={site} />
-      {error && (
-        <Alert color="red" icon={<IconAlertTriangle size={18} />}>
-          {error}
-        </Alert>
-      )}
+      <SyncProgress state={sync} site={site} onSwitch={switchTo(site)} />
+      {error && <StartError error={error} site={site} onCancelled={clearError} />}
       <Group>
         <Button leftSection={<IconRefresh size={16} />} loading={running} onClick={() => void start(false)}>
           Sync decks
@@ -115,7 +131,7 @@ function OptionsCard({
 }) {
   const { key, site } = usePageAccount();
   const sync = useSyncState(key);
-  const { start, error, starting } = useStartSync();
+  const { start, error, starting, clearError } = useStartSync();
   const running = sync?.status === 'running' || starting;
   const ignored = new Set(config.ignoredBoards);
   const boardKeys = [...boards.keys()].filter((b) => BASE_BOARDS.includes(b) || (boards.get(b) ?? 0) > 0).sort((a, b) => site.boardOrder(a) - site.boardOrder(b));
@@ -175,12 +191,8 @@ function OptionsCard({
         <Text size="xs" c="dimmed">
           Decks synced {decksSyncedAt ? timeAgo(decksSyncedAt) : 'never'} · Collection read {collectionAt ? timeAgo(collectionAt) : 'never'}
         </Text>
-        <SyncProgress state={sync} site={site} />
-        {error && (
-          <Alert color="red" icon={<IconAlertTriangle size={18} />}>
-            {error}
-          </Alert>
-        )}
+        <SyncProgress state={sync} site={site} onSwitch={switchTo(site)} />
+        {error && <StartError error={error} site={site} onCancelled={clearError} />}
         <Group gap="xs">
           {/* During a decks-only sync this joins it: the collection is read right after the decks. */}
           <Button leftSection={<IconArrowsDiff size={16} />} loading={running && sync?.withCollection} onClick={() => void start(true)}>
@@ -265,6 +277,7 @@ export function MismatchPage() {
     return (
       <Stack>
         {header}
+        <AccountHint type={site.type} />
         <FirstSync decks={[]} />
       </Stack>
     );
@@ -275,6 +288,7 @@ export function MismatchPage() {
     return (
       <Stack>
         {header}
+        <AccountHint type={site.type} />
         <FirstSync decks={decks} />
       </Stack>
     );
@@ -286,6 +300,7 @@ export function MismatchPage() {
   return (
     <Stack>
       {header}
+      <AccountHint type={site.type} />
       <SimpleGrid cols={{ base: 1, lg: 2 }}>
         <Paper withBorder p="md" radius="md">
           <Stack gap="xs">

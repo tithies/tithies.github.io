@@ -1,10 +1,10 @@
 import { Alert, Button, Group, NumberInput, Paper, SimpleGrid, Switch, Table, Text, Title } from '@mantine/core';
 import { IconCash, IconCheck, IconRestore } from '@tabler/icons-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useRef, useState } from 'react';
 import { db } from '@/lib/db';
-import { DEFAULT_SETTINGS, getSettings, settingsItem, settingsSchema, type Settings } from '@/lib/settings';
+import { DEFAULT_SETTINGS, SELLING_SETTING_KEYS, type Settings } from '@/lib/settings';
 import { SettingsSection } from '@/lib/ui/SettingsSection';
+import { useSettingsForm } from '@/lib/ui/useSettingsForm';
 import type { BulkRates } from '../types';
 import { dateTime, money } from './format';
 
@@ -21,7 +21,7 @@ const RATE_LABELS: [keyof BulkRates, string][] = [
   ['promo', 'Promotional card'],
 ];
 
-const FIELD_LABELS: Record<keyof Settings, string> = {
+const FIELD_LABELS: Partial<Record<keyof Settings, string>> = {
   requestIntervalMs: 'Min. gap between requests',
   jitterMs: 'Random extra delay',
   batchSize: 'Prints per request',
@@ -29,11 +29,7 @@ const FIELD_LABELS: Record<keyof Settings, string> = {
   creditBonus: 'Store-credit bonus',
   fallbackEnabled: 'Fallback search',
   fallbackCap: 'Max fallback requests per run',
-  moxfieldPageSize: 'Moxfield page size',
 };
-
-/** Wait after the last keystroke before saving. */
-const SAVE_DELAY_MS = 400;
 
 /**
  * Settings → Selling. There is no Save button: each change is saved once it's valid (number
@@ -41,68 +37,11 @@ const SAVE_DELAY_MS = 400;
  * settings", update the form through the storage watcher.
  */
 export function SellingSettings() {
-  const [s, setS] = useState<Settings | null>(null);
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const { s, set, reset, invalid, num: n } = useSettingsForm(FIELD_LABELS);
   const bulk = useLiveQuery(() => db.meta.get('bulkRates'), [])?.value as BulkRates | undefined;
-  /** JSON of the last value written here, to tell our own writes from outside changes. */
-  const lastSaved = useRef('');
-  const pending = useRef<{ value: Settings; timer: ReturnType<typeof setTimeout> } | null>(null);
-
-  const persist = async (next: Settings) => {
-    const parsed = settingsSchema.safeParse(next);
-    if (!parsed.success) {
-      const issue = parsed.error.issues[0];
-      const field = FIELD_LABELS[issue?.path[0] as keyof Settings] ?? 'A value';
-      setInvalid(`${field}: ${issue?.message ?? 'invalid value'}`);
-      return;
-    }
-    setInvalid(null);
-    lastSaved.current = JSON.stringify(parsed.data);
-    await settingsItem.setValue(parsed.data);
-  };
-
-  const flush = () => {
-    if (!pending.current) return;
-    clearTimeout(pending.current.timer);
-    const { value } = pending.current;
-    pending.current = null;
-    void persist(value);
-  };
-
-  useEffect(() => {
-    let alive = true;
-    const load = () =>
-      void getSettings().then((v) => {
-        if (!alive) return;
-        lastSaved.current = JSON.stringify(v);
-        setS(v);
-      });
-    load();
-    const unwatch = settingsItem.watch((v) => {
-      if (JSON.stringify(v) !== lastSaved.current && !pending.current) load();
-    });
-    return () => {
-      alive = false;
-      unwatch();
-      flush(); // leaving the page right after typing still saves
-    };
-  }, []);
 
   if (!s) return null;
-
-  const set = <K extends keyof Settings>(k: K, v: Settings[K]) => {
-    const next = { ...s, [k]: v };
-    setS(next);
-    if (pending.current) clearTimeout(pending.current.timer);
-    pending.current = { value: next, timer: setTimeout(flush, SAVE_DELAY_MS) };
-  };
-  const resetSection = () => {
-    if (pending.current) clearTimeout(pending.current.timer);
-    pending.current = null;
-    setS(DEFAULT_SETTINGS);
-    void persist(DEFAULT_SETTINGS);
-  };
-  const n = (v: string | number, fallback: number) => (v === '' || Number.isNaN(Number(v)) ? fallback : Number(v));
+  const resetSection = () => reset(SELLING_SETTING_KEYS);
 
   return (
     <SettingsSection
@@ -158,7 +97,6 @@ export function SellingSettings() {
             onChange={(v) => set('creditBonus', n(v, 30) / 100)}
           />
           <NumberInput label={FIELD_LABELS.cacheTtlHours} description="F2F changes prices during the day · 0 = always fresh" suffix=" h" min={0} max={336} value={s.cacheTtlHours} onChange={(v) => set('cacheTtlHours', n(v, DEFAULT_SETTINGS.cacheTtlHours))} />
-          <NumberInput label={FIELD_LABELS.moxfieldPageSize} description="Rows per Moxfield request (max 5000 = one request)" min={25} max={5000} step={100} value={s.moxfieldPageSize} onChange={(v) => set('moxfieldPageSize', n(v, DEFAULT_SETTINGS.moxfieldPageSize))} />
           <Switch mt="md" label="Fallback search by set + number for prints not found by name" checked={s.fallbackEnabled} onChange={(e) => set('fallbackEnabled', e.currentTarget.checked)} />
           <NumberInput label={FIELD_LABELS.fallbackCap} description="Also the most cards checked on Shopify's search when both searches miss" min={0} max={2000} value={s.fallbackCap} onChange={(v) => set('fallbackCap', n(v, DEFAULT_SETTINGS.fallbackCap))} disabled={!s.fallbackEnabled} />
         </SimpleGrid>

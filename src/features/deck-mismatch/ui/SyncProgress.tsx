@@ -1,7 +1,8 @@
-import { Alert, Group, Progress, Stack, Text } from '@mantine/core';
-import { IconAlertTriangle } from '@tabler/icons-react';
+import { Alert, Button, Group, Progress, Stack, Text } from '@mantine/core';
+import { IconAlertTriangle, IconUserExclamation } from '@tabler/icons-react';
 import type { SyncState } from '@/lib/decks/types';
 import type { SiteProvider } from '@/lib/sites/provider';
+import type { SiteIdentity } from '@/lib/sites/types';
 import { duration, timeAgo } from '@/lib/format';
 
 /** Average time per deck request (≈ 0.2 s answer + 1–1.5 s polite gap), for the time-left estimate. */
@@ -23,7 +24,16 @@ function runningLabel(s: SyncState, label: string): string {
 }
 
 /** Live state of the background sync (progress, rate-limit waits, last result or error). */
-export function SyncProgress({ state, site }: { state: SyncState | null | undefined; site: Pick<SiteProvider, 'label'> }) {
+export function SyncProgress({
+  state,
+  site,
+  onSwitch,
+}: {
+  state: SyncState | null | undefined;
+  site: Pick<SiteProvider, 'label'>;
+  /** "Switch Tithies to …" after a sync stopped because the site is logged in as someone else. */
+  onSwitch?: (who: SiteIdentity) => void;
+}) {
   if (!state) return null;
 
   if (state.status === 'running') {
@@ -53,6 +63,22 @@ export function SyncProgress({ state, site }: { state: SyncState | null | undefi
   }
 
   if (state.status === 'error' || state.status === 'interrupted') {
+    if (state.code === 'wrong_account') {
+      const who = state.actual;
+      return (
+        <Alert color="yellow" variant="light" icon={<IconUserExclamation size={18} />} title="Logged in as another account" p="xs">
+          <Text size="sm">{state.error}</Text>
+          {who && onSwitch && (
+            <Button size="xs" variant="light" color="yellow" mt={6} onClick={() => onSwitch(who)}>
+              Switch Tithies to {who.userName}
+            </Button>
+          )}
+          <Text size="xs" c="dimmed" mt={4}>
+            Nothing was read as {who ? who.userName : 'the other account'}. Decks read before this are kept: the next sync only reads what's left.
+          </Text>
+        </Alert>
+      );
+    }
     return (
       <Alert color="red" variant="light" icon={<IconAlertTriangle size={18} />} title={state.status === 'interrupted' ? 'Sync interrupted' : 'Sync failed'} p="xs">
         <Text size="sm">{state.error}</Text>

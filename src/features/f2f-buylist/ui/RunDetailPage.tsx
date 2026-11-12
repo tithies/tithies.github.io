@@ -7,7 +7,9 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { useRun, useRunItems } from '@/lib/accounts/hooks';
-import type { AccountKey } from '@/lib/accounts/types';
+import { accountLabel, type AccountKey } from '@/lib/accounts/types';
+import { siteOf } from '@/lib/sites/registry';
+import { SiteIcon } from '@/lib/ui/SiteIcon';
 import { f2fLinks } from '@/lib/f2f/links';
 import { categoryOf, type Item } from '../types';
 import { summarize } from '../summary';
@@ -79,7 +81,7 @@ export function RunDetailPage() {
   const run = useRun(runId);
   const { hidden, save: saveHidden } = useHiddenColumns();
   const items = useRunItems(runId);
-  const { key: currentKey, switchTo } = useCurrentAccount();
+  const { key: currentKey, accounts, switchTo } = useCurrentAccount();
   useEffect(() => {
     if (run && shouldSwitchForRun(runId, run.accountKey, currentKey)) void switchTo(run.accountKey as AccountKey);
   }, [run, runId, currentKey, switchTo]);
@@ -127,11 +129,27 @@ export function RunDetailPage() {
   }
 
   const progress = t.prints ? (t.done / t.prints) * 100 : 0;
+  const runAccount = accounts.find((a) => a.key === run.accountKey);
+  const site = siteOf(runAccount?.type ?? 'moxfield');
   const reviewCount = t.notFound + t.loose + t.priceCheck + t.errors;
   const sortStatus: DataTableSortStatus<Item> = { columnAccessor: sort.key, direction: sort.dir };
 
   return (
     <Stack>
+      {run.accountKey !== currentKey && (
+        <Alert color="blue" variant="light" p="xs">
+          <Group justify="space-between" gap="xs">
+            <Text size="sm">
+              This run checks {runAccount ? <b>{accountLabel(runAccount)}</b> : 'another account'}'s collection, but Tithies is showing another account.
+            </Text>
+            {runAccount && (
+              <Button size="xs" variant="light" leftSection={<SiteIcon type={runAccount.type} size={14} />} onClick={() => void switchTo(runAccount.key)}>
+                Switch to {accountLabel(runAccount)}
+              </Button>
+            )}
+          </Group>
+        </Alert>
+      )}
       <Group justify="space-between" align="flex-start">
         <Stack gap={4}>
           <Group gap="xs">
@@ -144,7 +162,8 @@ export function RunDetailPage() {
             </Badge>
           </Group>
           <Text size="sm" c="dimmed">
-            {dateTime(run.createdAt)} · Moxfield filters: <b>{run.source.summary}</b> · {t.entries} rows → {t.prints} prints · {run.requests} F2F requests
+            {dateTime(run.createdAt)} · {runAccount ? `${accountLabel(runAccount)} · ` : ''}
+            {site.label} filters: <b>{run.source.summary}</b> · {t.entries} rows → {t.prints} prints · {run.requests} F2F requests
           </Text>
         </Stack>
         <Group gap="xs">

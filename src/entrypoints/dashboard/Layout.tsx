@@ -3,8 +3,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconArrowsDiff, IconCards, IconCash, IconHistory, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
 import { Link, Outlet, useLocation } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
-import { accountLabel } from '@/lib/accounts/types';
-import { siteOf } from '@/lib/sites/registry';
+import { AccountSelector } from '@/lib/ui/AccountSelector';
 import { UpdateBanner } from '@/lib/ui/UpdateBanner';
 import iconUrl from '@/assets/tithies-icon.webp';
 
@@ -27,7 +26,7 @@ export function Layout() {
   const { pathname } = useLocation();
   const { setColorScheme } = useMantineColorScheme();
   const scheme = useComputedColorScheme('dark');
-  const { key: accountKey, account, loading } = useCurrentAccount();
+  const { key: accountKey, loading } = useCurrentAccount();
 
   return (
     <AppShell header={{ height: 56 }} navbar={{ width: 220, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="md">
@@ -44,16 +43,12 @@ export function Layout() {
             </Text>
           </Group>
           <Group gap="sm" wrap="nowrap">
-            {account && (
-              <Text size="sm" c="dimmed" truncate maw={220} title={`${siteOf(account.type).label} account ${account.userName}`}>
-                {siteOf(account.type).label} · {accountLabel(account)}
-              </Text>
-            )}
-          <Tooltip label={scheme === 'dark' ? 'Light theme' : 'Dark theme'}>
-            <ActionIcon variant="default" size="lg" onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')} aria-label="Toggle color scheme">
-              {scheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
-            </ActionIcon>
-          </Tooltip>
+            <AccountSelector />
+            <Tooltip label={scheme === 'dark' ? 'Light theme' : 'Dark theme'}>
+              <ActionIcon variant="default" size="lg" onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')} aria-label="Toggle color scheme">
+                {scheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+              </ActionIcon>
+            </Tooltip>
           </Group>
         </Group>
       </AppShell.Header>

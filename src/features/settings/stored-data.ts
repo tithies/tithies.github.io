@@ -77,6 +77,12 @@ const ACCOUNT_PREFERENCE_PREFIXES: Record<string, string> = {
   'deckMismatchConfig:': 'Mismatches page options of one account: decks and folders left out, boards, proxies, what to show',
 };
 
+/** The account a per-account preference key belongs to ("deckMismatchConfig:moxfield:123" → "moxfield:123"), else null. */
+export function accountOfPreference(key: string): string | null {
+  const prefix = Object.keys(ACCOUNT_PREFERENCE_PREFIXES).find((p) => key.startsWith(p));
+  return prefix ? key.slice(prefix.length) : null;
+}
+
 export function preferenceLabel(key: string): string {
   if (PREFERENCE_LABELS[key]) return PREFERENCE_LABELS[key];
   const prefix = Object.keys(ACCOUNT_PREFERENCE_PREFIXES).find((p) => key.startsWith(p));

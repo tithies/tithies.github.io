@@ -2,14 +2,24 @@ import { Badge, Button, Group, Modal, Paper, Stack, Table, Text, useMantineColor
 import { IconCheck, IconRestore } from '@tabler/icons-react';
 import { useCallback, useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
+import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
+import { accountLabel } from '@/lib/accounts/types';
 import { SettingsSection } from '@/lib/ui/SettingsSection';
-import { listStoredPreferences, resetAllSettings, type StoredPreference } from './stored-data';
+import { accountOfPreference, listStoredPreferences, resetAllSettings, type StoredPreference } from './stored-data';
 
 const WHERE = { extension: 'Extension storage', local: 'Dashboard local storage' } as const;
 
 /** Settings → Reset settings: every setting and preference back to its default, data kept. */
 export function ResetSection() {
   const { colorScheme, clearColorScheme } = useMantineColorScheme();
+  const { accounts } = useCurrentAccount();
+  /** Per-account preferences say which account (by name). */
+  const label = (p: StoredPreference) => {
+    const key = accountOfPreference(p.key);
+    if (!key) return p.label;
+    const a = accounts.find((x) => x.key === key);
+    return `${p.label.replace(' of one account', '')} (${a ? accountLabel(a) : 'a forgotten account'})`;
+  };
   const [prefs, setPrefs] = useState<StoredPreference[] | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [done, setDone] = useState(false);
@@ -40,7 +50,7 @@ export function ResetSection() {
     <SettingsSection
       title="Reset settings"
       icon={IconRestore}
-      description="Every setting and preference back to its default. Your data (runs, synced decks, caches) is kept: clear it above."
+      description="Every setting and preference back to its default, for every account. Your data (accounts, runs, synced decks, caches) is kept: clear it above."
     >
       <Paper withBorder p="md" radius="md">
         <Stack gap="sm">
@@ -52,7 +62,7 @@ export function ResetSection() {
                   {prefs.map((p) => (
                     <Table.Tr key={`${p.where}:${p.key}`}>
                       <Table.Td>
-                        <Text size="sm">{p.label}</Text>
+                        <Text size="sm">{label(p)}</Text>
                       </Table.Td>
                       <Table.Td w={200}>
                         <Badge size="xs" variant="light" color={p.where === 'extension' ? 'violet' : 'cyan'}>

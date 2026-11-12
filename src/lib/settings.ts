@@ -1,5 +1,6 @@
 import { storage } from '#imports';
 import { z } from 'zod';
+import { MAX_COLLECTION_PAGE_SIZE, MOX_PACING } from '@/lib/sites/moxfield/constants';
 
 export const settingsSchema = z.object({
   /** Minimum gap between two F2F requests (ms). */
@@ -16,9 +17,17 @@ export const settingsSchema = z.object({
   fallbackEnabled: z.boolean().default(true),
   /** Max fallback requests per run (each covers up to `batchSize` prints); also the most cards checked on Shopify search (pass 3). */
   fallbackCap: z.number().int().min(0).max(2000).default(200),
-  /** Moxfield page size requested when reading the collection (verified: Moxfield accepts up to 5000). */
-  moxfieldPageSize: z.number().int().min(25).max(5000).default(1000),
+  /** Moxfield page size requested when the panel reads the collection (verified: Moxfield accepts up to 5000). */
+  moxfieldPageSize: z.number().int().min(25).max(MAX_COLLECTION_PAGE_SIZE).default(1000),
+  /** Minimum gap between two Moxfield requests of a sync (ms). */
+  moxfieldIntervalMs: z.number().int().min(250).max(30_000).default(MOX_PACING.intervalMs),
+  /** Extra random delay added to each Moxfield request (ms). */
+  moxfieldJitterMs: z.number().int().min(0).max(10_000).default(MOX_PACING.jitterMs),
 });
+
+/** The settings of each Settings section ("Reset to defaults" only resets its own). */
+export const SELLING_SETTING_KEYS = ['requestIntervalMs', 'jitterMs', 'batchSize', 'cacheTtlHours', 'creditBonus', 'fallbackEnabled', 'fallbackCap'] as const;
+export const MOXFIELD_SETTING_KEYS = ['moxfieldIntervalMs', 'moxfieldJitterMs', 'moxfieldPageSize'] as const;
 
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = settingsSchema.parse({});
