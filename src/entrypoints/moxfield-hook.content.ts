@@ -1,61 +1,33 @@
 import { defineContentScript } from '#imports';
-import { runMoxRequest } from '@/lib/sites/moxfield/api';
-import { bridge, type CaptureInfo } from '@/lib/sites/moxfield/bridge';
+import { bridge } from '@/lib/sites/moxfield/bridge';
 import { MOX_API_HOST } from '@/lib/sites/moxfield/constants';
-import type { CollectionEntry } from '@/lib/cards/types';
-import { isCollectionSearchUrl, normalizeEntry, withPaging, type CollectionPage } from '@/lib/sites/moxfield/normalize';
-import { siteFail, type SiteTabStatus } from '@/lib/sites/types';
-
-const API_HOST = MOX_API_HOST;
-
-/** Session headers worth replaying: the bearer token and Moxfield's own x-* headers. */
-const pickAuthHeaders = (h: Record<string, string>): Record<string, string> | null => {
-  const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(h)) {
-    const key = k.toLowerCase();
-    if (key === 'authorization' || key.startsWith('x-')) out[key] = v;
-  }
-  return out.authorization ? out : null;
-};
+import { STARTUP_PATH } from '@/lib/sites/moxfield/identity';
+import { MoxPageSession } from '@/lib/sites/moxfield/page-api';
 
 /**
- * Runs in Moxfield's own JS world. It remembers the last collection-search request the page made
- * (URL = the filters you applied, headers = your session) and can replay it page by page. It also
- * remembers the session headers of the page's latest API request, so the extension can ask this
- * page to read decks and the whole collection (`api`). Nothing captured here is persisted or sent
- * anywhere except back to Moxfield's own API; only trimmed card data leaves the page.
+ * Runs in Moxfield's own JS world. It watches the API requests the page makes to know its
+ * session (the newest login headers, and whose they are), remembers the last collection-search
+ * request (URL = the filters you applied, headers = your session) so the panel can replay it page
+ * by page, and makes the API requests the extension asks for (`api`). Nothing captured here is
+ * persisted or sent anywhere except back to Moxfield's own API; only trimmed card data and the
+ * account (user id + username) leave the page.
  */
 export default defineContentScript({
   matches: ['https://moxfield.com/*', 'https://www.moxfield.com/*'],
   world: 'MAIN',
   runAt: 'document_start',
   main() {
-    let captured: { url: string; headers: Record<string, string>; at: number } | null = null;
-    let auth: { headers: Record<string, string>; at: number } | null = null;
+    const session = new MoxPageSession((info) => void bridge.sendMessage('sessionChanged', info).catch(() => {}));
     const origFetch = window.fetch.bind(window);
+    const pageFetch = (url: string, headers: Record<string, string>) => origFetch(url, { headers, credentials: 'include' });
 
-    const isApiUrl = (url: string) => {
+    const apiUrl = (url: string): URL | null => {
       try {
-        return new URL(url, location.href).hostname === API_HOST;
+        const u = new URL(url, location.href);
+        return u.hostname === MOX_API_HOST ? u : null;
       } catch {
-        return false;
+        return null;
       }
-    };
-
-    /** Keeps the newest session headers (the page refreshes its token by itself). */
-    const noteAuth = (headers: Record<string, string>) => {
-      const picked = pickAuthHeaders(headers);
-      if (picked) auth = { headers: picked, at: Date.now() };
-    };
-
-    const info = (): CaptureInfo =>
-      captured ? { hasCapture: true, url: captured.url, capturedAt: captured.at } : { hasCapture: false };
-
-    const capture = (url: string, headers: Record<string, string>) => {
-      const abs = new URL(url, location.href).toString();
-      if (!isCollectionSearchUrl(abs)) return;
-      captured = { url: abs, headers, at: Date.now() };
-      void bridge.sendMessage('captureUpdated', info()).catch(() => {});
     };
 
     const headersToObject = (h: HeadersInit | undefined): Record<string, string> => {
@@ -67,18 +39,41 @@ export default defineContentScript({
       return out;
     };
 
+    /** Every page request to the API: follow the session, and capture collection searches. */
+    const noteRequest = (u: URL, headers: Record<string, string>) => {
+      session.noteRequest(headers);
+      if (u.pathname.includes('/collections/search') && session.noteCollectionSearch(u.toString(), headers)) {
+        void bridge.sendMessage('captureUpdated', session.captureInfo()).catch(() => {});
+      }
+    };
+
+    /** The page's own token refresh / login (`startup/authenticated`) answered. */
+    const noteStartup = (status: number, readBody: () => Promise<unknown>) => {
+      void readBody()
+        .catch(() => null)
+        .then((body) => session.noteStartup(status, body));
+    };
+
     window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+      let startup = false;
       try {
         const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-        if (isApiUrl(url)) {
-          const headers = { ...(input instanceof Request ? headersToObject(input.headers) : {}), ...headersToObject(init?.headers) };
-          noteAuth(headers);
-          if (url.includes('/collections/search')) capture(url, headers);
+        const u = apiUrl(url);
+        if (u) {
+          noteRequest(u, { ...(input instanceof Request ? headersToObject(input.headers) : {}), ...headersToObject(init?.headers) });
+          startup = u.pathname === STARTUP_PATH;
         }
       } catch {
         /* never break the page */
       }
-      return origFetch(input as RequestInfo, init);
+      const p = origFetch(input as RequestInfo, init);
+      if (startup) {
+        void p.then(
+          (res) => noteStartup(res.status, () => res.clone().json()),
+          () => {},
+        );
+      }
+      return p;
     };
 
     const xhrMeta = new WeakMap<XMLHttpRequest, { url: string; headers: Record<string, string> }>();
@@ -95,9 +90,19 @@ export default defineContentScript({
     XMLHttpRequest.prototype.send = function (this: XMLHttpRequest, body?: Document | XMLHttpRequestBodyInit | null) {
       try {
         const m = xhrMeta.get(this);
-        if (m && isApiUrl(m.url)) {
-          noteAuth(m.headers);
-          if (m.url.includes('/collections/search')) capture(m.url, m.headers);
+        const u = m && apiUrl(m.url);
+        if (m && u) {
+          noteRequest(u, m.headers);
+          if (u.pathname === STARTUP_PATH) {
+            const xhr = this;
+            xhr.addEventListener('load', () =>
+              noteStartup(xhr.status, async () => {
+                if (xhr.responseType === 'json') return xhr.response;
+                if (xhr.responseType === '' || xhr.responseType === 'text') return JSON.parse(xhr.responseText);
+                return null;
+              }),
+            );
+          }
         }
       } catch {
         /* never break the page */
@@ -105,46 +110,15 @@ export default defineContentScript({
       return send.call(this, body);
     };
 
-    bridge.onMessage('getCaptureInfo', () => info());
+    bridge.onMessage('getCaptureInfo', () => session.captureInfo());
 
-    bridge.onMessage('getStatus', (): SiteTabStatus => ({ hasAuth: auth != null, authAt: auth?.at, path: location.pathname }));
+    bridge.onMessage('getStatus', () => session.status(location.pathname));
 
     // One request per call: throttling, retries and progress live in the extension's background worker.
-    bridge.onMessage('api', async ({ data }) => {
-      if (!auth) return siteFail(0, 'no_auth', 'No Moxfield session in this tab yet: log in to Moxfield, or reload the page.');
-      const headers = { ...auth.headers };
-      return runMoxRequest(data, (url) => origFetch(url, { headers, credentials: 'include' }));
-    });
+    bridge.onMessage('api', ({ data }) => session.api(data, pageFetch));
 
-    bridge.onMessage('fetchCollection', async ({ data }) => {
-      if (!captured) throw new Error('No collection query seen yet. Reload the collection page and try again.');
-      const { url, headers } = captured;
-      const getPage = async (pageNumber: number, pageSize: number): Promise<CollectionPage> => {
-        const res = await origFetch(withPaging(url, pageNumber, pageSize), { headers, credentials: 'include' });
-        if (res.status === 401 || res.status === 403) throw new Error('Moxfield refused the request (session expired?). Reload the page and try again.');
-        if (!res.ok) throw new Error(`Moxfield answered HTTP ${res.status}`);
-        return res.json();
-      };
-
-      const entries: CollectionEntry[] = [];
-      const first = await getPage(1, data.pageSize);
-      // Moxfield may cap the page size: keep paging with whatever size it actually used.
-      const size = first.pageSize || data.pageSize;
-      const totalPages = first.totalPages || Math.ceil((first.totalResults || 0) / size) || 1;
-      const push = (p: CollectionPage) => {
-        for (const raw of p.data ?? []) {
-          const e = normalizeEntry(raw);
-          if (e) entries.push(e);
-        }
-      };
-      push(first);
-      void bridge.sendMessage('collectionProgress', { page: 1, totalPages, fetched: entries.length }).catch(() => {});
-      for (let page = 2; page <= totalPages; page++) {
-        await new Promise((r) => setTimeout(r, data.delayMs));
-        push(await getPage(page, size));
-        void bridge.sendMessage('collectionProgress', { page, totalPages, fetched: entries.length }).catch(() => {});
-      }
-      return { url, entries, totalResults: first.totalResults ?? entries.length, pages: totalPages };
-    });
+    bridge.onMessage('fetchCollection', ({ data }) =>
+      session.readCapture(data, pageFetch, (p) => void bridge.sendMessage('collectionProgress', p).catch(() => {})),
+    );
   },
 });

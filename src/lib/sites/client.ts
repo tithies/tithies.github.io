@@ -1,7 +1,7 @@
 import PQueue from 'p-queue';
 import type { CollectionEntry } from '@/lib/cards/types';
 import type { DeckCard, DeckSummary } from '@/lib/decks/types';
-import { siteFail, type SiteErrorCode, type SiteRequest, type SiteResult, type SiteSuccess } from './types';
+import { siteFail, type SiteErrorCode, type SiteIdentity, type SiteRequest, type SiteResult, type SiteSuccess } from './types';
 
 /** Sends one request to a site (in practice: through a logged-in tab of that site). */
 export type SiteTransport = (req: SiteRequest) => Promise<SiteResult>;
@@ -22,6 +22,16 @@ export class SiteAuthError extends SiteError {}
 export class SiteRateLimitError extends SiteError {}
 /** The deck (or page) doesn't exist (any more). */
 export class SiteNotFoundError extends SiteError {}
+/** The site's session belongs to another account than the one asked for: nothing was read as it. */
+export class SiteWrongAccountError extends SiteError {
+  constructor(
+    message: string,
+    /** Who the site is logged in as (null when unknown). */
+    readonly actual: SiteIdentity | null,
+  ) {
+    super(message, 0, 'wrong_account');
+  }
+}
 export class CancelledError extends Error {
   constructor() {
     super('Cancelled');
@@ -46,6 +56,12 @@ export interface SitePacing {
 export interface SiteClientOptions extends SitePacing {
   /** The site's name in messages ("Moxfield is rate limiting Tithies…"). */
   label: string;
+  /**
+   * The account every answer must have been made as (a userId; read before each answer, so it
+   * can be bound late). Any answer made as someone else fails with SiteWrongAccountError before
+   * its status means anything (a 404 as another account is not "deck deleted").
+   */
+  expectedUserId?: () => string | undefined;
   signal?: AbortSignal;
   /** Called before each long wait, e.g. to show "Rate limited, retrying in 30 s (1/3)". */
   onWait?: (message: string, ms: number) => void;
@@ -117,6 +133,16 @@ export class SiteClient {
       } finally {
         this.lastAt = this.now();
       }
+      const expected = this.opts.expectedUserId?.();
+      if (expected !== undefined) {
+        // Success must say it was made as the expected account; a failure made as somebody else too.
+        const other = res.ok ? res.as?.userId !== expected : !!res.as && res.as.userId !== expected;
+        if (other) {
+          const who = res.as ? `as ${res.as.userName}` : 'as an unknown account';
+          throw new SiteWrongAccountError(res.ok ? `${label} answered ${who}.` : res.message, res.as ?? null);
+        }
+      }
+      if (!res.ok && res.code === 'wrong_account') throw new SiteWrongAccountError(res.message, res.as ?? null);
       if (res.ok) return res;
 
       if (res.status === 429) {

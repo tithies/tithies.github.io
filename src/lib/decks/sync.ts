@@ -25,7 +25,7 @@ const isFatal = (e: unknown) =>
   e instanceof SiteAuthError ||
   e instanceof SiteRateLimitError ||
   e instanceof CancelledError ||
-  (e instanceof SiteError && (e.code === 'no_tab' || e.code === 'tab_lost'));
+  (e instanceof SiteError && (e.code === 'no_tab' || e.code === 'tab_lost' || e.code === 'wrong_account'));
 
 const MAX_CONSECUTIVE_DECK_FAILURES = 3;
 

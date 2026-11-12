@@ -12,7 +12,7 @@ import { browser } from 'wxt/browser';
 import { sendMessage } from '@/lib/messaging';
 import { abortableSleep } from './client';
 import type { SiteProvider } from './provider';
-import { siteFail, type SiteRequest, type SiteResult, type SiteTabStatus } from './types';
+import { siteFail, type SiteApiCall, type SiteIdentity, type SiteRequest, type SiteResult, type SiteTabStatus } from './types';
 
 /** The tab operations the transport needs (the real one is Chrome's; tests pass a fake). */
 export interface TabPort {
@@ -27,7 +27,7 @@ export interface TabPort {
   /** The site page's status, or null when no content script answers there. */
   status(tabId: number): Promise<SiteTabStatus | null>;
   /** One request made by the page. Throws when the tab went away mid-request. */
-  call(tabId: number, req: SiteRequest): Promise<SiteResult | null | undefined>;
+  call(tabId: number, call: SiteApiCall): Promise<SiteResult | null | undefined>;
   onRemoved(listener: (tabId: number) => void): () => void;
 }
 
@@ -59,7 +59,7 @@ export const chromeTabPort: TabPort = {
       return null; // no content script there (still loading, discarded, or injected by an older build)
     }
   },
-  call: (tabId, req) => sendMessage('siteApi', req, tabId),
+  call: (tabId, call) => sendMessage('siteApi', call, tabId),
   onRemoved(listener) {
     browser.tabs.onRemoved.addListener(listener);
     return () => browser.tabs.onRemoved.removeListener(listener);
@@ -79,9 +79,25 @@ export interface TabTransportOptions {
   maxReacquire?: number;
   /** Pause after reloading Tithies' own tab, so the old page has gone (ms). */
   reloadSettleMs?: number;
+  /**
+   * Whose session requests may use. An account: only tabs logged in as it, and every request is
+   * refused by the page if its session isn't that account's. 'first': the first logged-in account
+   * found, then only that one (see `identity`). Unset: any logged-in tab, no account checks.
+   */
+  expect?: SiteIdentity | 'first';
 }
 
 class NoTabError extends Error {}
+
+/** The site is logged in as another account than the one asked for. */
+class WrongAccountError extends Error {
+  constructor(
+    message: string,
+    readonly actual: SiteIdentity | null,
+  ) {
+    super(message);
+  }
+}
 
 export class TabTransport {
   private tabId: number | null = null;
@@ -94,6 +110,8 @@ export class TabTransport {
   private readonly maxReacquire: number;
   private readonly reloadSettleMs: number;
   private readonly stopListening: () => void;
+  private readonly checked: boolean;
+  private expected: SiteIdentity | null;
 
   constructor(
     private site: Pick<SiteProvider, 'label' | 'tabPatterns' | 'syncTabUrl'>,
@@ -104,7 +122,36 @@ export class TabTransport {
     this.pollMs = opts.pollMs ?? 500;
     this.maxReacquire = opts.maxReacquire ?? 2;
     this.reloadSettleMs = opts.reloadSettleMs ?? 2000;
+    this.checked = opts.expect !== undefined;
+    this.expected = opts.expect && opts.expect !== 'first' ? opts.expect : null;
     this.stopListening = port.onRemoved(this.onRemoved);
+  }
+
+  /** The account requests are made as (with `expect`): the expected one, or the first one found. */
+  get identity(): SiteIdentity | null {
+    return this.expected;
+  }
+
+  /**
+   * Whether requests may go through this tab. With account checks: only a session whose account
+   * is known and is the expected one (binding 'first' to it); other accounts go to `others`.
+   */
+  private async usable(tabId: number, others: SiteIdentity[]): Promise<boolean> {
+    const st = await this.port.status(tabId);
+    if (!st?.hasAuth) return false;
+    if (!this.checked) return true;
+    const id = st.identity ?? null;
+    if (!id) return false;
+    if (!this.expected) this.expected = id;
+    if (id.userId === this.expected.userId) return true;
+    if (!others.some((o) => o.userId === id.userId)) others.push(id);
+    return false;
+  }
+
+  private wrongAccount(actual: SiteIdentity): WrongAccountError {
+    const { label } = this.site;
+    const want = this.expected ? ` Log in as ${this.expected.userName} on ${label}, then try again.` : '';
+    return new WrongAccountError(`${label} is logged in as ${actual.userName}.${want}`, actual);
   }
 
   private onRemoved = (tabId: number) => {
@@ -140,14 +187,17 @@ export class TabTransport {
 
   /** Picks the tab requests go through: Tithies' own tab, else a logged-in open tab, else a new tab of its own. */
   private async acquire(): Promise<number> {
-    if (this.ownTabId != null && (await this.port.status(this.ownTabId))?.hasAuth) return (this.tabId = this.ownTabId);
+    const others: SiteIdentity[] = [];
+    if (this.ownTabId != null && (await this.usable(this.ownTabId, others))) return (this.tabId = this.ownTabId);
 
     const tabs = await this.port.query(this.site.tabPatterns);
     tabs.sort((a, b) => Number(b.active) - Number(a.active) || (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
     for (const t of tabs) {
       if (t.id === this.ownTabId) continue;
-      if ((await this.port.status(t.id))?.hasAuth) return (this.tabId = t.id);
+      if (await this.usable(t.id, others)) return (this.tabId = t.id);
     }
+    // Logged in as someone else: a new tab would be too (one login per browser profile).
+    if (others.length) throw this.wrongAccount(others[0]);
 
     const { label } = this.site;
     this.opts.onStatus?.(`Opening ${label} (shown for a moment while it starts)…`);
@@ -160,7 +210,13 @@ export class TabTransport {
       this.tabId = this.ownTabId;
       return this.ownTabId;
     });
-    if (ready && this.ownTabId != null) return this.ownTabId;
+    if (ready && this.ownTabId != null) {
+      if (await this.usable(this.ownTabId, others)) return this.ownTabId;
+      // Leave the tab open so the user can log in as the right account there.
+      this.keepOwnTab = true;
+      if (others.length) throw this.wrongAccount(others[0]);
+      throw new NoTabError(`Couldn't tell which ${label} account is logged in. Reload the ${label} tab, then try again.`);
+    }
     // Leave the tab open so the user can log in there.
     this.keepOwnTab = true;
     throw new NoTabError(`${label} has no logged-in session. Log in to ${label} (Tithies left a ${label} tab open for you), then try again.`);
@@ -175,11 +231,12 @@ export class TabTransport {
         tabId = this.tabId ?? (await this.acquire());
       } catch (e) {
         if (this.opts.signal?.aborted) throw e;
+        if (e instanceof WrongAccountError) return siteFail(0, 'wrong_account', e.message, e.actual);
         return siteFail(0, 'no_tab', e instanceof Error ? e.message : String(e));
       }
       let res: SiteResult | null | undefined;
       try {
-        res = await this.port.call(tabId, req);
+        res = await this.port.call(tabId, this.checked ? { req, expect: this.expected?.userId } : { req });
       } catch {
         // The tab was closed, reloaded or navigated away mid-request.
         this.tabId = null;
@@ -190,6 +247,21 @@ export class TabTransport {
         this.tabId = null;
         if (this.reacquired++ < this.maxReacquire) continue;
         return siteFail(0, 'tab_lost', `The ${label} tab stopped answering. Reload it and try again.`);
+      }
+      if (this.checked) {
+        // A content script from before account checks doesn't say who answered: never trust it.
+        if (res.as === undefined) {
+          this.tabId = null;
+          return siteFail(0, 'tab_lost', `The ${label} tab runs an older version of Tithies: reload it, then try again.`);
+        }
+        // The tab now belongs to another account: look for another tab still logged in as the right one.
+        // (A failure made as nobody, e.g. "no session", is handled below like any failure.)
+        const otherAccount = res.as ? res.as.userId !== this.expected?.userId : res.ok;
+        if ((!res.ok && res.code === 'wrong_account') || otherAccount) {
+          this.tabId = null;
+          if (this.reacquired++ < this.maxReacquire) continue;
+          return res.ok ? siteFail(0, 'wrong_account', `${label} answered as another account.`, res.as) : res;
+        }
       }
       // The session of a hidden tab can expire: reload Tithies' own tab once to get a fresh one.
       if (!res.ok && res.code === 'no_auth' && tabId === this.ownTabId && !this.reloadedForAuth) {

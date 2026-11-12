@@ -4,8 +4,10 @@ import { db } from '@/lib/db';
 import { AccountSyncJob } from '@/lib/decks/job';
 import { holdAwake } from '@/lib/keepalive';
 import { onMessage, sendMessage } from '@/lib/messaging';
-import { SITE_TYPES, siteOf } from '@/lib/sites/registry';
-import { TabTransport } from '@/lib/sites/tab-transport';
+import { isSiteType, SITE_TYPES, siteOf } from '@/lib/sites/registry';
+import { SessionRegistry } from '@/lib/sites/sessions';
+import { chromeTabPort, TabTransport } from '@/lib/sites/tab-transport';
+import { parseIdentity } from '@/lib/sites/validate';
 import type { SiteType } from '@/lib/sites/types';
 import { getSettings } from '@/lib/settings';
 import { controlRun, createRun, Runner, toProgress } from '@/features/f2f-buylist/runner';
@@ -71,6 +73,24 @@ export default defineBackground(() => {
     }
     return run ? toProgress(run) : null;
   });
+
+  // Which account each open site tab is logged in as (dashboard dot and hints; never adds accounts).
+  const sessions = new SessionRegistry();
+  const pruneSessions = async () => {
+    const open = new Set<number>();
+    for (const type of SITE_TYPES) for (const t of await chromeTabPort.query(siteOf(type).tabPatterns).catch(() => [])) open.add(t.id);
+    await sessions.prune(open);
+  };
+  onMessage('siteSessionChanged', ({ data, sender }) => {
+    const tabId = sender.tab?.id;
+    if (tabId == null || !isSiteType(data?.type)) return;
+    const hasAuth = data.hasAuth === true;
+    void sessions.report({ tabId, type: data.type, hasAuth, identity: hasAuth ? parseIdentity(data.identity) : null });
+  });
+  onMessage('pruneSessions', () => pruneSessions());
+  browser.tabs.onRemoved.addListener((tabId) => void sessions.forget(tabId));
+  browser.tabs.onReplaced.addListener((_added, removed) => void sessions.forget(removed));
+  void pruneSessions();
 
   browser.action.onClicked.addListener(() => void openDashboard());
 

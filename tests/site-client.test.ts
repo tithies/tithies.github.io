@@ -1,4 +1,4 @@
-import { CancelledError, SiteAuthError, SiteClient, SiteError, SiteNotFoundError, SiteRateLimitError, type SiteClientOptions, type SiteTransport } from '@/lib/sites/client';
+import { CancelledError, SiteAuthError, SiteClient, SiteError, SiteNotFoundError, SiteRateLimitError, SiteWrongAccountError, type SiteClientOptions, type SiteTransport } from '@/lib/sites/client';
 import { MOX_PACING } from '@/lib/sites/moxfield/constants';
 import { siteFail, type SiteRequest, type SiteResult } from '@/lib/sites/types';
 
@@ -93,5 +93,39 @@ describe('SiteClient', () => {
     const ac = new AbortController();
     ac.abort();
     await expect(newClient(scripted([]).transport, { ...fakeTime(), signal: ac.signal }).deckList()).rejects.toBeInstanceOf(CancelledError);
+  });
+});
+
+describe('SiteClient account checks', () => {
+  const ALICE = { userId: '111111', userName: 'alice' };
+  const BOB = { userId: '222222', userName: 'bob' };
+  const expectAlice = { expectedUserId: () => ALICE.userId };
+
+  it('accepts answers made as the expected account', async () => {
+    const client = newClient(scripted([{ ok: true, kind: 'deckList', decks: [], as: ALICE }]).transport, { ...fakeTime(), ...expectAlice });
+    expect(await client.deckList()).toEqual([]);
+  });
+
+  it('a 404 made as another account is a wrong account, not "deleted"', async () => {
+    const client = newClient(scripted([siteFail(404, 'http', 'not found', BOB)]).transport, { ...fakeTime(), ...expectAlice });
+    const err = await client.deck('abcdefgh').catch((e) => e);
+    expect(err).toBeInstanceOf(SiteWrongAccountError);
+    expect(err).not.toBeInstanceOf(SiteNotFoundError);
+    expect(err.actual).toEqual(BOB);
+  });
+
+  it('a success made as someone else (or as nobody) is refused', async () => {
+    const asBob = newClient(scripted([{ ok: true, kind: 'deckList', decks: [], as: BOB }]).transport, { ...fakeTime(), ...expectAlice });
+    await expect(asBob.deckList()).rejects.toThrow('Moxfield answered as bob.');
+    const asNobody = newClient(scripted([{ ok: true, kind: 'deckList', decks: [] }]).transport, { ...fakeTime(), ...expectAlice });
+    await expect(asNobody.deckList()).rejects.toBeInstanceOf(SiteWrongAccountError);
+  });
+
+  it('wrong_account answers are never retried; "no session" stays an auth error', async () => {
+    const wrong = scripted([siteFail(0, 'wrong_account', 'Moxfield is logged in as bob.', BOB)]);
+    await expect(newClient(wrong.transport, { ...fakeTime(), ...expectAlice }).deckList()).rejects.toBeInstanceOf(SiteWrongAccountError);
+    expect(wrong.calls).toHaveLength(1);
+    const noSession = scripted([siteFail(0, 'no_auth', 'log in', null)]);
+    await expect(newClient(noSession.transport, { ...fakeTime(), ...expectAlice }).deckList()).rejects.toBeInstanceOf(SiteAuthError);
   });
 });

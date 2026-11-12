@@ -1,6 +1,6 @@
 import { defineExtensionMessaging } from '@webext-core/messaging';
 import type { CollectionEntry } from '@/lib/cards/types';
-import type { SiteRequest, SiteResult, SiteTabStatus, SiteType } from '@/lib/sites/types';
+import type { SiteApiCall, SiteIdentity, SiteResult, SiteTabStatus, SiteType } from '@/lib/sites/types';
 import type { RunProgress, RunSource } from '@/features/f2f-buylist/types';
 
 export type RunAction = 'pause' | 'resume' | 'cancel' | 'retryErrors';
@@ -22,8 +22,12 @@ interface ProtocolMap {
   cancelAccountSync(data: { type: SiteType }): { ok: boolean };
   /** background → site tab: can this tab make requests to its site? */
   siteStatus(): SiteTabStatus;
-  /** background → site tab: one request, made by the page itself. */
-  siteApi(data: SiteRequest): SiteResult;
+  /** background → site tab: one request, made by the page itself (only as `expect`, when given). */
+  siteApi(data: SiteApiCall): SiteResult;
+  /** site tab → background: the tab's session appeared, went away, or changed account. */
+  siteSessionChanged(data: { type: SiteType; hasAuth: boolean; identity: SiteIdentity | null }): void;
+  /** dashboard → background: drop sessions of tabs that are gone or left the site. */
+  pruneSessions(): void;
 }
 
 export const { sendMessage, onMessage } = defineExtensionMessaging<ProtocolMap>();

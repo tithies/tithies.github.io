@@ -1,0 +1,31 @@
+{
+  "refresh": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJodHRwczovL21veGZpZWxkLmNvbSIsImlzcyI6Imh0dHBzOi8vbW94ZmllbGQuY29tIiwiZXhwIjoyMDAwMDAwMDAwLCJpYXQiOjE5OTk5OTkxMDAsIm5iZiI6MTk5OTk5OTEwMCwic3ViIjoiYWxpY2UiLCJqdGkiOiJmYWtlLWp0aSIsImh0dHA6Ly93d3cubW94ZmllbGQuY29tL3dzLzIwMTYvMDgvaWRlbnRpdHkvY2xhaW1zL1VzZXJJZCI6IjExMTExMSIsImFkdWx0IjoiRmFsc2UifQ.ZmFrZS1zaWduYXR1cmU",
+    "refresh_token": "fake-refresh",
+    "token_type": "Bearer",
+    "user_name": "alice",
+    "email_address": "alice@example.invalid",
+    "is_email_confirmed": true,
+    "expiration": "2033-05-18T03:33:20Z",
+    "expires_in_minutes": 15,
+    "permissions": [],
+    "preferences": {},
+    "view_settings": {},
+    "user_id": "aBcD1",
+    "nolt_token": "x.y.z",
+    "mature_content_pref": "",
+    "date_of_birth": "",
+    "collectionVisibility": "private",
+    "collectionPublicId": "fake"
+  },
+  "wishList": {
+    "deck": {},
+    "viewerInfo": {}
+  },
+  "allLists": {},
+  "muted": [],
+  "follows": {
+    "following": {},
+    "followers": {}
+  }
+}
