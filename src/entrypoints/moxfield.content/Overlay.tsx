@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 // Inlined as a data: URL. A file URL would need web_accessible_resources, which lets any page detect the extension.
 import iconUrl from '@/assets/tithies-icon.webp?inline';
-import { bridge, type CaptureInfo } from '@/lib/page-bridge';
+import { bridge, type CaptureInfo } from '@/lib/sites/moxfield/bridge';
 import { groupPrints, isEligible } from '@/lib/cards/prints';
-import { describeQuery } from '@/lib/moxfield/normalize';
+import { describeQuery } from '@/lib/sites/moxfield/normalize';
 import { onMessage, sendMessage } from '@/lib/messaging';
 import { getSettings, overlayCollapsedItem as collapsedItem } from '@/lib/settings';
 import type { RunProgress } from '@/features/f2f-buylist/types';

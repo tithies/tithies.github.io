@@ -3,18 +3,21 @@ import { IconAlertTriangle, IconArrowsDiff, IconPlayerStop, IconRefresh } from '
 import { useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { DeckTreePicker } from '@/lib/decks/DeckTreePicker';
-import { cancelMoxfieldSync, startMoxfieldSync, useCollectionMeta, useDeckData, useDecks, useDecksMeta, useMoxSync } from '@/lib/decks/hooks';
+import { cancelSync, startSync, useCollectionMeta, useDeckData, useDecks, useDecksMeta, useSyncState } from '@/lib/decks/hooks';
 import { GettingStarted } from '@/lib/ui/GettingStarted';
 import { markDecksSeen } from '@/lib/decks/sync';
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
 import { timeAgo } from '@/lib/format';
-import { boardLabel, boardOrder } from '@/lib/moxfield/decks';
+import { siteOf } from '@/lib/sites/registry';
 import { Stat } from '@/lib/ui/Stat';
 import { compareDecksToCollection } from '../compare';
 import { useMismatchConfig, type MismatchConfig } from '../config';
 import { mismatchFiltersFromParams, mismatchSortFromParams, writeMismatchParams } from '../filtering';
 import { MismatchTable } from './MismatchTable';
 import { SyncProgress } from './SyncProgress';
+
+/** The site whose decks are compared. */
+const site = siteOf('moxfield');
 
 /** Boards always offered, even before any deck uses them. */
 const BASE_BOARDS = ['commanders', 'mainboard', 'sideboard', 'maybeboard'];
@@ -24,7 +27,7 @@ function useStartSync() {
   const start = async (collection: boolean) => {
     setError(null);
     try {
-      await startMoxfieldSync(collection);
+      await startSync(site.type, collection);
     } catch (e) {
       setError(`Couldn't start the sync: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -33,18 +36,18 @@ function useStartSync() {
 }
 
 function FirstSync({ decks }: { decks: DeckRow[] }) {
-  const sync = useMoxSync();
+  const sync = useSyncState();
   const { start, error } = useStartSync();
   const running = sync?.status === 'running';
   const partial = decks.filter((d) => d.cardsUpdatedAt).length;
   return (
-    <GettingStarted title="First, sync your Moxfield decks">
+    <GettingStarted title={`First, sync your ${site.label} decks`}>
       <Text size="sm">
         Tithies reads your deck list, then every deck's cards, and keeps them here. Later syncs only read decks you changed or added
         (using each deck's last-updated time), so they take seconds.
       </Text>
       <Text size="sm" c="dimmed">
-        You must be logged in to Moxfield in this browser. If no logged-in Moxfield tab is open, Tithies opens one (shown for a few seconds while Moxfield starts, then it switches back here) and closes it at the end.
+        You must be logged in to {site.label} in this browser. If no logged-in {site.label} tab is open, Tithies opens one (shown for a few seconds while {site.label} starts, then it switches back here) and closes it at the end.
         Requests go one at a time, about one per second, so a first sync of ~270 decks takes about 6 minutes. You can leave this page meanwhile.
       </Text>
       {partial > 0 && !running && (
@@ -52,7 +55,7 @@ function FirstSync({ decks }: { decks: DeckRow[] }) {
           {partial} of {decks.length} decks were already read by an earlier, unfinished sync; syncing again continues from there.
         </Text>
       )}
-      <SyncProgress state={sync} />
+      <SyncProgress state={sync} site={site} />
       {error && (
         <Alert color="red" icon={<IconAlertTriangle size={18} />}>
           {error}
@@ -63,7 +66,7 @@ function FirstSync({ decks }: { decks: DeckRow[] }) {
           Sync decks
         </Button>
         {running && (
-          <Button variant="default" leftSection={<IconPlayerStop size={16} />} onClick={() => void cancelMoxfieldSync()}>
+          <Button variant="default" leftSection={<IconPlayerStop size={16} />} onClick={() => void cancelSync(site.type)}>
             Cancel
           </Button>
         )}
@@ -92,11 +95,11 @@ function OptionsCard({
   decksSyncedAt?: number;
   collectionAt?: number;
 }) {
-  const sync = useMoxSync();
+  const sync = useSyncState();
   const { start, error } = useStartSync();
   const running = sync?.status === 'running';
   const ignored = new Set(config.ignoredBoards);
-  const boardKeys = [...boards.keys()].filter((b) => BASE_BOARDS.includes(b) || (boards.get(b) ?? 0) > 0).sort((a, b) => boardOrder(a) - boardOrder(b));
+  const boardKeys = [...boards.keys()].filter((b) => BASE_BOARDS.includes(b) || (boards.get(b) ?? 0) > 0).sort((a, b) => site.boardOrder(a) - site.boardOrder(b));
   const toggleBoard = (b: string, count: boolean) => update({ ignoredBoards: count ? config.ignoredBoards.filter((x) => x !== b) : [...ignored, b] });
 
   return (
@@ -131,7 +134,7 @@ function OptionsCard({
                 size="sm"
                 label={
                   <>
-                    {boardLabel(b)}{' '}
+                    {site.boardLabel(b)}{' '}
                     <Text span size="xs" c="dimmed" className="ti-num">
                       {boards.get(b) ?? 0}
                     </Text>
@@ -153,7 +156,7 @@ function OptionsCard({
         <Text size="xs" c="dimmed">
           Decks synced {decksSyncedAt ? timeAgo(decksSyncedAt) : 'never'} · Collection read {collectionAt ? timeAgo(collectionAt) : 'never'}
         </Text>
-        <SyncProgress state={sync} />
+        <SyncProgress state={sync} site={site} />
         {error && (
           <Alert color="red" icon={<IconAlertTriangle size={18} />}>
             {error}
@@ -168,7 +171,7 @@ function OptionsCard({
             Sync decks only
           </Button>
           {running && (
-            <Button variant="subtle" color="gray" leftSection={<IconPlayerStop size={16} />} onClick={() => void cancelMoxfieldSync()}>
+            <Button variant="subtle" color="gray" leftSection={<IconPlayerStop size={16} />} onClick={() => void cancelSync(site.type)}>
               Cancel
             </Button>
           )}
@@ -184,7 +187,7 @@ function OptionsCard({
 export function MismatchPage() {
   const decks = useDecks();
   const decksMeta = useDecksMeta();
-  const sync = useMoxSync();
+  const sync = useSyncState();
   const collectionMeta = useCollectionMeta();
   const { config, update } = useMismatchConfig();
   // The "Likely wrong print" card toggles the table's filter of the same name (kept in the URL).
@@ -274,6 +277,7 @@ export function MismatchPage() {
               decks={decks}
               excluded={excluded}
               onChange={(next) => update({ excludedDeckIds: [...next].filter((id) => deckById.has(id)) })}
+              siteLabel={site.label}
             />
           </Stack>
         </Paper>
@@ -339,6 +343,7 @@ export function MismatchPage() {
           <MismatchTable
             rows={shown}
             decks={deckById}
+            boardLabel={site.boardLabel}
             loading={!loaded}
             emptyText={config.showMissing || config.showUnassigned ? 'No mismatches: decks and collection agree' : 'Both “Show” options are off'}
           />

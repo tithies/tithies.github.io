@@ -1,8 +1,8 @@
 import { createShadowRootUi, defineContentScript, type ContentScriptContext } from '#imports';
 import ReactDOM from 'react-dom/client';
-import { moxFail, type MoxApiResult, type MoxTabStatus } from '@/lib/moxfield/api';
 import { onMessage } from '@/lib/messaging';
-import { bridge } from '@/lib/page-bridge';
+import { bridge } from '@/lib/sites/moxfield/bridge';
+import { siteFail, type SiteResult, type SiteTabStatus } from '@/lib/sites/types';
 import { Overlay } from './Overlay';
 import './style.css';
 
@@ -25,10 +25,10 @@ function withTimeout<T>(p: Promise<T>, ms: number, onTimeout: () => T): Promise<
 
 /** Relays the background worker's Moxfield requests to the page hook (on every Moxfield page). */
 function registerRelays() {
-  const offline = (): MoxTabStatus => ({ hasAuth: false, path: location.pathname });
-  onMessage('moxfieldStatus', () => withTimeout(bridge.sendMessage('getStatus', undefined), 3000, offline));
-  onMessage('moxfieldApi', ({ data }) =>
-    withTimeout<MoxApiResult>(bridge.sendMessage('api', data), 90_000, () => moxFail(0, 'timeout', 'Moxfield took too long to answer')),
+  const offline = (): SiteTabStatus => ({ hasAuth: false, path: location.pathname });
+  onMessage('siteStatus', () => withTimeout(bridge.sendMessage('getStatus', undefined), 3000, offline));
+  onMessage('siteApi', ({ data }) =>
+    withTimeout<SiteResult>(bridge.sendMessage('api', data), 90_000, () => siteFail(0, 'timeout', 'Moxfield took too long to answer')),
   );
 }
 

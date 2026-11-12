@@ -1,18 +1,19 @@
-/** Dashboard-side access to the Moxfield deck cache and the background sync job. */
+/** Dashboard-side access to the deck cache and the background sync job. */
 import { liveQuery } from 'dexie';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { db, getMeta } from '@/lib/db';
 import { sendMessage } from '@/lib/messaging';
+import type { SiteType } from '@/lib/sites/types';
 import type { CollectionEntry } from '@/lib/cards/types';
 import { META_COLLECTION, META_DECKS, META_SYNC, type CollectionMeta, type DeckCardsRow, type DeckRow, type DecksMeta, type SyncState } from './types';
 
-/** Starts (or joins) the background sync. `collection` also re-reads the whole collection afterwards. */
-export const startMoxfieldSync = (collection: boolean) => sendMessage('startMoxfieldSync', { collection });
-export const cancelMoxfieldSync = () => sendMessage('cancelMoxfieldSync', undefined);
+/** Starts (or joins) the background sync of a site. `collection` also re-reads the whole collection afterwards. */
+export const startSync = (type: SiteType, collection: boolean) => sendMessage('startAccountSync', { type, collection });
+export const cancelSync = (type: SiteType) => sendMessage('cancelAccountSync', { type });
 
 /** Resolves with the final state once job `jobId` has stopped running. */
-export function waitForMoxSync(jobId: string): Promise<SyncState> {
+export function waitForSync(jobId: string): Promise<SyncState> {
   return new Promise((resolve, reject) => {
     const sub = liveQuery(() => getMeta<SyncState>(META_SYNC)).subscribe({
       next: (s) => {
@@ -29,7 +30,7 @@ export function waitForMoxSync(jobId: string): Promise<SyncState> {
 /** Light deck rows (no cards). undefined while loading. */
 export const useDecks = () => useLiveQuery(() => db.decks.toArray(), []);
 export const useDecksMeta = () => useLiveQuery(async () => (await getMeta<DecksMeta>(META_DECKS)) ?? {}, []);
-export const useMoxSync = () => useLiveQuery(async () => (await getMeta<SyncState>(META_SYNC)) ?? null, []);
+export const useSyncState = () => useLiveQuery(async () => (await getMeta<SyncState>(META_SYNC)) ?? null, []);
 export const useCollectionMeta = () => useLiveQuery(async () => (await getMeta<CollectionMeta>(META_COLLECTION)) ?? null, []);
 
 /**

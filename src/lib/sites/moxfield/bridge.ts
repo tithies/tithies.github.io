@@ -1,6 +1,6 @@
 import { defineCustomEventMessaging } from '@webext-core/messaging/page';
-import type { MoxApiRequest, MoxApiResult, MoxTabStatus } from '@/lib/moxfield/api';
 import type { CollectionEntry } from '@/lib/cards/types';
+import type { SiteRequest, SiteResult, SiteTabStatus } from '@/lib/sites/types';
 
 export interface CaptureInfo {
   hasCapture: boolean;
@@ -15,14 +15,14 @@ export interface CollectionResult {
   pages: number;
 }
 
-/** Bridge between the MAIN-world Moxfield hook and the isolated content script. */
+/** Bridge between the MAIN-world Moxfield hook and the isolated Moxfield content script. */
 interface BridgeProtocol {
   getCaptureInfo(): CaptureInfo;
   fetchCollection(data: { pageSize: number; delayMs: number }): CollectionResult;
   /** Whether the page has a Moxfield session Tithies can use. */
-  getStatus(): MoxTabStatus;
+  getStatus(): SiteTabStatus;
   /** One Moxfield API request, made by the page with its own session; answers are trimmed in the page. */
-  api(data: MoxApiRequest): MoxApiResult;
+  api(data: SiteRequest): SiteResult;
   /** main → isolated */
   captureUpdated(data: CaptureInfo): void;
   collectionProgress(data: { page: number; totalPages: number; fetched: number }): void;

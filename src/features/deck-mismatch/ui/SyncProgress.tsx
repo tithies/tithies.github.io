@@ -1,15 +1,16 @@
 import { Alert, Group, Progress, Stack, Text } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import type { SyncState } from '@/lib/decks/types';
+import type { SiteProvider } from '@/lib/sites/provider';
 import { duration, timeAgo } from '@/lib/format';
 
 /** Average time per deck request (≈ 0.2 s answer + 1–1.5 s polite gap), for the time-left estimate. */
 const MS_PER_DECK = 1400;
 
-function runningLabel(s: SyncState): string {
+function runningLabel(s: SyncState, label: string): string {
   switch (s.phase) {
     case 'connecting':
-      return 'Connecting to Moxfield…';
+      return `Connecting to ${label}…`;
     case 'deckList':
       return 'Reading your deck list…';
     case 'decks':
@@ -21,8 +22,8 @@ function runningLabel(s: SyncState): string {
   }
 }
 
-/** Live state of the background Moxfield sync (progress, rate-limit waits, last result or error). */
-export function SyncProgress({ state }: { state: SyncState | null | undefined }) {
+/** Live state of the background sync (progress, rate-limit waits, last result or error). */
+export function SyncProgress({ state, site }: { state: SyncState | null | undefined; site: Pick<SiteProvider, 'label'> }) {
   if (!state) return null;
 
   if (state.status === 'running') {
@@ -32,7 +33,7 @@ export function SyncProgress({ state }: { state: SyncState | null | undefined })
       <Stack gap={4}>
         <Group justify="space-between" gap="xs" wrap="nowrap">
           <Text size="sm" truncate>
-            {runningLabel(state)}
+            {runningLabel(state, site.label)}
             {decksPhase && state.current ? <Text span c="dimmed"> — {state.current}</Text> : null}
           </Text>
           {decksPhase && state.done < state.total && (
@@ -67,7 +68,7 @@ export function SyncProgress({ state }: { state: SyncState | null | undefined })
     <Stack gap={2}>
       <Text size="xs" c="dimmed">
         {state.status === 'cancelled' ? 'Sync cancelled' : 'Last sync'} {state.finishedAt ? timeAgo(state.finishedAt) : ''}
-        {d ? ` · ${d.fetched} deck${d.fetched === 1 ? '' : 's'} read (${d.added} added, ${d.changed} changed, ${d.removed} removed)` : ''} · {state.requests} Moxfield request
+        {d ? ` · ${d.fetched} deck${d.fetched === 1 ? '' : 's'} read (${d.added} added, ${d.changed} changed, ${d.removed} removed)` : ''} · {state.requests} {site.label} request
         {state.requests === 1 ? '' : 's'}
       </Text>
       {d && d.failed.length > 0 && (

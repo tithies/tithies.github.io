@@ -1,11 +1,11 @@
 /**
- * Moxfield deck cache: one request for the deck list, then one per new or changed deck
- * (compared on the list's `lastUpdatedAtUtc`). Every deck is committed as soon as it arrives,
+ * Deck cache of one site: one request for the deck list, then one per new or changed deck
+ * (compared on the list's last-updated time). Every deck is committed as soon as it arrives,
  * so an interrupted sync carries on where it stopped. Reusable by any feature that needs decks.
  */
 import { db, getMeta, putMeta } from '@/lib/db';
-import { DECK_CARDS_VERSION } from '@/lib/moxfield/decks';
-import { describeMoxError, MoxAuthError, MoxCancelledError, MoxError, MoxNotFoundError, MoxRateLimitError, type DeckSource } from '@/lib/moxfield/client';
+import { CancelledError, describeSiteError, SiteAuthError, SiteError, SiteNotFoundError, SiteRateLimitError, type DeckSource } from '@/lib/sites/client';
+import type { SiteProvider } from '@/lib/sites/provider';
 import { META_DECKS, type DeckRow, type DeckSyncSummary, type DecksMeta } from './types';
 
 export interface DeckSyncProgress {
@@ -22,23 +22,24 @@ export interface DeckSyncControl {
 
 /** Errors that stop the whole sync (other per-deck errors are recorded on the deck and skipped). */
 const isFatal = (e: unknown) =>
-  e instanceof MoxAuthError ||
-  e instanceof MoxRateLimitError ||
-  e instanceof MoxCancelledError ||
-  (e instanceof MoxError && (e.code === 'no_tab' || e.code === 'tab_lost'));
+  e instanceof SiteAuthError ||
+  e instanceof SiteRateLimitError ||
+  e instanceof CancelledError ||
+  (e instanceof SiteError && (e.code === 'no_tab' || e.code === 'tab_lost'));
 
 const MAX_CONSECUTIVE_DECK_FAILURES = 3;
 
-/** True when the cached cards don't match the deck list's current version of the deck. */
-export const isDeckStale = (d: Pick<DeckRow, 'cardsUpdatedAt' | 'cardsV' | 'lastUpdatedAt'>) =>
-  d.cardsUpdatedAt !== d.lastUpdatedAt || d.cardsV !== DECK_CARDS_VERSION;
+/** True when the cached cards don't match the deck list's current version of the deck (or an older normaliser read them). */
+export const isDeckStale = (d: Pick<DeckRow, 'cardsUpdatedAt' | 'cardsV' | 'lastUpdatedAt'>, cardsVersion: number) =>
+  d.cardsUpdatedAt !== d.lastUpdatedAt || d.cardsV !== cardsVersion;
 
-export async function syncDecks(client: DeckSource, ctl: DeckSyncControl = {}): Promise<DeckSyncSummary> {
+export async function syncDecks(site: Pick<SiteProvider, 'label' | 'deckCardsVersion'>, client: DeckSource, ctl: DeckSyncControl = {}): Promise<DeckSyncSummary> {
+  const cardsVersion = site.deckCardsVersion;
   const progress = async (p: DeckSyncProgress) => {
     await ctl.onProgress?.(p);
   };
   const checkCancelled = () => {
-    if (ctl.signal?.aborted) throw new MoxCancelledError();
+    if (ctl.signal?.aborted) throw new CancelledError();
   };
 
   await progress({ phase: 'deckList', done: 0, total: 0 });
@@ -48,8 +49,8 @@ export async function syncDecks(client: DeckSource, ctl: DeckSyncControl = {}): 
   const meta = (await getMeta<DecksMeta>(META_DECKS)) ?? {};
   const firstSync = !meta.lastSuccessAt;
   const existing = await db.decks.toArray();
-  // An empty answer next to a full cache is far more likely a Moxfield hiccup than 200 deleted decks.
-  if (!list.length && existing.length) throw new Error('Moxfield returned an empty deck list; the cached decks were kept.');
+  // An empty answer next to a full cache is far more likely a site hiccup than 200 deleted decks.
+  if (!list.length && existing.length) throw new Error(`${site.label} returned an empty deck list; the cached decks were kept.`);
 
   const now = Date.now();
   const known = new Map(existing.map((d) => [d.id, d]));
@@ -71,7 +72,7 @@ export async function syncDecks(client: DeckSource, ctl: DeckSyncControl = {}): 
   });
 
   // New decks first, then changed ones (list order within each group).
-  const stale = rows.filter(isDeckStale).sort((a, b) => Number(known.has(a.id)) - Number(known.has(b.id)));
+  const stale = rows.filter((d) => isDeckStale(d, cardsVersion)).sort((a, b) => Number(known.has(a.id)) - Number(known.has(b.id)));
   const failed: DeckSyncSummary['failed'] = [];
   let changed = 0;
   let fetched = 0;
@@ -86,10 +87,10 @@ export async function syncDecks(client: DeckSource, ctl: DeckSyncControl = {}): 
       const { cards } = await client.deck(deck.publicId);
       const fetchedAt = Date.now();
       await db.transaction('rw', db.decks, db.deckCards, async () => {
-        await db.deckCards.put({ deckId: deck.id, v: DECK_CARDS_VERSION, updatedAt: deck.lastUpdatedAt, fetchedAt, cards });
+        await db.deckCards.put({ deckId: deck.id, v: cardsVersion, updatedAt: deck.lastUpdatedAt, fetchedAt, cards });
         await db.decks.update(deck.id, {
           cardsUpdatedAt: deck.lastUpdatedAt,
-          cardsV: DECK_CARDS_VERSION,
+          cardsV: cardsVersion,
           cardsFetchedAt: fetchedAt,
           cardCount: cards.reduce((s, c) => s + c.qty, 0),
           error: undefined,
@@ -99,7 +100,7 @@ export async function syncDecks(client: DeckSource, ctl: DeckSyncControl = {}): 
       if (known.has(deck.id)) changed++;
       consecutiveFailures = 0;
     } catch (e) {
-      if (e instanceof MoxNotFoundError) {
+      if (e instanceof SiteNotFoundError) {
         // Deleted between the list and now.
         await db.transaction('rw', db.decks, db.deckCards, async () => {
           await db.decks.delete(deck.id);
@@ -109,7 +110,7 @@ export async function syncDecks(client: DeckSource, ctl: DeckSyncControl = {}): 
         continue;
       }
       if (isFatal(e)) throw e;
-      const error = describeMoxError(e);
+      const error = describeSiteError(e);
       await db.decks.update(deck.id, { error });
       failed.push({ id: deck.id, name: deck.name, error });
       if (++consecutiveFailures >= MAX_CONSECUTIVE_DECK_FAILURES) {

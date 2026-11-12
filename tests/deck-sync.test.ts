@@ -1,14 +1,15 @@
 import { db, getMeta } from '@/lib/db';
 import { refreshCollection } from '@/lib/decks/collection';
-import { MoxfieldSyncJob, type SyncTransport } from '@/lib/decks/job';
+import { AccountSyncJob, type SyncTransport } from '@/lib/decks/job';
 import { isDeckStale, markDecksSeen, syncDecks } from '@/lib/decks/sync';
 import { META_DECKS, META_SYNC, type DecksMeta, type SyncState } from '@/lib/decks/types';
-import { moxFail, type MoxApiRequest, type MoxApiResult } from '@/lib/moxfield/api';
-import { MoxAuthError, MoxNotFoundError, type DeckSource } from '@/lib/moxfield/client';
+import { SiteAuthError, SiteNotFoundError, type DeckSource } from '@/lib/sites/client';
+import { moxfieldSite } from '@/lib/sites/moxfield/provider';
+import { siteFail, type SiteRequest, type SiteResult } from '@/lib/sites/types';
 import type { DeckCard, DeckSummary } from '@/lib/decks/types';
-import { DECK_CARDS_VERSION, normalizeDeckCards } from '@/lib/moxfield/decks';
+import { DECK_CARDS_VERSION, normalizeDeckCards } from '@/lib/sites/moxfield/decks';
 import type { CollectionEntry } from '@/lib/cards/types';
-import { normalizeEntry } from '@/lib/moxfield/normalize';
+import { normalizeEntry } from '@/lib/sites/moxfield/normalize';
 import { clearCaches } from '@/features/f2f-buylist/runner';
 import { fixture } from './helpers';
 
@@ -59,11 +60,11 @@ describe('Deck sync', () => {
   it('first sync reads the list and every deck, marking nothing as new', async () => {
     const mox = new FakeMox();
     mox.list = [summary('a'), summary('b'), summary('c')];
-    const res = await syncDecks(mox);
+    const res = await syncDecks(moxfieldSite, mox);
     expect(mox.asked).toEqual(['list', 'Public_a_xxxx', 'Public_b_xxxx', 'Public_c_xxxx']);
     expect(res).toMatchObject({ total: 3, added: 3, changed: 0, removed: 0, fetched: 3, failed: [] });
     const rows = await db.decks.toArray();
-    expect(rows.every((d) => !d.isNew && !isDeckStale(d))).toBe(true);
+    expect(rows.every((d) => !d.isNew && !isDeckStale(d, DECK_CARDS_VERSION))).toBe(true);
     expect(rows[0].cardCount).toBe(CARDS.reduce((s, c) => s + c.qty, 0));
     expect((await db.deckCards.get('a'))!.cards).toHaveLength(CARDS.length);
     expect((await getMeta<DecksMeta>(META_DECKS))!.lastSuccessAt).toBeGreaterThan(0);
@@ -72,15 +73,15 @@ describe('Deck sync', () => {
   it('later syncs only read new and changed decks, and drop deleted ones', async () => {
     const mox = new FakeMox();
     mox.list = [summary('a'), summary('b'), summary('c')];
-    await syncDecks(mox);
+    await syncDecks(moxfieldSite, mox);
 
     mox.asked = [];
-    expect(await syncDecks(mox)).toMatchObject({ fetched: 0, added: 0 });
+    expect(await syncDecks(moxfieldSite, mox)).toMatchObject({ fetched: 0, added: 0 });
     expect(mox.asked).toEqual(['list']);
 
     mox.asked = [];
     mox.list = [summary('a'), summary('b', '2026-02-02T00:00:00Z'), summary('d')]; // b changed, c deleted, d new
-    const res = await syncDecks(mox);
+    const res = await syncDecks(moxfieldSite, mox);
     expect(mox.asked).toEqual(['list', 'Public_d_xxxx', 'Public_b_xxxx']); // new decks first
     expect(res).toMatchObject({ total: 3, added: 1, changed: 1, removed: 1, fetched: 2 });
     expect(await db.decks.get('c')).toBeUndefined();
@@ -94,14 +95,14 @@ describe('Deck sync', () => {
   it('keeps finished decks when a sync stops midway, and resumes with the rest', async () => {
     const mox = new FakeMox();
     mox.list = [summary('a'), summary('b'), summary('c')];
-    mox.fail.set('Public_b_xxxx', new MoxAuthError('log in', 401, 'no_auth'));
-    await expect(syncDecks(mox)).rejects.toBeInstanceOf(MoxAuthError);
+    mox.fail.set('Public_b_xxxx', new SiteAuthError('log in', 401, 'no_auth'));
+    await expect(syncDecks(moxfieldSite, mox)).rejects.toBeInstanceOf(SiteAuthError);
     expect((await db.deckCards.get('a'))).toBeDefined();
     expect(await getMeta(META_DECKS)).toBeUndefined();
 
     mox.fail.clear();
     mox.asked = [];
-    await syncDecks(mox);
+    await syncDecks(moxfieldSite, mox);
     expect(mox.asked).toEqual(['list', 'Public_b_xxxx', 'Public_c_xxxx']);
     // Still the first successful sync: nothing is "new".
     expect((await db.decks.toArray()).some((d) => d.isNew)).toBe(false);
@@ -111,33 +112,33 @@ describe('Deck sync', () => {
     const mox = new FakeMox();
     mox.list = [summary('a'), summary('b'), summary('c')];
     mox.fail.set('Public_a_xxxx', new Error('weird answer'));
-    mox.fail.set('Public_b_xxxx', new MoxNotFoundError('gone', 404, 'not_found'));
-    const res = await syncDecks(mox);
+    mox.fail.set('Public_b_xxxx', new SiteNotFoundError('gone', 404, 'not_found'));
+    const res = await syncDecks(moxfieldSite, mox);
     expect(res.failed).toEqual([{ id: 'a', name: 'Deck a', error: 'weird answer' }]);
     expect(res.removed).toBe(1);
     expect((await db.decks.get('a'))!.error).toBe('weird answer');
-    expect(isDeckStale((await db.decks.get('a'))!)).toBe(true);
+    expect(isDeckStale((await db.decks.get('a'))!, DECK_CARDS_VERSION)).toBe(true);
     expect(await db.decks.get('b')).toBeUndefined();
 
     mox.list = [];
-    await expect(syncDecks(mox)).rejects.toThrow(/empty deck list/);
+    await expect(syncDecks(moxfieldSite, mox)).rejects.toThrow(/empty deck list/);
     expect(await db.decks.count()).toBe(2);
   });
 
   it('re-reads every deck when the card format version changes', async () => {
     const mox = new FakeMox();
     mox.list = [summary('a'), summary('b')];
-    await syncDecks(mox);
+    await syncDecks(moxfieldSite, mox);
     await db.decks.update('a', { cardsV: DECK_CARDS_VERSION - 1 });
     mox.asked = [];
-    await syncDecks(mox);
+    await syncDecks(moxfieldSite, mox);
     expect(mox.asked).toEqual(['list', 'Public_a_xxxx']);
   });
 
   it('survives "Clear F2F cache"', async () => {
     const mox = new FakeMox();
     mox.list = [summary('a')];
-    await syncDecks(mox);
+    await syncDecks(moxfieldSite, mox);
     await clearCaches();
     expect(await db.decks.count()).toBe(1);
     expect(await getMeta(META_DECKS)).toBeDefined();
@@ -152,7 +153,7 @@ describe('Collection snapshot', () => {
     const half = Math.ceil(entries.length / 2);
     const pages = [entries.slice(0, half), [...entries.slice(half), entries[0]]];
     const asked: number[] = [];
-    const meta = await refreshCollection({
+    const meta = await refreshCollection(moxfieldSite, {
       collectionPage: async (n: number, size: number) => {
         asked.push(n);
         return { entries: pages[n - 1], totalResults: entries.length, totalPages: 2, pageSize: size };
@@ -164,12 +165,12 @@ describe('Collection snapshot', () => {
   });
 });
 
-describe('MoxfieldSyncJob', () => {
+describe('AccountSyncJob', () => {
   beforeEach(reset);
 
   /** Transport answering like a Moxfield tab, from a fake list + the deck fixture + the collection fixture. */
-  function fakeTransport(opts: { list: DeckSummary[]; gate?: Promise<void>; deckAnswer?: MoxApiResult }) {
-    const calls: MoxApiRequest[] = [];
+  function fakeTransport(opts: { list: DeckSummary[]; gate?: Promise<void>; deckAnswer?: SiteResult }) {
+    const calls: SiteRequest[] = [];
     let released = 0;
     const transport: SyncTransport = {
       call: async (req) => {
@@ -196,7 +197,7 @@ describe('MoxfieldSyncJob', () => {
     const gate = new Promise<void>((r) => (open = r));
     const t = fakeTransport({ list: [summary('a'), summary('b')], gate });
     const active: boolean[] = [];
-    const job = new MoxfieldSyncJob({ createTransport: () => t.transport, onActiveChange: (a) => active.push(a), clientOptions: fast });
+    const job = new AccountSyncJob(moxfieldSite, { createTransport: () => t.transport, onActiveChange: (a) => active.push(a), clientOptions: fast });
 
     const first = await job.start({ collection: false });
     expect(first.alreadyRunning).toBe(false);
@@ -216,8 +217,8 @@ describe('MoxfieldSyncJob', () => {
   });
 
   it('reports errors and cancellation', async () => {
-    const auth = fakeTransport({ list: [summary('a')], deckAnswer: moxFail(401, 'no_auth', 'Log in to Moxfield') });
-    const job = new MoxfieldSyncJob({ createTransport: () => auth.transport, clientOptions: fast });
+    const auth = fakeTransport({ list: [summary('a')], deckAnswer: siteFail(401, 'no_auth', 'Log in to Moxfield') });
+    const job = new AccountSyncJob(moxfieldSite, { createTransport: () => auth.transport, clientOptions: fast });
     await job.start({ collection: true });
     await job.finished;
     expect(await getMeta<SyncState>(META_SYNC)).toMatchObject({ status: 'error', error: 'Log in to Moxfield' });
@@ -225,7 +226,7 @@ describe('MoxfieldSyncJob', () => {
     let open!: () => void;
     const gate = new Promise<void>((r) => (open = r));
     const slow = fakeTransport({ list: [summary('a')], gate });
-    const job2 = new MoxfieldSyncJob({ createTransport: () => slow.transport, clientOptions: fast });
+    const job2 = new AccountSyncJob(moxfieldSite, { createTransport: () => slow.transport, clientOptions: fast });
     await job2.start({ collection: false });
     expect(job2.cancel()).toBe(true);
     open();
@@ -235,7 +236,7 @@ describe('MoxfieldSyncJob', () => {
 
   it('marks a job left running by a previous worker as interrupted', async () => {
     await db.meta.put({ key: META_SYNC, value: { jobId: 'old', status: 'running', phase: 'decks', withCollection: false, done: 3, total: 9, startedAt: 1, heartbeatAt: 1, requests: 4 }, updatedAt: 1 });
-    await new MoxfieldSyncJob({ createTransport: () => fakeTransport({ list: [] }).transport }).markStale();
+    await new AccountSyncJob(moxfieldSite, { createTransport: () => fakeTransport({ list: [] }).transport }).markStale();
     expect((await getMeta<SyncState>(META_SYNC))!.status).toBe('interrupted');
   });
 });

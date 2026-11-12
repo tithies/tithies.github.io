@@ -3,7 +3,7 @@ import type { F2FDoc } from '@/lib/f2f/api';
 import { F2FClient } from '@/lib/f2f/client';
 import { db } from '@/lib/db';
 import type { CollectionEntry } from '@/lib/cards/types';
-import { normalizeEntry } from '@/lib/moxfield/normalize';
+import { normalizeEntry } from '@/lib/sites/moxfield/normalize';
 import { saveSettings } from '@/lib/settings';
 import { clearCaches, controlRun, createRun, Runner } from '@/features/f2f-buylist/runner';
 import { PRICE_CHECK_NOTE } from '@/features/f2f-buylist/matcher';

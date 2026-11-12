@@ -1,23 +1,25 @@
 /**
- * Background Moxfield sync job: deck list + changed decks, then (optionally) the whole collection.
+ * Background sync job of one site: deck list + changed decks, then (optionally) the whole collection.
  * `start` answers at once; progress lives in `meta.moxSync`, which pages read with useLiveQuery.
  * One job at a time: starting while one runs joins it (and can ask it to read the collection too).
  */
 import { getMeta, putMeta } from '@/lib/db';
-import { describeMoxError, MoxAuthError, MoxCancelledError, MoxfieldClient, type MoxClientOptions, type MoxTransport } from '@/lib/moxfield/client';
+import { CancelledError, describeSiteError, SiteAuthError, SiteClient, type SiteClientOptions, type SiteTransport } from '@/lib/sites/client';
+import type { SiteProvider } from '@/lib/sites/provider';
 import { refreshCollection } from './collection';
 import { syncDecks } from './sync';
 import { META_SYNC, type SyncState } from './types';
 
 export interface SyncTransport {
-  call: MoxTransport;
+  call: SiteTransport;
   release(opts?: { keepOwnTab?: boolean }): Promise<void>;
 }
 
 export interface SyncJobDeps {
   createTransport(ctl: { signal: AbortSignal; onStatus(message: string): void; onOwnTabClosed(): void }): SyncTransport;
   onActiveChange?(active: boolean): void;
-  clientOptions?: Partial<MoxClientOptions>;
+  /** Overrides the provider's pacing (tests, settings). */
+  clientOptions?: Partial<SiteClientOptions>;
 }
 
 interface ActiveJob {
@@ -26,10 +28,13 @@ interface ActiveJob {
   done: Promise<void>;
 }
 
-export class MoxfieldSyncJob {
+export class AccountSyncJob {
   private active: ActiveJob | null = null;
 
-  constructor(private deps: SyncJobDeps) {}
+  constructor(
+    readonly site: SiteProvider,
+    private deps: SyncJobDeps,
+  ) {}
 
   get isActive() {
     return this.active != null;
@@ -104,14 +109,16 @@ export class MoxfieldSyncJob {
       onStatus: (message) => void this.patch(job, { message }),
       onOwnTabClosed: () => job.abort.abort(),
     });
-    const client = new MoxfieldClient(transport.call, {
+    const client = new SiteClient(transport.call, {
+      label: this.site.label,
+      ...this.site.pacing,
       ...this.deps.clientOptions,
       signal,
       onWait: (message) => void this.patch(job, { message }),
     });
     let keepOwnTab = false;
     try {
-      const decks = await syncDecks(client, {
+      const decks = await syncDecks(this.site, client, {
         signal,
         onProgress: (p) => this.patch(job, { phase: p.phase, done: p.done, total: p.total, current: p.current, message: undefined, requests: client.requests }),
       });
@@ -119,18 +126,18 @@ export class MoxfieldSyncJob {
       // Read at this point: a "Find mismatches" may have joined a decks-only sync meanwhile.
       if (job.state.withCollection) {
         await this.patch(job, { phase: 'collection', done: 0, total: 1, message: undefined });
-        await refreshCollection(client, {
+        await refreshCollection(this.site, client, {
           signal,
           onProgress: (p) => this.patch(job, { done: p.done, total: p.total, message: undefined, requests: client.requests }),
         });
       }
       await this.patch(job, { status: 'done', phase: 'done', finishedAt: Date.now(), message: undefined, requests: client.requests });
     } catch (e) {
-      const cancelled = signal.aborted || e instanceof MoxCancelledError;
-      keepOwnTab = e instanceof MoxAuthError;
+      const cancelled = signal.aborted || e instanceof CancelledError;
+      keepOwnTab = e instanceof SiteAuthError;
       await this.patch(job, {
         status: cancelled ? 'cancelled' : 'error',
-        error: cancelled ? undefined : describeMoxError(e),
+        error: cancelled ? undefined : describeSiteError(e),
         finishedAt: Date.now(),
         message: undefined,
         current: undefined,

@@ -1,23 +1,24 @@
-/** Snapshot of the whole Moxfield collection (every row, no filters), replaced on every read. */
+/** Snapshot of a site's whole collection (every row, no filters), replaced on every read. */
 import { db, putMeta } from '@/lib/db';
-import { MAX_COLLECTION_PAGE_SIZE } from '@/lib/moxfield/api';
-import { MoxCancelledError, type CollectionSource } from '@/lib/moxfield/client';
+import { CancelledError, type CollectionSource } from '@/lib/sites/client';
+import type { SiteProvider } from '@/lib/sites/provider';
 import type { CollectionEntry } from '@/lib/cards/types';
 import { META_COLLECTION, type CollectionMeta } from './types';
 
 const MAX_PAGES = 200;
 
 export async function refreshCollection(
+  site: Pick<SiteProvider, 'maxCollectionPageSize'>,
   client: CollectionSource,
   ctl: { signal?: AbortSignal; onProgress?: (p: { done: number; total: number; entries: number }) => void | Promise<void> } = {},
 ): Promise<CollectionMeta> {
-  const first = await client.collectionPage(1, MAX_COLLECTION_PAGE_SIZE);
-  const pageSize = first.pageSize || MAX_COLLECTION_PAGE_SIZE;
+  const first = await client.collectionPage(1, site.maxCollectionPageSize);
+  const pageSize = first.pageSize || site.maxCollectionPageSize;
   const totalPages = Math.min(MAX_PAGES, Math.max(1, first.totalPages));
   const all: CollectionEntry[] = [...first.entries];
   await ctl.onProgress?.({ done: 1, total: totalPages, entries: all.length });
   for (let page = 2; page <= totalPages; page++) {
-    if (ctl.signal?.aborted) throw new MoxCancelledError();
+    if (ctl.signal?.aborted) throw new CancelledError();
     all.push(...(await client.collectionPage(page, pageSize)).entries);
     await ctl.onProgress?.({ done: page, total: totalPages, entries: all.length });
   }

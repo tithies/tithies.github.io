@@ -1,4 +1,4 @@
-/** Deck folder hierarchy built from Moxfield folder paths ("Collection/Final Fantasy"). */
+/** Deck folder hierarchy built from "/"-separated folder paths ("Collection/Final Fantasy"). */
 import type { DeckRow } from './types';
 
 export const NO_FOLDER_LABEL = '(No folder)';

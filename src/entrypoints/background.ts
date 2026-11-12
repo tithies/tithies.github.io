@@ -1,10 +1,12 @@
 import { defineBackground } from '#imports';
 import { browser } from 'wxt/browser';
 import { db } from '@/lib/db';
-import { MoxfieldSyncJob } from '@/lib/decks/job';
+import { AccountSyncJob } from '@/lib/decks/job';
 import { holdAwake } from '@/lib/keepalive';
 import { onMessage, sendMessage } from '@/lib/messaging';
-import { MoxTabTransport } from '@/lib/moxfield/tab-transport';
+import { SITE_TYPES, siteOf } from '@/lib/sites/registry';
+import { TabTransport } from '@/lib/sites/tab-transport';
+import type { SiteType } from '@/lib/sites/types';
 import { getSettings } from '@/lib/settings';
 import { controlRun, createRun, Runner, toProgress } from '@/features/f2f-buylist/runner';
 import type { Run } from '@/features/f2f-buylist/types';
@@ -25,12 +27,18 @@ export default defineBackground(() => {
     onActiveChange: (active) => holdAwake('f2f-runner', active),
   });
 
-  // Moxfield decks + collection, read through a logged-in Moxfield tab (shared by deck features).
-  const moxSync = new MoxfieldSyncJob({
-    createTransport: (ctl) => new MoxTabTransport(ctl),
-    onActiveChange: (active) => holdAwake('moxfield-sync', active),
-  });
-  void moxSync.markStale();
+  // Decks + collection of each site, read through a logged-in tab of that site (shared by deck features).
+  const syncJobs = Object.fromEntries(
+    SITE_TYPES.map((type) => {
+      const site = siteOf(type);
+      const job = new AccountSyncJob(site, {
+        createTransport: (ctl) => new TabTransport(site, ctl),
+        onActiveChange: (active) => holdAwake(`${type}-sync`, active),
+      });
+      return [type, job];
+    }),
+  ) as Record<SiteType, AccountSyncJob>;
+  for (const job of Object.values(syncJobs)) void job.markStale();
 
   const openDashboard = (runId?: number) =>
     browser.tabs.create({ url: browser.runtime.getURL('/dashboard.html') + (runId ? `#/f2f/runs/${runId}` : '#/f2f/runs') });
@@ -52,8 +60,8 @@ export default defineBackground(() => {
 
   onMessage('openDashboard', ({ data }) => void openDashboard(data.runId));
 
-  onMessage('startMoxfieldSync', ({ data }) => moxSync.start({ collection: data.collection }));
-  onMessage('cancelMoxfieldSync', () => ({ ok: moxSync.cancel() }));
+  onMessage('startAccountSync', ({ data }) => syncJobs[data.type].start({ collection: data.collection }));
+  onMessage('cancelAccountSync', ({ data }) => ({ ok: syncJobs[data.type].cancel() }));
 
   onMessage('getProgress', async ({ data, sender }) => {
     let run = data.runId ? await db.runs.get(data.runId) : undefined;

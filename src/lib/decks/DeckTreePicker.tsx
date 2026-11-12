@@ -9,6 +9,8 @@ export interface DeckTreePickerProps {
   /** Decks left out. Anything not listed (including new decks) is included. */
   excluded: ReadonlySet<string>;
   onChange(next: Set<string>): void;
+  /** The decks' site, for "Open on …" links. */
+  siteLabel: string;
   maxHeight?: number;
 }
 
@@ -25,7 +27,7 @@ function indexNodes(nodes: DeckTreeNode[], map = new Map<string, DeckTreeNode>()
 
 const FORMAT_LABEL: Record<string, string> = { commander: 'Commander', pauperEdh: 'Pauper EDH', none: '' };
 
-function DeckLabel({ deck }: { deck: DeckRow }) {
+function DeckLabel({ deck, siteLabel }: { deck: DeckRow; siteLabel: string }) {
   const format = FORMAT_LABEL[deck.format] ?? deck.format;
   return (
     <Group gap={6} wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
@@ -62,7 +64,7 @@ function DeckLabel({ deck }: { deck: DeckRow }) {
       <Text size="xs" c="dimmed" className="ti-num" style={{ marginLeft: 'auto', flexShrink: 0 }}>
         {deck.cardCount ?? ''}
       </Text>
-      <Tooltip label="Open on Moxfield">
+      <Tooltip label={`Open on ${siteLabel}`}>
         <ActionIcon
           component="a"
           href={deck.publicUrl}
@@ -70,7 +72,7 @@ function DeckLabel({ deck }: { deck: DeckRow }) {
           size="xs"
           variant="subtle"
           color="gray"
-          aria-label="Open on Moxfield"
+          aria-label={`Open on ${siteLabel}`}
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
         >
           <IconExternalLink size={12} />
@@ -81,7 +83,7 @@ function DeckLabel({ deck }: { deck: DeckRow }) {
 }
 
 /** Deck / folder hierarchy with tri-state checkboxes. Reusable by any feature that works on a subset of decks. */
-export function DeckTreePicker({ decks, excluded, onChange, maxHeight = 420 }: DeckTreePickerProps) {
+export function DeckTreePicker({ decks, excluded, onChange, siteLabel, maxHeight = 420 }: DeckTreePickerProps) {
   const [q, setQ] = useState('');
   // Rebuild only when something shown in the tree changes (not on every per-deck write of a sync).
   const signature = decks
@@ -196,7 +198,7 @@ export function DeckTreePicker({ decks, excluded, onChange, maxHeight = 420 }: D
                       </Text>
                     </Group>
                   ) : (
-                    <DeckLabel deck={n.deck!} />
+                    <DeckLabel deck={n.deck!} siteLabel={siteLabel} />
                   )}
                 </Group>
               );

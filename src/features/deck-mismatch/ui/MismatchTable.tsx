@@ -8,7 +8,6 @@ import { useSearchParams } from 'react-router';
 import type { DeckRow } from '@/lib/decks/types';
 import { scryfallCardLink, scryfallImage } from '@/lib/f2f/links';
 import { FINISH_LABEL, finishLabel } from '@/lib/format';
-import { boardLabel } from '@/lib/moxfield/decks';
 import { CardThumb } from '@/lib/ui/CardThumb';
 import type { MismatchRow, OtherPrint } from '../compare';
 import { downloadMismatchCsv } from '../csv';
@@ -39,7 +38,7 @@ function hintText(o: OtherPrint): string {
   return o.diff > 0 ? `Collection has ${print} ×${o.diff} not in a deck` : `Decks use ${print} ×${-o.diff} not in the collection`;
 }
 
-function DeckUses({ row, decks }: { row: MismatchRow; decks: ReadonlyMap<string, DeckRow> }) {
+function DeckUses({ row, decks, boardLabel }: { row: MismatchRow; decks: ReadonlyMap<string, DeckRow>; boardLabel: (board: string) => string }) {
   if (!row.decks.length) return <Text size="sm" c="dimmed">—</Text>;
   const label = (deckId: string, board: string) => `${decks.get(deckId)?.name ?? 'Unknown deck'}${board === 'mainboard' ? '' : ` · ${boardLabel(board)}`}`;
   const first = row.decks.slice(0, 2);
@@ -85,7 +84,7 @@ function DeckUses({ row, decks }: { row: MismatchRow; decks: ReadonlyMap<string,
   );
 }
 
-function buildColumns(decks: ReadonlyMap<string, DeckRow>): DataTableColumn<MismatchRow>[] {
+function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: string) => string): DataTableColumn<MismatchRow>[] {
   return [
     {
       accessor: 'kind',
@@ -174,7 +173,7 @@ function buildColumns(decks: ReadonlyMap<string, DeckRow>): DataTableColumn<Mism
       textAlign: 'right',
       render: (r) => num(r.diff > 0 ? `+${r.diff}` : r.diff, r.diff < 0 ? 'red' : 'orange'),
     },
-    { accessor: 'decks', title: 'Decks', sortable: true, render: (r) => <DeckUses row={r} decks={decks} /> },
+    { accessor: 'decks', title: 'Decks', sortable: true, render: (r) => <DeckUses row={r} decks={decks} boardLabel={boardLabel} /> },
     {
       accessor: 'links',
       title: '',
@@ -193,11 +192,13 @@ function buildColumns(decks: ReadonlyMap<string, DeckRow>): DataTableColumn<Mism
 interface Props {
   rows: MismatchRow[];
   decks: ReadonlyMap<string, DeckRow>;
+  /** The decks' site board names ("Sideboard"…). */
+  boardLabel: (board: string) => string;
   loading?: boolean;
   emptyText: string;
 }
 
-export function MismatchTable({ rows, decks, loading, emptyText }: Props) {
+export function MismatchTable({ rows, decks, boardLabel, loading, emptyText }: Props) {
   const tableRef = useStickyTableHeader();
   const [params, setParams] = useSearchParams();
   const [pageSize, setPageSize] = useLocalStorage({ key: 'tithies:decks:pageSize', defaultValue: 50 });
@@ -215,7 +216,7 @@ export function MismatchTable({ rows, decks, loading, emptyText }: Props) {
   const lastPage = Math.max(1, Math.ceil(view.length / pageSize));
   const safePage = Math.min(page, lastPage);
   const records = view.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const columns = useMemo(() => buildColumns(decks), [decks]);
+  const columns = useMemo(() => buildColumns(decks, boardLabel), [decks, boardLabel]);
   const sortStatus: DataTableSortStatus<MismatchRow> = { columnAccessor: sort.key, direction: sort.dir };
 
   const setOptions = useMemo(() => {
@@ -276,8 +277,8 @@ export function MismatchTable({ rows, decks, loading, emptyText }: Props) {
             </Button>
           </Menu.Target>
           <Menu.Dropdown>
-            <Menu.Item onClick={() => downloadMismatchCsv(view, deckName, filtered ? '-filtered' : '')}>Current view ({view.length} rows)</Menu.Item>
-            <Menu.Item onClick={() => downloadMismatchCsv(applyMismatchSort(rows, sort, deckName), deckName)}>All mismatches ({rows.length} rows)</Menu.Item>
+            <Menu.Item onClick={() => downloadMismatchCsv(view, deckName, boardLabel, filtered ? '-filtered' : '')}>Current view ({view.length} rows)</Menu.Item>
+            <Menu.Item onClick={() => downloadMismatchCsv(applyMismatchSort(rows, sort, deckName), deckName, boardLabel)}>All mismatches ({rows.length} rows)</Menu.Item>
           </Menu.Dropdown>
         </Menu>
       </Group>

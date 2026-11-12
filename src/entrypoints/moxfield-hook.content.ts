@@ -1,10 +1,12 @@
 import { defineContentScript } from '#imports';
-import { bridge, type CaptureInfo } from '@/lib/page-bridge';
-import { moxFail, runMoxRequest, type MoxTabStatus } from '@/lib/moxfield/api';
+import { runMoxRequest } from '@/lib/sites/moxfield/api';
+import { bridge, type CaptureInfo } from '@/lib/sites/moxfield/bridge';
+import { MOX_API_HOST } from '@/lib/sites/moxfield/constants';
 import type { CollectionEntry } from '@/lib/cards/types';
-import { isCollectionSearchUrl, normalizeEntry, withPaging, type CollectionPage } from '@/lib/moxfield/normalize';
+import { isCollectionSearchUrl, normalizeEntry, withPaging, type CollectionPage } from '@/lib/sites/moxfield/normalize';
+import { siteFail, type SiteTabStatus } from '@/lib/sites/types';
 
-const API_HOST = 'api2.moxfield.com';
+const API_HOST = MOX_API_HOST;
 
 /** Session headers worth replaying: the bearer token and Moxfield's own x-* headers. */
 const pickAuthHeaders = (h: Record<string, string>): Record<string, string> | null => {
@@ -105,11 +107,11 @@ export default defineContentScript({
 
     bridge.onMessage('getCaptureInfo', () => info());
 
-    bridge.onMessage('getStatus', (): MoxTabStatus => ({ hasAuth: auth != null, authAt: auth?.at, path: location.pathname }));
+    bridge.onMessage('getStatus', (): SiteTabStatus => ({ hasAuth: auth != null, authAt: auth?.at, path: location.pathname }));
 
     // One request per call: throttling, retries and progress live in the extension's background worker.
     bridge.onMessage('api', async ({ data }) => {
-      if (!auth) return moxFail(0, 'no_auth', 'No Moxfield session in this tab yet: log in to Moxfield, or reload the page.');
+      if (!auth) return siteFail(0, 'no_auth', 'No Moxfield session in this tab yet: log in to Moxfield, or reload the page.');
       const headers = { ...auth.headers };
       return runMoxRequest(data, (url) => origFetch(url, { headers, credentials: 'include' }));
     });

@@ -1,5 +1,5 @@
 import { groupPrints, isEligible } from '@/lib/cards/prints';
-import { describeQuery, isCollectionSearchUrl, normalizeEntry, withPaging } from '@/lib/moxfield/normalize';
+import { describeQuery, isCollectionSearchUrl, normalizeEntry, withPaging } from '@/lib/sites/moxfield/normalize';
 import { fixture } from './helpers';
 
 const page = fixture<{ data: any[] }>('moxfield-page.json');

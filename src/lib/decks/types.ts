@@ -91,7 +91,7 @@ export interface DeckSyncSummary {
   failed: { id: string; name: string; error: string }[];
 }
 
-/** meta row 'moxSync': state of the latest background Moxfield sync job. */
+/** meta row 'moxSync': state of the latest background sync job. */
 export interface SyncState {
   jobId: string;
   status: SyncStatus;
