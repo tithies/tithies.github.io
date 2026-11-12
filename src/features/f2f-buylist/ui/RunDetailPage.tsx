@@ -199,7 +199,7 @@ export function RunDetailPage() {
         </Alert>
       )}
 
-      <SimpleGrid cols={{ base: 2, md: 3, lg: 6 }} spacing="sm">
+      <SimpleGrid cols={{ base: 2, md: 3 }} spacing="sm">
         <Stat
           label="F2F buys"
           value={`${t.buylistPrints}`}

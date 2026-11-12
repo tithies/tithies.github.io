@@ -7,6 +7,21 @@
   --ti-navbar-shadow: 1px 0 10px rgba(16, 24, 40, 0.04);
   --ti-card-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 14px rgba(16, 24, 40, 0.05);
   --ti-art-opacity: 0.1;
+  --ti-menu-art-opacity: 0.8;
+  /* In the light theme the art's dark ground also fades out, so the Settings link stays readable. */
+  --ti-menu-art-mask: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.12) 12%, rgba(0, 0, 0, 0.4) 24%, rgba(0, 0, 0, 0.75) 36%, #000 48%, #000 72%, rgba(0, 0, 0, 0.3) 100%);
+  /* Opacity of every surface in the page content, dialogs and popovers (see "Glass" below). */
+  --ti-glass: 70%;
+  --ti-glass-blur: 12px;
+  /* Table rows: tints over their panel, so a see-through row stays see-through. */
+  --ti-row-stripe: rgba(16, 24, 40, 0.025);
+  --ti-row-hover: rgba(16, 24, 40, 0.05);
+  --mantine-datatable-striped-color-light: var(--ti-row-stripe);
+  --mantine-datatable-striped-color-dark: var(--ti-row-stripe);
+  --mantine-datatable-highlight-on-hover-color-light: var(--ti-row-hover);
+  --mantine-datatable-highlight-on-hover-color-dark: var(--ti-row-hover);
+  --mantine-datatable-pagination-active-background-color-light: color-mix(in srgb, var(--mantine-primary-color-filled) var(--ti-glass), transparent);
+  --mantine-datatable-pagination-active-background-color-dark: color-mix(in srgb, var(--mantine-primary-color-filled) var(--ti-glass), transparent);
 }
 [data-mantine-color-scheme='dark'] {
   --ti-canvas: var(--mantine-color-dark-9);
@@ -15,6 +30,10 @@
   --ti-navbar-shadow: 4px 0 18px rgba(0, 0, 0, 0.4);
   --ti-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025), 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.35);
   --ti-art-opacity: 0.16;
+  --ti-menu-art-opacity: 1;
+  --ti-menu-art-mask: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.12) 12%, rgba(0, 0, 0, 0.4) 24%, rgba(0, 0, 0, 0.75) 36%, #000 48%);
+  --ti-row-stripe: rgba(255, 255, 255, 0.03);
+  --ti-row-hover: rgba(255, 255, 255, 0.065);
 }
 body {
   background: var(--ti-canvas);
@@ -49,8 +68,160 @@ body {
   background: var(--ti-navbar);
   box-shadow: var(--ti-navbar-shadow);
 }
+/* The fire mage art fills the bottom of the menu, under its links (the fixed menu is its own
+   stacking context, so z-index -1 still paints over the menu's background). Its top fades out
+   into the menu colour along an eased curve, so there is no visible edge. */
+.mantine-AppShell-navbar::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  aspect-ratio: 516 / 699;
+  pointer-events: none;
+  background: url('../../assets/tithies-menu-art.webp') center bottom / 100% auto no-repeat;
+  opacity: var(--ti-menu-art-opacity);
+  -webkit-mask: var(--ti-menu-art-mask);
+  mask: var(--ti-menu-art-mask);
+}
 .mantine-Paper-root[data-with-border] {
   box-shadow: var(--ti-card-shadow);
+}
+
+/* Glass: in the page content (and in dialogs, popovers and tooltips, which are portaled to the
+   body), opaque surfaces let the page background through at --ti-glass. The header and the menu
+   keep theirs. Each rule mixes the colour Mantine would paint with transparent, so light/dark
+   themes, colours, variants and states keep working (Mantine 9's light variants are solid
+   colours too; transparent ones stay transparent).
+   postcss-preset-mantine turns light-dark() into a second rule prefixed with
+   [data-mantine-color-scheme='dark'], so no selector here may start with that attribute. */
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Paper-root {
+  background-color: color-mix(in srgb, var(--mantine-color-body) var(--ti-glass), transparent);
+}
+
+/* Buttons, action icons, badges, theme icons, alerts. */
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Button-root {
+  --ti-glass-fill: var(--button-bg, var(--mantine-primary-color-filled));
+  --ti-glass-fill-hover: var(--button-hover, var(--mantine-primary-color-filled-hover));
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-ActionIcon-root {
+  --ti-glass-fill: var(--ai-bg, var(--mantine-primary-color-filled));
+  --ti-glass-fill-hover: var(--ai-hover, var(--mantine-primary-color-filled-hover));
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Badge-root {
+  --ti-glass-fill: var(--badge-bg);
+}
+/* (--ti-bg here is Mantine's ThemeIcon variable, not one of ours.) */
+:is(.mantine-AppShell-main, [data-portal]) .mantine-ThemeIcon-root {
+  --ti-glass-fill: var(--ti-bg, var(--mantine-primary-color-filled));
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Alert-root {
+  --ti-glass-fill: var(--alert-bg);
+}
+:is(.mantine-AppShell-main, [data-portal])
+  :is(.mantine-Button-root, .mantine-ActionIcon-root, .mantine-Badge-root, .mantine-ThemeIcon-root, .mantine-Alert-root) {
+  background-color: color-mix(in srgb, var(--ti-glass-fill) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal])
+  :is(.mantine-Button-root, .mantine-ActionIcon-root):is(:hover, :active):not([data-loading], :disabled, [data-disabled]) {
+  background-color: color-mix(in srgb, var(--ti-glass-fill-hover) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) :is(.mantine-Button-root, .mantine-ActionIcon-root):is(:disabled, [data-disabled]):not([data-loading]) {
+  background-color: color-mix(in srgb, var(--mantine-color-disabled) var(--ti-glass), transparent);
+}
+
+/* Inputs, checkboxes, switches, segmented controls, progress bars, pills, pagination, tree,
+   dropdown options, close buttons. */
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Input-input {
+  background-color: color-mix(in srgb, var(--input-bg) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Input-input:is(:disabled, [data-disabled], :has(input:disabled)) {
+  background-color: color-mix(in srgb, var(--input-disabled-bg) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Checkbox-input:not(:disabled) {
+  background-color: color-mix(in srgb, light-dark(var(--mantine-color-white), var(--mantine-color-dark-6)) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Checkbox-input:is(:checked, [data-indeterminate]):not(:disabled) {
+  background-color: color-mix(in srgb, var(--checkbox-color) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Switch-track {
+  background-color: color-mix(in srgb, var(--switch-bg) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-SegmentedControl-root {
+  background-color: color-mix(in srgb, light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-8)) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-SegmentedControl-indicator,
+:is(.mantine-AppShell-main, [data-portal]) .mantine-SegmentedControl-label[data-active]::before {
+  background-color: color-mix(in srgb, var(--sc-color, light-dark(var(--mantine-color-white), var(--mantine-color-dark-5))) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Progress-root {
+  background-color: color-mix(in srgb, light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4)) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Progress-section {
+  background-color: color-mix(in srgb, var(--progress-section-color) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Pill-root {
+  background-color: color-mix(in srgb, light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-7)) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Pagination-control:not([data-active]) {
+  background-color: color-mix(in srgb, light-dark(var(--mantine-color-white), var(--mantine-color-dark-6)) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Pagination-control:not([data-active], :disabled, [data-disabled]):is(:hover, :active) {
+  background-color: color-mix(in srgb, light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-5)) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Tree-label[data-selected] {
+  background-color: color-mix(in srgb, light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5)) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) [data-combobox-option]:is(:hover, :active):not([data-combobox-selected], [data-combobox-disabled]) {
+  background-color: color-mix(in srgb, light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7)) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) [data-combobox-option][data-combobox-selected] {
+  background-color: color-mix(in srgb, var(--mantine-primary-color-filled) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-CloseButton-root:not([data-disabled], :disabled):is(:hover, :active) {
+  background-color: color-mix(in srgb, light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6)) var(--ti-glass), transparent);
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-datatable-empty-state-icon {
+  background: color-mix(in srgb, light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5)) var(--ti-glass), transparent);
+}
+
+/* Tables sit in a panel: they paint no background of their own, rows only a tint. A data-table
+   cell repeats its row's background, which shows twice on a see-through row: cells paint none. */
+:is(.mantine-AppShell-main, [data-portal]) .mantine-Table-table {
+  --table-striped-color: var(--ti-row-stripe);
+  --table-hover-color: var(--ti-row-hover);
+}
+:is(.mantine-AppShell-main, [data-portal]) :is(.mantine-datatable, .mantine-datatable-table, .mantine-datatable-table td) {
+  background: transparent;
+}
+:is(.mantine-AppShell-main, [data-portal]) .mantine-datatable-header-cell-sortable:hover:not(:has(button:hover)) {
+  background: var(--ti-row-hover);
+}
+
+/* Dialogs, popovers, menus, dropdowns and tooltips float over the page: they also blur what is
+   under them, so their text stays readable. */
+body
+  :is(.mantine-Popover-dropdown, .mantine-Menu-dropdown, .mantine-HoverCard-dropdown, .mantine-Combobox-dropdown, .mantine-Select-dropdown, .mantine-MultiSelect-dropdown) {
+  background-color: color-mix(in srgb, light-dark(var(--mantine-color-white), var(--mantine-color-dark-6)) var(--ti-glass), transparent);
+  -webkit-backdrop-filter: blur(var(--ti-glass-blur));
+  backdrop-filter: blur(var(--ti-glass-blur));
+}
+body .mantine-Tooltip-tooltip {
+  background-color: color-mix(in srgb, var(--tooltip-bg, light-dark(var(--mantine-color-gray-9), var(--mantine-color-gray-2))) var(--ti-glass), transparent);
+  -webkit-backdrop-filter: blur(var(--ti-glass-blur));
+  backdrop-filter: blur(var(--ti-glass-blur));
+}
+body .mantine-Modal-content {
+  -webkit-backdrop-filter: blur(var(--ti-glass-blur));
+  backdrop-filter: blur(var(--ti-glass-blur));
+}
+/* The dialog's title bar is part of its panel (it would paint the panel colour a second time). */
+body .mantine-Modal-header {
+  background-color: transparent;
+}
+body .mantine-Menu-item:where(:hover, :focus, [data-menu-active]):where(:not(:disabled, [data-disabled])) {
+  background-color: color-mix(in srgb, var(--menu-item-hover, light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-4))) var(--ti-glass), transparent);
 }
 .ti-num {
   font-variant-numeric: tabular-nums;
@@ -72,29 +243,37 @@ body {
 }
 
 /* Run page: rows that need review are red, striped or not, hovered or not. The table's striped
-   and hover rules read these variables, so setting them on the row turns those red too. */
+   and hover rules read these variables, so setting them on the row turns those red too. Cells
+   paint no background of their own (see "Glass"): the dark values are what a row and its cells
+   used to add up to. */
 .mantine-datatable-row.ti-review-row {
-  --ti-review-bg: var(--mantine-color-red-1);
-  --ti-review-bg-hover: var(--mantine-color-red-2);
+  --ti-review-bg: color-mix(in srgb, var(--mantine-color-red-1) var(--ti-glass), transparent);
+  --ti-review-bg-hover: color-mix(in srgb, var(--mantine-color-red-2) var(--ti-glass), transparent);
   --mantine-datatable-striped-color: var(--ti-review-bg);
   --mantine-datatable-highlight-on-hover-color: var(--ti-review-bg-hover);
   background: var(--ti-review-bg);
 }
 [data-mantine-color-scheme='dark'] .mantine-datatable-row.ti-review-row {
-  --ti-review-bg: rgba(201, 42, 42, 0.28);
-  --ti-review-bg-hover: rgba(201, 42, 42, 0.4);
+  --ti-review-bg: rgba(201, 42, 42, 0.48);
+  --ti-review-bg-hover: rgba(201, 42, 42, 0.64);
 }
 
 /* Sticky table header (see useStickyTableHeader): the header is moved down by the page's scroll
-   position, between the offsets the hook computes. Runs on the compositor, so it never lags. */
+   position, between the offsets the hook computes. Runs on the compositor, so it never lags.
+   While it is moved it covers rows, so it gets a solid background then (none before the range:
+   the animation only fills forwards). */
 @keyframes ti-stick-header {
+  from {
+    background-color: var(--mantine-color-body);
+  }
   to {
     transform: translateY(var(--ti-stick-room, 0px));
+    background-color: var(--mantine-color-body);
   }
 }
 @supports (animation-timeline: scroll()) {
   .ti-sticky-head .mantine-datatable-header {
-    animation: ti-stick-header linear both;
+    animation: ti-stick-header linear forwards;
     animation-timeline: scroll(root block);
     animation-range: var(--ti-stick-from, 0px) var(--ti-stick-to, 0px);
   }

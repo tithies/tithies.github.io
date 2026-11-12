@@ -230,7 +230,7 @@ export function StoredDataSection() {
               {blocks.map((b) => (
                 <Fragment key={b.account?.key ?? 'shared'}>
                   <Table.Tr>
-                    <Table.Td colSpan={5} bg="var(--mantine-color-default-hover)" py={6}>
+                    <Table.Td colSpan={5} bg="color-mix(in srgb, var(--mantine-color-default-hover) var(--ti-glass), transparent)" py={6}>
                       {b.account ? (
                         <Group gap="xs">
                           <SiteIcon type={b.account.type} size={16} />
