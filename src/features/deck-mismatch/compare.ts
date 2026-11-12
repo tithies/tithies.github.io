@@ -3,7 +3,8 @@
  * Deck copies are summed over every included deck: each physical copy is expected to live in one deck.
  */
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
-import { printKey, type MoxCard, type MoxEntry, type MoxFinish } from '@/lib/moxfield/normalize';
+import { printKey } from '@/lib/cards/prints';
+import type { CardPrint, CollectionEntry, Finish } from '@/lib/cards/types';
 
 /** missing = in decks, not (enough) in the collection; unassigned = in the collection, not (enough) in decks. */
 export type MismatchKind = 'missing' | 'unassigned';
@@ -20,7 +21,7 @@ export interface OtherPrint {
   set: string;
   setName: string;
   cn: string;
-  finish: MoxFinish;
+  finish: Finish;
   /** That print's collection − decks. */
   diff: number;
   /** Same set and number: only the finish differs. */
@@ -34,7 +35,7 @@ export interface MismatchRow {
   set: string;
   setName: string;
   cn: string;
-  finish: MoxFinish;
+  finish: Finish;
   rarity: string;
   typeLine: string;
   scryfallId: string;
@@ -73,8 +74,8 @@ export interface CompareSummary {
 
 interface Acc {
   key: string;
-  card: MoxCard;
-  finish: MoxFinish;
+  card: CardPrint;
+  finish: Finish;
   deckQty: number;
   collectionQty: number;
   decks: Map<string, DeckUse>;
@@ -85,7 +86,7 @@ const nameKey = (name: string) => name.trim().toLowerCase();
 export function compareDecksToCollection(
   decks: readonly DeckRow[],
   deckCards: readonly DeckCardsRow[],
-  collection: readonly MoxEntry[],
+  collection: readonly CollectionEntry[],
   opts: CompareOptions,
 ): { rows: MismatchRow[]; summary: CompareSummary } {
   const excluded = new Set(opts.excludedDeckIds);
@@ -107,7 +108,7 @@ export function compareDecksToCollection(
     nonPaperSkipped: 0,
   };
 
-  const slot = (card: MoxCard, finish: MoxFinish): Acc => {
+  const slot = (card: CardPrint, finish: Finish): Acc => {
     const key = printKey(card.set, card.cn, finish);
     let a = acc.get(key);
     if (!a) {

@@ -1,5 +1,5 @@
 import { nmVariant, type F2FDoc } from '@/lib/f2f/api';
-import type { MoxFinish } from '@/lib/moxfield/normalize';
+import type { Finish } from '@/lib/cards/types';
 import type { BulkRates } from './types';
 
 /** F2F MTG bulk rates observed on 2026-11-09, used only if a lot is missing from the live page. */
@@ -73,7 +73,7 @@ const EXCLUDED_SETS: Record<string, string> = { unf: 'Unfinity', ust: 'Unstable'
 export interface BulkInput {
   set: string;
   setType: string;
-  finish: MoxFinish;
+  finish: Finish;
   /** Moxfield rarity (common/uncommon/rare/mythic/special/bonus). */
   rarity: string;
   typeLine: string;

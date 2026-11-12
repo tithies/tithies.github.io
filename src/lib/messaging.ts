@@ -1,13 +1,13 @@
 import { defineExtensionMessaging } from '@webext-core/messaging';
 import type { MoxApiRequest, MoxApiResult, MoxTabStatus } from '@/lib/moxfield/api';
-import type { MoxEntry } from '@/lib/moxfield/normalize';
+import type { CollectionEntry } from '@/lib/cards/types';
 import type { RunProgress, RunSource } from '@/features/f2f-buylist/types';
 
 export type RunAction = 'pause' | 'resume' | 'cancel' | 'retryErrors';
 
 /** Messages between content scripts, extension pages and the background worker. */
 interface ProtocolMap {
-  startRun(data: { source: Omit<RunSource, 'tabId'>; entries: MoxEntry[] }): { runId: number; prints: number };
+  startRun(data: { source: Omit<RunSource, 'tabId'>; entries: CollectionEntry[] }): { runId: number; prints: number };
   controlRun(data: { runId: number; action: RunAction }): { ok: boolean; error?: string };
   openDashboard(data: { runId?: number }): void;
   getProgress(data: { runId?: number }): RunProgress | null;

@@ -1,6 +1,6 @@
 import { defineCustomEventMessaging } from '@webext-core/messaging/page';
 import type { MoxApiRequest, MoxApiResult, MoxTabStatus } from '@/lib/moxfield/api';
-import type { MoxEntry } from '@/lib/moxfield/normalize';
+import type { CollectionEntry } from '@/lib/cards/types';
 
 export interface CaptureInfo {
   hasCapture: boolean;
@@ -10,7 +10,7 @@ export interface CaptureInfo {
 
 export interface CollectionResult {
   url: string;
-  entries: MoxEntry[];
+  entries: CollectionEntry[];
   totalResults: number;
   pages: number;
 }

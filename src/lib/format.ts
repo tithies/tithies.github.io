@@ -1,5 +1,5 @@
 /** Formatting helpers shared by every dashboard feature. */
-import type { MoxFinish } from '@/lib/moxfield/normalize';
+import type { Finish } from '@/lib/cards/types';
 
 export const dateTime = (t: number) => new Date(t).toLocaleString();
 
@@ -23,8 +23,8 @@ export function duration(ms: number): string {
   return s % 60 ? `${m} min ${s % 60} s` : `${m} min`;
 }
 
-export const FINISH_LABEL: Record<MoxFinish, string> = { nonFoil: 'Non-foil', foil: 'Foil', etched: 'Etched' };
-export const finishLabel = (f: MoxFinish) => FINISH_LABEL[f] ?? f;
+export const FINISH_LABEL: Record<Finish, string> = { nonFoil: 'Non-foil', foil: 'Foil', etched: 'Etched' };
+export const finishLabel = (f: Finish) => FINISH_LABEL[f] ?? f;
 
 /** Lower-case, accents removed: for forgiving text search. */
 export const fold = (s: string) =>

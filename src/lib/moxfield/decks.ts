@@ -2,47 +2,12 @@
  * Moxfield deck API (`/v3/decks` list and `/v3/decks/all/{publicId}`) → compact deck data.
  * Pure functions: they run inside the Moxfield page (MAIN world), so only trimmed data crosses the bridge.
  */
-import { normalizeEntry, type MoxCard, type MoxFinish } from './normalize';
+import type { BoardInfo, DeckCard, DeckSummary } from '@/lib/decks/types';
+import { normalizeEntry } from './normalize';
+
 
 /** Bump when DeckCard's shape or the normaliser changes, so cached decks are fetched again. */
 export const DECK_CARDS_VERSION = 2; // 2: per-copy finishes/prints from `printingData`
-
-/** One deck from the deck list (no cards). */
-export interface DeckSummary {
-  /** Moxfield's internal deck id (stable key). */
-  id: string;
-  /** Id used in deck URLs and the deck API. */
-  publicId: string;
-  name: string;
-  format: string;
-  visibility: string;
-  /** Full folder path, "/"-separated (e.g. "Collection/Final Fantasy"); '' when the deck has no folder. */
-  folderPath: string;
-  /** The list's `lastUpdatedAtUtc`, kept verbatim: it's what change detection compares. */
-  lastUpdatedAt: string;
-  createdAt: string;
-  /** As reported by the list (mainboardCount includes commanders). */
-  mainboardCount: number;
-  sideboardCount: number;
-  maybeboardCount: number;
-  commanders: string[];
-  publicUrl: string;
-}
-
-/** One card row of a deck board. */
-export interface DeckCard {
-  board: string;
-  qty: number;
-  finish: MoxFinish;
-  isProxy: boolean;
-  isAlter: boolean;
-  card: MoxCard;
-}
-
-export interface BoardInfo {
-  key: string;
-  label: string;
-}
 
 /** Moxfield's deck boards, in display order. Unknown boards are still read (see boardLabel). */
 export const BOARDS: BoardInfo[] = [

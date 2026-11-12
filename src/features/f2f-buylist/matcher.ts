@@ -1,5 +1,5 @@
 import { isScanListing, nmVariant, type F2FDoc } from '@/lib/f2f/api';
-import type { MoxFinish } from '@/lib/moxfield/normalize';
+import type { Finish } from '@/lib/cards/types';
 import { bulkValue } from './bulk';
 import type { BulkRates, Category, Item, MatchStatus } from './types';
 
@@ -14,13 +14,13 @@ export const normName = (s: string) =>
     .replace(/[^a-z0-9_]/g, '');
 export const normCn = (s: string) => s.trim().toLowerCase().replace(/^0+(?=\d)/, '');
 
-const F2F_FINISH: Record<MoxFinish, string> = { nonFoil: 'Non-Foil', foil: 'Foil', etched: 'Etched Foil' };
+const F2F_FINISH: Record<Finish, string> = { nonFoil: 'Non-Foil', foil: 'Foil', etched: 'Etched Foil' };
 
 export interface PrintRef {
   set: string;
   setName: string;
   cn: string;
-  finish: MoxFinish;
+  finish: Finish;
   faces: string[];
   name: string;
   /** Alternate printed name; F2F titles these "Flavor Name - Card Name". */
@@ -79,7 +79,7 @@ const withScanNote = (doc: F2FDoc, note?: string) => ({
  * (Surge, Galaxy…). F2F can list dozens of scanned single copies next to the regular product,
  * so candidates are ranked rather than taken in F2F's order.
  */
-function pickFinish(docs: F2FDoc[], finish: MoxFinish): { doc: F2FDoc; note?: string } | null {
+function pickFinish(docs: F2FDoc[], finish: Finish): { doc: F2FDoc; note?: string } | null {
   const ranked = byRank(docs);
   const target = F2F_FINISH[finish].toLowerCase();
   const exact = ranked.find((d) => d.finish.toLowerCase() === target);

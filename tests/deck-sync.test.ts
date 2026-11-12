@@ -2,11 +2,13 @@ import { db, getMeta } from '@/lib/db';
 import { refreshCollection } from '@/lib/decks/collection';
 import { MoxfieldSyncJob, type SyncTransport } from '@/lib/decks/job';
 import { isDeckStale, markDecksSeen, syncDecks } from '@/lib/decks/sync';
-import { META_DECKS, META_SYNC, type DecksMeta, type MoxSyncState } from '@/lib/decks/types';
+import { META_DECKS, META_SYNC, type DecksMeta, type SyncState } from '@/lib/decks/types';
 import { moxFail, type MoxApiRequest, type MoxApiResult } from '@/lib/moxfield/api';
 import { MoxAuthError, MoxNotFoundError, type DeckSource } from '@/lib/moxfield/client';
-import { DECK_CARDS_VERSION, normalizeDeckCards, type DeckCard, type DeckSummary } from '@/lib/moxfield/decks';
-import { normalizeEntry, type MoxEntry } from '@/lib/moxfield/normalize';
+import type { DeckCard, DeckSummary } from '@/lib/decks/types';
+import { DECK_CARDS_VERSION, normalizeDeckCards } from '@/lib/moxfield/decks';
+import type { CollectionEntry } from '@/lib/cards/types';
+import { normalizeEntry } from '@/lib/moxfield/normalize';
 import { clearCaches } from '@/features/f2f-buylist/runner';
 import { fixture } from './helpers';
 
@@ -146,7 +148,7 @@ describe('Collection snapshot', () => {
   beforeEach(reset);
 
   it('reads every page and keeps each row once', async () => {
-    const entries = page.data.map(normalizeEntry).filter((e): e is MoxEntry => e !== null);
+    const entries = page.data.map(normalizeEntry).filter((e): e is CollectionEntry => e !== null);
     const half = Math.ceil(entries.length / 2);
     const pages = [entries.slice(0, half), [...entries.slice(half), entries[0]]];
     const asked: number[] = [];
@@ -177,7 +179,7 @@ describe('MoxfieldSyncJob', () => {
           return { ok: true, kind: 'deckList', decks: opts.list };
         }
         if (req.kind === 'deck') return opts.deckAnswer ?? { ok: true, kind: 'deck', lastUpdatedAt: '', cards: CARDS };
-        const entries = page.data.map(normalizeEntry).filter((e): e is MoxEntry => e !== null);
+        const entries = page.data.map(normalizeEntry).filter((e): e is CollectionEntry => e !== null);
         return { ok: true, kind: 'collection', entries, totalResults: entries.length, totalPages: 1, pageSize: 5000 };
       },
       release: async () => {
@@ -198,13 +200,13 @@ describe('MoxfieldSyncJob', () => {
 
     const first = await job.start({ collection: false });
     expect(first.alreadyRunning).toBe(false);
-    expect((await getMeta<MoxSyncState>(META_SYNC))!.status).toBe('running');
+    expect((await getMeta<SyncState>(META_SYNC))!.status).toBe('running');
     // A "Find mismatches" while the deck sync runs joins it and adds the collection step.
     expect(await job.start({ collection: true })).toEqual({ jobId: first.jobId, alreadyRunning: true });
     open();
     await job.finished;
 
-    const state = (await getMeta<MoxSyncState>(META_SYNC))!;
+    const state = (await getMeta<SyncState>(META_SYNC))!;
     expect(state).toMatchObject({ jobId: first.jobId, status: 'done', phase: 'done', withCollection: true, requests: 4 });
     expect(state.decks).toMatchObject({ total: 2, fetched: 2 });
     expect(t.calls.map((c) => c.kind)).toEqual(['deckList', 'deck', 'deck', 'collection']);
@@ -218,7 +220,7 @@ describe('MoxfieldSyncJob', () => {
     const job = new MoxfieldSyncJob({ createTransport: () => auth.transport, clientOptions: fast });
     await job.start({ collection: true });
     await job.finished;
-    expect(await getMeta<MoxSyncState>(META_SYNC)).toMatchObject({ status: 'error', error: 'Log in to Moxfield' });
+    expect(await getMeta<SyncState>(META_SYNC)).toMatchObject({ status: 'error', error: 'Log in to Moxfield' });
 
     let open!: () => void;
     const gate = new Promise<void>((r) => (open = r));
@@ -228,12 +230,12 @@ describe('MoxfieldSyncJob', () => {
     expect(job2.cancel()).toBe(true);
     open();
     await job2.finished;
-    expect((await getMeta<MoxSyncState>(META_SYNC))!.status).toBe('cancelled');
+    expect((await getMeta<SyncState>(META_SYNC))!.status).toBe('cancelled');
   });
 
   it('marks a job left running by a previous worker as interrupted', async () => {
     await db.meta.put({ key: META_SYNC, value: { jobId: 'old', status: 'running', phase: 'decks', withCollection: false, done: 3, total: 9, startedAt: 1, heartbeatAt: 1, requests: 4 }, updatedAt: 1 });
     await new MoxfieldSyncJob({ createTransport: () => fakeTransport({ list: [] }).transport }).markStale();
-    expect((await getMeta<MoxSyncState>(META_SYNC))!.status).toBe('interrupted');
+    expect((await getMeta<SyncState>(META_SYNC))!.status).toBe('interrupted');
   });
 });

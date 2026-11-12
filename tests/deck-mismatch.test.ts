@@ -2,10 +2,10 @@ import { compareDecksToCollection, type CompareOptions } from '@/features/deck-m
 import { DEFAULT_MISMATCH_CONFIG, parseMismatchConfig } from '@/features/deck-mismatch/config';
 import { applyMismatchFilters, applyMismatchSort, mismatchFiltersFromParams, writeMismatchParams, DEFAULT_MISMATCH_SORT } from '@/features/deck-mismatch/filtering';
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
-import type { DeckCard } from '@/lib/moxfield/decks';
-import type { MoxCard, MoxEntry, MoxFinish } from '@/lib/moxfield/normalize';
+import type { DeckCard } from '@/lib/decks/types';
+import type { CardPrint, CollectionEntry, Finish } from '@/lib/cards/types';
 
-const card = (name: string, set: string, cn: string): MoxCard => ({
+const card = (name: string, set: string, cn: string): CardPrint => ({
   id: `${set}-${cn}`,
   scryfallId: '',
   set,
@@ -26,9 +26,9 @@ const SHEOLDRED = card('Sheoldred, the Apocalypse', 'dmu', '107');
 const EZURI = card('Ezuri, Claw of Progress', '2x2', '211');
 const ISLAND = card('Island', 'dsk', '279');
 
-const dc = (c: MoxCard, qty: number, board = 'mainboard', finish: MoxFinish = 'nonFoil', isProxy = false): DeckCard => ({ board, qty, finish, isProxy, isAlter: false, card: c });
+const dc = (c: CardPrint, qty: number, board = 'mainboard', finish: Finish = 'nonFoil', isProxy = false): DeckCard => ({ board, qty, finish, isProxy, isAlter: false, card: c });
 let n = 0;
-const entry = (c: MoxCard, qty: number, finish: MoxFinish = 'nonFoil', extra: Partial<MoxEntry> = {}): MoxEntry => ({
+const entry = (c: CardPrint, qty: number, finish: Finish = 'nonFoil', extra: Partial<CollectionEntry> = {}): CollectionEntry => ({
   id: `e${n++}`,
   qty,
   condition: 'nearMint',

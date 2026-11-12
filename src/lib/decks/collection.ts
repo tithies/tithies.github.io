@@ -2,7 +2,7 @@
 import { db, putMeta } from '@/lib/db';
 import { MAX_COLLECTION_PAGE_SIZE } from '@/lib/moxfield/api';
 import { MoxCancelledError, type CollectionSource } from '@/lib/moxfield/client';
-import type { MoxEntry } from '@/lib/moxfield/normalize';
+import type { CollectionEntry } from '@/lib/cards/types';
 import { META_COLLECTION, type CollectionMeta } from './types';
 
 const MAX_PAGES = 200;
@@ -14,7 +14,7 @@ export async function refreshCollection(
   const first = await client.collectionPage(1, MAX_COLLECTION_PAGE_SIZE);
   const pageSize = first.pageSize || MAX_COLLECTION_PAGE_SIZE;
   const totalPages = Math.min(MAX_PAGES, Math.max(1, first.totalPages));
-  const all: MoxEntry[] = [...first.entries];
+  const all: CollectionEntry[] = [...first.entries];
   await ctl.onProgress?.({ done: 1, total: totalPages, entries: all.length });
   for (let page = 2; page <= totalPages; page++) {
     if (ctl.signal?.aborted) throw new MoxCancelledError();
@@ -23,7 +23,7 @@ export async function refreshCollection(
   }
 
   // Rows can shift between pages while paging: keep each collection row once.
-  const byId = new Map<string, MoxEntry>();
+  const byId = new Map<string, CollectionEntry>();
   all.forEach((e, i) => {
     const id = e.id || `row-${i}`;
     if (!byId.has(id)) byId.set(id, { ...e, id });

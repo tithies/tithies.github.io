@@ -2,8 +2,10 @@
  * Moxfield API requests Tithies makes, and how they are answered. Requests always run inside a
  * logged-in Moxfield tab (see moxfield-hook.content.ts), so the session token never leaves the page.
  */
-import { normalizeDeckCards, normalizeDeckList, type DeckCard, type DeckSummary } from './decks';
-import { COLLECTION_SEARCH_PATH, normalizeEntry, type CollectionPage, type MoxEntry } from './normalize';
+import type { DeckCard, DeckSummary } from '@/lib/decks/types';
+import { normalizeDeckCards, normalizeDeckList } from './decks';
+import type { CollectionEntry } from '@/lib/cards/types';
+import { COLLECTION_SEARCH_PATH, normalizeEntry, type CollectionPage } from './normalize';
 
 export const MOX_API_ORIGIN = 'https://api2.moxfield.com';
 export const MOX_TAB_PATTERNS = ['https://moxfield.com/*', 'https://www.moxfield.com/*'];
@@ -61,7 +63,7 @@ export interface MoxApiFailure {
 export type MoxApiSuccess =
   | { ok: true; kind: 'deckList'; decks: DeckSummary[] }
   | { ok: true; kind: 'deck'; lastUpdatedAt: string; cards: DeckCard[] }
-  | { ok: true; kind: 'collection'; entries: MoxEntry[]; totalResults: number; totalPages: number; pageSize: number };
+  | { ok: true; kind: 'collection'; entries: CollectionEntry[]; totalResults: number; totalPages: number; pageSize: number };
 
 /** Results are returned, never thrown: status codes don't survive a thrown error across the messaging layers. */
 export type MoxApiResult = MoxApiSuccess | MoxApiFailure;
@@ -126,7 +128,7 @@ export async function runMoxRequest(req: MoxApiRequest, doFetch: (url: string) =
     }
     case 'collection': {
       const p = body as CollectionPage;
-      const entries: MoxEntry[] = [];
+      const entries: CollectionEntry[] = [];
       for (const raw of Array.isArray(p?.data) ? p.data : []) {
         const e = normalizeEntry(raw);
         if (e) entries.push(e);

@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import type { BulkRates } from '@/features/f2f-buylist/types';
 import { db, getMeta } from '@/lib/db';
-import { META_COLLECTION, META_DECKS, META_SYNC, type CollectionMeta, type DecksMeta, type MoxSyncState } from '@/lib/decks/types';
+import { META_COLLECTION, META_DECKS, META_SYNC, type CollectionMeta, type DecksMeta, type SyncState } from '@/lib/decks/types';
 import { timeAgo } from '@/lib/format';
 import { getSettings, settingsItem } from '@/lib/settings';
 import { SettingsSection } from '@/lib/ui/SettingsSection';
@@ -27,7 +27,7 @@ function useStats(ttlHours: number) {
       db.decks.count(),
       db.deckCards.count(),
       getMeta<DecksMeta>(META_DECKS),
-      getMeta<MoxSyncState>(META_SYNC),
+      getMeta<SyncState>(META_SYNC),
       db.moxCollection.count(),
       getMeta<CollectionMeta>(META_COLLECTION),
       db.runs.count(),

@@ -1,7 +1,8 @@
 import { defineContentScript } from '#imports';
 import { bridge, type CaptureInfo } from '@/lib/page-bridge';
 import { moxFail, runMoxRequest, type MoxTabStatus } from '@/lib/moxfield/api';
-import { isCollectionSearchUrl, normalizeEntry, withPaging, type CollectionPage, type MoxEntry } from '@/lib/moxfield/normalize';
+import type { CollectionEntry } from '@/lib/cards/types';
+import { isCollectionSearchUrl, normalizeEntry, withPaging, type CollectionPage } from '@/lib/moxfield/normalize';
 
 const API_HOST = 'api2.moxfield.com';
 
@@ -123,7 +124,7 @@ export default defineContentScript({
         return res.json();
       };
 
-      const entries: MoxEntry[] = [];
+      const entries: CollectionEntry[] = [];
       const first = await getPage(1, data.pageSize);
       // Moxfield may cap the page size: keep paging with whatever size it actually used.
       const size = first.pageSize || data.pageSize;

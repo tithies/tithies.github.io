@@ -2,7 +2,8 @@ import { vi } from 'vitest';
 import type { F2FDoc } from '@/lib/f2f/api';
 import { F2FClient } from '@/lib/f2f/client';
 import { db } from '@/lib/db';
-import { normalizeEntry, type MoxEntry } from '@/lib/moxfield/normalize';
+import type { CollectionEntry } from '@/lib/cards/types';
+import { normalizeEntry } from '@/lib/moxfield/normalize';
 import { saveSettings } from '@/lib/settings';
 import { clearCaches, controlRun, createRun, Runner } from '@/features/f2f-buylist/runner';
 import { PRICE_CHECK_NOTE } from '@/features/f2f-buylist/matcher';
@@ -14,7 +15,7 @@ const cardDocs = [...docs('f2f-batch.json'), ...docs('f2f-dfc.json')];
 const flavorDocs = docs('f2f-flavor.json');
 const f2fSets = fixture<{ sets: string[] }>('f2f-sets.json').sets;
 
-const entry = (name: string, set: string, setName: string, cn: string, finish: MoxEntry['finish'], rarity = 'rare', qty = 1, flavorName = ''): MoxEntry => ({
+const entry = (name: string, set: string, setName: string, cn: string, finish: CollectionEntry['finish'], rarity = 'rare', qty = 1, flavorName = ''): CollectionEntry => ({
   id: `${set}-${cn}-${finish}`,
   qty,
   condition: 'nearMint',
@@ -25,7 +26,7 @@ const entry = (name: string, set: string, setName: string, cn: string, finish: M
   card: { id: cn, scryfallId: '', set, setName, setType: 'expansion', name, faces: name.split(' // '), flavorName, cn, rarity, typeLine: 'Creature', isToken: false, usd: { nonFoil: 1, foil: 2, etched: null } },
 });
 
-const ENTRIES: MoxEntry[] = [
+const ENTRIES: CollectionEntry[] = [
   entry('Sheoldred, the Apocalypse', 'dmu', 'Dominaria United', '435', 'foil', 'mythic', 2),
   entry('Sol Ring', 'tmc', 'Teenage Mutant Ninja Turtles Eternal', '59', 'foil', 'uncommon'),
   entry('Sol Ring', 'plst', 'The List', 'BLC-129', 'nonFoil', 'uncommon', 3),
@@ -35,7 +36,7 @@ const ENTRIES: MoxEntry[] = [
   entry('Wall of Omens', 'fca', 'Final Fantasy: Through the Ages', '27', 'foil', 'uncommon', 1, 'The Imperial City of Archades'),
   // Same card without Moxfield's flavor name: found by the set + number fallback.
   entry('Wall of Omens', 'fca', 'Final Fantasy: Through the Ages', '27', 'nonFoil', 'uncommon'),
-  ...fixture<{ data: unknown[] }>('moxfield-page.json').data.map(normalizeEntry).filter((e): e is MoxEntry => e !== null),
+  ...fixture<{ data: unknown[] }>('moxfield-page.json').data.map(normalizeEntry).filter((e): e is CollectionEntry => e !== null),
 ];
 
 /** Pass-1 requests only (name + number), not the other-versions check (name + set). */

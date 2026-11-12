@@ -1,6 +1,6 @@
 import type { F2FDoc } from '@/lib/f2f/api';
 import { isOversized } from './bulk';
-import type { MoxFinish } from '@/lib/moxfield/normalize';
+import type { Finish } from '@/lib/cards/types';
 
 export type RunStatus = 'fetching_collection' | 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 export type RunPhase = 'bulk_rates' | 'lookup' | 'fallback' | 'shop_search' | 'done';
@@ -110,7 +110,7 @@ export interface Item {
   setName: string;
   setType: string;
   cn: string;
-  finish: MoxFinish;
+  finish: Finish;
   rarity: string;
   typeLine: string;
   isToken: boolean;

@@ -1,7 +1,8 @@
 import { buildSearchUrl, F2F_COLLECTIONS, F2F_MAX_PAGE_SIZE, type F2FDoc } from '@/lib/f2f/api';
 import { describeError, F2FClient } from '@/lib/f2f/client';
 import { db } from '@/lib/db';
-import { groupPrints, type MoxEntry } from '@/lib/moxfield/normalize';
+import { groupPrints } from '@/lib/cards/prints';
+import type { CollectionEntry } from '@/lib/cards/types';
 import { getSettings, type Settings } from '@/lib/settings';
 import { batchPageUrl, buildBatch, f2fSetLookup, makeBatches, makeSetBatches, nameFacets, setFacets, type Batch } from './batching';
 import { productJsUrl, SUGGEST_LIMIT, suggestUrl, withProductVariants } from '@/lib/f2f/shopify';
@@ -43,7 +44,7 @@ export const splitParts = (prints: number, total: number) =>
 // ---------------------------------------------------------------------------------------------
 // Run creation
 
-export async function createRun(source: RunSource, entries: MoxEntry[], creditBonus: number): Promise<{ runId: number; prints: number }> {
+export async function createRun(source: RunSource, entries: CollectionEntry[], creditBonus: number): Promise<{ runId: number; prints: number }> {
   const groups = groupPrints(entries);
   const now = Date.now();
   const totals = emptyTotals();

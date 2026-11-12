@@ -7,7 +7,7 @@ import { getMeta, putMeta } from '@/lib/db';
 import { describeMoxError, MoxAuthError, MoxCancelledError, MoxfieldClient, type MoxClientOptions, type MoxTransport } from '@/lib/moxfield/client';
 import { refreshCollection } from './collection';
 import { syncDecks } from './sync';
-import { META_SYNC, type MoxSyncState } from './types';
+import { META_SYNC, type SyncState } from './types';
 
 export interface SyncTransport {
   call: MoxTransport;
@@ -21,7 +21,7 @@ export interface SyncJobDeps {
 }
 
 interface ActiveJob {
-  state: MoxSyncState;
+  state: SyncState;
   abort: AbortController;
   done: Promise<void>;
 }
@@ -81,7 +81,7 @@ export class MoxfieldSyncJob {
   /** On worker start: a job still marked running died with the previous worker. It is not resumed automatically. */
   async markStale(): Promise<void> {
     if (this.active) return;
-    const s = await getMeta<MoxSyncState>(META_SYNC);
+    const s = await getMeta<SyncState>(META_SYNC);
     if (s?.status !== 'running') return;
     await putMeta(META_SYNC, {
       ...s,
@@ -89,10 +89,10 @@ export class MoxfieldSyncJob {
       error: 'The sync was interrupted (browser closed or extension reloaded). Sync again: decks already read are kept.',
       message: undefined,
       finishedAt: Date.now(),
-    } satisfies MoxSyncState);
+    } satisfies SyncState);
   }
 
-  private patch(job: ActiveJob, p: Partial<MoxSyncState>): Promise<void> {
+  private patch(job: ActiveJob, p: Partial<SyncState>): Promise<void> {
     job.state = { ...job.state, ...p, heartbeatAt: Date.now() };
     return putMeta(META_SYNC, job.state);
   }

@@ -1,6 +1,7 @@
 import { requestUrl, runMoxRequest, wholeCollectionUrl, MAX_COLLECTION_PAGE_SIZE } from '@/lib/moxfield/api';
 import { boardLabel, normalizeDeckCards, normalizeDeckList } from '@/lib/moxfield/decks';
-import { normalizeEntry, printKey } from '@/lib/moxfield/normalize';
+import { printKey } from '@/lib/cards/prints';
+import { normalizeEntry } from '@/lib/moxfield/normalize';
 import { fixture } from './helpers';
 
 const list = fixture<any>('moxfield-decks.json');

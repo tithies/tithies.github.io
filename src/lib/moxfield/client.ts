@@ -1,7 +1,7 @@
 import PQueue from 'p-queue';
 import { moxFail, type MoxApiRequest, type MoxApiResult, type MoxApiSuccess, type MoxErrorCode } from './api';
-import type { DeckCard, DeckSummary } from './decks';
-import type { MoxEntry } from './normalize';
+import type { DeckCard, DeckSummary } from '@/lib/decks/types';
+import type { CollectionEntry } from '@/lib/cards/types';
 
 /** Sends one request to Moxfield (in practice: through a logged-in Moxfield tab). */
 export type MoxTransport = (req: MoxApiRequest) => Promise<MoxApiResult>;
@@ -158,7 +158,7 @@ export class MoxfieldClient {
     return { lastUpdatedAt, cards };
   }
 
-  async collectionPage(pageNumber: number, pageSize: number): Promise<{ entries: MoxEntry[]; totalResults: number; totalPages: number; pageSize: number }> {
+  async collectionPage(pageNumber: number, pageSize: number): Promise<{ entries: CollectionEntry[]; totalResults: number; totalPages: number; pageSize: number }> {
     const { entries, totalResults, totalPages, pageSize: size } = await this.request({ kind: 'collection', pageNumber, pageSize });
     return { entries, totalResults, totalPages, pageSize: size };
   }

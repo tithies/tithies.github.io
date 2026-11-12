@@ -1,12 +1,12 @@
 import { Alert, Group, Progress, Stack, Text } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
-import type { MoxSyncState } from '@/lib/decks/types';
+import type { SyncState } from '@/lib/decks/types';
 import { duration, timeAgo } from '@/lib/format';
 
 /** Average time per deck request (≈ 0.2 s answer + 1–1.5 s polite gap), for the time-left estimate. */
 const MS_PER_DECK = 1400;
 
-function runningLabel(s: MoxSyncState): string {
+function runningLabel(s: SyncState): string {
   switch (s.phase) {
     case 'connecting':
       return 'Connecting to Moxfield…';
@@ -22,7 +22,7 @@ function runningLabel(s: MoxSyncState): string {
 }
 
 /** Live state of the background Moxfield sync (progress, rate-limit waits, last result or error). */
-export function SyncProgress({ state }: { state: MoxSyncState | null | undefined }) {
+export function SyncProgress({ state }: { state: SyncState | null | undefined }) {
   if (!state) return null;
 
   if (state.status === 'running') {

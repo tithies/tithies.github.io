@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
 import type { CacheEntry, Item, Run } from '@/features/f2f-buylist/types';
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
-import type { MoxEntry } from '@/lib/moxfield/normalize';
+import type { CollectionEntry } from '@/lib/cards/types';
 
 export interface MetaRow {
   key: string;
@@ -20,7 +20,7 @@ export class TithiesDB extends Dexie {
   /** Cards of each deck, keyed by deck id. */
   deckCards!: EntityTable<DeckCardsRow, 'deckId'>;
   /** Snapshot of the whole Moxfield collection, replaced on every read. */
-  moxCollection!: EntityTable<MoxEntry, 'id'>;
+  moxCollection!: EntityTable<CollectionEntry, 'id'>;
 
   constructor(name = 'tithies') {
     super(name);

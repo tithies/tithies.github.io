@@ -1,4 +1,41 @@
-import type { DeckCard, DeckSummary } from '@/lib/moxfield/decks';
+import type { CardPrint, Finish } from '@/lib/cards/types';
+
+/** One deck from the deck list (no cards). */
+export interface DeckSummary {
+  /** The site's internal deck id (stable key). */
+  id: string;
+  /** Id used in deck URLs and the deck API. */
+  publicId: string;
+  name: string;
+  format: string;
+  visibility: string;
+  /** Full folder path, "/"-separated (e.g. "Collection/Final Fantasy"); '' when the deck has no folder. */
+  folderPath: string;
+  /** The list's `lastUpdatedAtUtc`, kept verbatim: it's what change detection compares. */
+  lastUpdatedAt: string;
+  createdAt: string;
+  /** As reported by the list (mainboardCount includes commanders). */
+  mainboardCount: number;
+  sideboardCount: number;
+  maybeboardCount: number;
+  commanders: string[];
+  publicUrl: string;
+}
+
+/** One card row of a deck board. */
+export interface DeckCard {
+  board: string;
+  qty: number;
+  finish: Finish;
+  isProxy: boolean;
+  isAlter: boolean;
+  card: CardPrint;
+}
+
+export interface BoardInfo {
+  key: string;
+  label: string;
+}
 
 /** A cached deck (light row: no cards, so live queries over every deck stay cheap). */
 export interface DeckRow extends DeckSummary {
@@ -40,8 +77,8 @@ export interface CollectionMeta {
   copies: number;
 }
 
-export type MoxSyncStatus = 'running' | 'done' | 'error' | 'cancelled' | 'interrupted';
-export type MoxSyncPhase = 'connecting' | 'deckList' | 'decks' | 'collection' | 'done';
+export type SyncStatus = 'running' | 'done' | 'error' | 'cancelled' | 'interrupted';
+export type SyncPhase = 'connecting' | 'deckList' | 'decks' | 'collection' | 'done';
 
 export interface DeckSyncSummary {
   /** Decks in the list. */
@@ -55,10 +92,10 @@ export interface DeckSyncSummary {
 }
 
 /** meta row 'moxSync': state of the latest background Moxfield sync job. */
-export interface MoxSyncState {
+export interface SyncState {
   jobId: string;
-  status: MoxSyncStatus;
-  phase: MoxSyncPhase;
+  status: SyncStatus;
+  phase: SyncPhase;
   /** Also read the whole collection after the decks. */
   withCollection: boolean;
   done: number;
