@@ -7,9 +7,6 @@
   --ti-navbar-shadow: 1px 0 10px rgba(16, 24, 40, 0.04);
   --ti-card-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 14px rgba(16, 24, 40, 0.05);
   --ti-art-opacity: 0.1;
-  --ti-menu-art-opacity: 0.8;
-  /* In the light theme the art's dark ground also fades out, so the Settings link stays readable. */
-  --ti-menu-art-mask: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.12) 12%, rgba(0, 0, 0, 0.4) 24%, rgba(0, 0, 0, 0.75) 36%, #000 48%, #000 72%, rgba(0, 0, 0, 0.3) 100%);
   /* Opacity of every surface in the page content, dialogs and popovers (see "Glass" below). */
   --ti-glass: 70%;
   --ti-glass-blur: 12px;
@@ -30,8 +27,6 @@
   --ti-navbar-shadow: 4px 0 18px rgba(0, 0, 0, 0.4);
   --ti-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025), 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.35);
   --ti-art-opacity: 0.16;
-  --ti-menu-art-opacity: 1;
-  --ti-menu-art-mask: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.12) 12%, rgba(0, 0, 0, 0.4) 24%, rgba(0, 0, 0, 0.75) 36%, #000 48%);
   --ti-row-stripe: rgba(255, 255, 255, 0.03);
   --ti-row-hover: rgba(255, 255, 255, 0.065);
 }
@@ -70,7 +65,8 @@ body {
 }
 /* The fire mage art fills the bottom of the menu, under its links (the fixed menu is its own
    stacking context, so z-index -1 still paints over the menu's background). Its top fades out
-   into the menu colour along an eased curve, so there is no visible edge. */
+   into the menu colour along an eased curve, so there is no visible edge; its bottom darkens to
+   black under the Settings link, the same in both themes (see .ti-nav-on-art). */
 .mantine-AppShell-navbar::before {
   content: '';
   position: absolute;
@@ -80,10 +76,22 @@ body {
   bottom: 0;
   aspect-ratio: 516 / 699;
   pointer-events: none;
-  background: url('../../assets/tithies-menu-art.webp') center bottom / 100% auto no-repeat;
-  opacity: var(--ti-menu-art-opacity);
-  -webkit-mask: var(--ti-menu-art-mask);
-  mask: var(--ti-menu-art-mask);
+  background:
+    linear-gradient(to top, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.75) 10%, rgba(0, 0, 0, 0.42) 22%, rgba(0, 0, 0, 0.14) 34%, transparent 46%),
+    url('../../assets/tithies-menu-art.webp') center bottom / 100% auto no-repeat;
+  -webkit-mask: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.12) 12%, rgba(0, 0, 0, 0.4) 24%, rgba(0, 0, 0, 0.75) 36%, #000 48%);
+  mask: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.12) 12%, rgba(0, 0, 0, 0.4) 24%, rgba(0, 0, 0, 0.75) 36%, #000 48%);
+}
+/* Menu links drawn over the art's black bottom: white text in both themes, and hover/active
+   backgrounds that stay dark enough for it (Mantine's light-theme ones are pale). */
+.mantine-AppShell-navbar .ti-nav-on-art {
+  --nl-color: var(--mantine-color-white);
+  --nl-bg: color-mix(in srgb, var(--mantine-primary-color-filled) 45%, transparent);
+  --nl-hover: color-mix(in srgb, var(--mantine-primary-color-filled) 60%, transparent);
+  color: var(--mantine-color-white);
+}
+.mantine-AppShell-navbar .ti-nav-on-art:not([data-active]):is(:hover, :active) {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 .mantine-Paper-root[data-with-border] {
   box-shadow: var(--ti-card-shadow);

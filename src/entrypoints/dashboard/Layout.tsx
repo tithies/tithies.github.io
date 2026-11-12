@@ -1,4 +1,4 @@
-import { ActionIcon, AppShell, Burger, Divider, Group, NavLink, Text, Title, Tooltip, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
+import { ActionIcon, AppShell, Burger, Group, NavLink, Text, Title, Tooltip, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconArrowsDiff, IconCards, IconCash, IconHistory, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
 import { Link, Outlet, useLocation } from 'react-router';
@@ -70,8 +70,14 @@ export function Layout() {
           ))}
         </AppShell.Section>
         <AppShell.Section>
-          <Divider mb="xs" />
-          <NavLink component={Link} to="/settings" label="Settings" leftSection={<IconSettings size={18} />} active={pathname === '/settings'} />
+          <NavLink
+            component={Link}
+            to="/settings"
+            label="Settings"
+            leftSection={<IconSettings size={18} />}
+            active={pathname === '/settings'}
+            className="ti-nav-on-art"
+          />
         </AppShell.Section>
       </AppShell.Navbar>
       <AppShell.Main>
