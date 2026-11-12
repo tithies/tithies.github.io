@@ -3,6 +3,14 @@ In mismatch page, add a selector to know which account to use.
 Accounts list should probably be accumulated while interacting with tithies.
 In the future, we will support archidekt, so make sure the code is not planned for only moxfield
 
+page content background should have the big tithies banner faded like in the website
+
+website: use     background: url(img/banner.webp) center top / contain no-repeat;  and remove opacity
+
+settings for request gap etc ... it seems we only have for f2f. What about moxfield or others ? Moxfield can be faster
+
+support french
+
 new page: show list of all cards in collection that are not used in any deck. Same as collection mismatches: we can select which folder/decks to take into account. Also the options are the same. (although "deck cards missing from the collection" and collection "cards not in any deck" checkboxes do not make sense here). Options are also save in the settings, but dont share the same as collection mismatches. We should also have a button to sync decks, and a button to start the process (which also sync decks). This page should be able to export the result to an account which has to be different than the one we are using here. All those are risky operations, so confirmations are necessary. Logging every mutation call globally and have a log page to show them all in detail is necessary to be able to roll back. Preview of what will be updated/added/delete/mutated is necessary as well.
 
 in "runs" page: same as the new page: should have options in filters to exclude cards already in decks. Algorithm is same as the new page basically. And settings are also not shared.
