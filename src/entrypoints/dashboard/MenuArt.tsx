@@ -1,5 +1,5 @@
 import { useReducedMotion } from '@mantine/hooks';
-import { useEffect, useRef } from 'react';
+import { type PointerEvent, useEffect, useRef } from 'react';
 import { buildSkyline, createFireScene, type FireScene } from './menu-art-scene';
 
 const CITY_FAR = buildSkyline(7, 668, 18, 80, 7, 18);
@@ -10,8 +10,9 @@ const HEAD = 'translate(290 262) rotate(12) scale(1.18) translate(-290 -262)';
 /**
  * The fire mage art at the bottom of the menu, painted live: two still SVG layers (the dusk sky
  * and city, then the figure on its cliff) with the moving fire drawn on canvases around them (see
- * menu-art-scene.ts). A click stokes the fireball. It sits under the menu's links, which take
- * their own clicks and hover first (see dashboard.css). With reduced motion it is a still image.
+ * menu-art-scene.ts). A light follows the pointer over it, and a click stokes the fireball. It
+ * sits under the menu's links, which take their own hover and clicks first (see dashboard.css):
+ * over a link the light fades out. With reduced motion it is a still image.
  */
 export function MenuArt() {
   const reduceMotion = useReducedMotion(false, { getInitialValueInEffect: false });
@@ -60,13 +61,26 @@ export function MenuArt() {
     };
   }, [reduceMotion]);
 
+  const point = (event: PointerEvent<HTMLDivElement>) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    sceneRef.current?.point(((event.clientX - box.left) / box.width) * 600, ((event.clientY - box.top) / box.height) * 800);
+  };
+
   const stoke = () => {
     sceneRef.current?.stoke();
     backdropRef.current?.animate([{ filter: 'brightness(1.55) saturate(1.2)' }, { filter: 'none' }], { duration: 900, easing: 'ease-out' });
   };
 
   return (
-    <div ref={stageRef} className="ti-menu-art" data-interactive={!reduceMotion || undefined} onClick={reduceMotion ? undefined : stoke} aria-hidden>
+    <div
+      ref={stageRef}
+      className="ti-menu-art"
+      data-interactive={!reduceMotion || undefined}
+      onClick={reduceMotion ? undefined : stoke}
+      onPointerMove={reduceMotion ? undefined : point}
+      onPointerLeave={reduceMotion ? undefined : () => sceneRef.current?.unpoint()}
+      aria-hidden
+    >
       <svg ref={backdropRef} className="ti-menu-art-layer" viewBox="0 0 600 800">
         <defs>
           <linearGradient id="ti-art-sky" x1="0" y1="0" x2="0" y2="1">

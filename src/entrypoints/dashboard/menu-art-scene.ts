@@ -78,6 +78,10 @@ export interface FireScene {
   render(): void;
   /** Flares the fireball and bursts sparks and flames out of it. */
   stoke(): void;
+  /** The pointer is over the art at (`x`, `y`) of the view box: a light follows it. */
+  point(x: number, y: number): void;
+  /** The pointer left the art: its light fades out. */
+  unpoint(): void;
 }
 
 const random = (min: number, max: number) => min + Math.random() * (max - min);
@@ -211,6 +215,9 @@ export function createFireScene(back: HTMLCanvasElement, front: HTMLCanvasElemen
   let flare = 1;
   let clock = 0;
   let pixelScale = 1;
+  /** The pointer's light: where it is drawn (easing after the pointer), how lit (0 to 1), and how
+   * much recent movement brightens it (0 to 1, settling back). */
+  const light = { x: 0, y: 0, targetX: 0, targetY: 0, isOn: false, level: 0, stir: 0 };
 
   const addFlame = (x: number, y: number, options: Pick<Flame, 'vx' | 'vy' | 'life' | 'size' | 'alpha'> & Partial<Flame>) => {
     flames.push({ x, y, age: 0, drag: 0.995, wind: 0, ...options });
@@ -271,6 +278,11 @@ export function createFireScene(back: HTMLCanvasElement, front: HTMLCanvasElemen
     flare += (1 - flare) * Math.min(1, 0.05 * dt);
     emit(dt);
 
+    light.level += ((light.isOn ? 1 : 0) - light.level) * Math.min(1, 0.12 * dt);
+    light.x += (light.targetX - light.x) * Math.min(1, 0.3 * dt);
+    light.y += (light.targetY - light.y) * Math.min(1, 0.3 * dt);
+    light.stir *= Math.pow(0.94, dt);
+
     for (const flame of flames) {
       flame.age += dt;
       flame.vx = (flame.vx + flame.wind * dt) * Math.pow(flame.drag, dt);
@@ -322,8 +334,27 @@ export function createFireScene(back: HTMLCanvasElement, front: HTMLCanvasElemen
     context.globalCompositeOperation = 'lighter';
   };
 
+  /** A warm glow of `radius` at the pointer's light, flickering a little. */
+  const drawLight = (context: CanvasRenderingContext2D, radius: number, strength: number) => {
+    if (light.level < 0.01) return;
+    const flicker = 1 + Math.sin(clock * 0.21) * 0.04 + Math.sin(clock * 0.57) * 0.03;
+    const size = radius * flicker * (1 + light.stir * 0.15);
+    const glow = context.createRadialGradient(light.x, light.y, 0, light.x, light.y, size);
+    glow.addColorStop(0, 'rgba(255, 214, 150, 1)');
+    glow.addColorStop(0.25, 'rgba(255, 160, 70, 0.55)');
+    glow.addColorStop(0.6, 'rgba(235, 90, 30, 0.18)');
+    glow.addColorStop(1, 'rgba(160, 30, 20, 0)');
+    context.globalAlpha = strength * light.level * flicker * (1 + light.stir * 0.6);
+    context.fillStyle = glow;
+    context.beginPath();
+    context.arc(light.x, light.y, size, 0, Math.PI * 2);
+    context.fill();
+  };
+
   const drawBack = () => {
     prepare(back, backContext);
+    // Behind the figure, the pointer lights the sky; the silhouette stays dark against it.
+    drawLight(backContext, 180, 0.55);
     for (const ember of embers) {
       const progress = ember.age / ember.life;
       const sprite = ember.size > 3 ? sprites[1] : sprites[3];
@@ -366,6 +397,9 @@ export function createFireScene(back: HTMLCanvasElement, front: HTMLCanvasElemen
       frontContext.stroke();
     }
 
+    // Over the figure, a fainter and tighter light, so she catches some of it too.
+    drawLight(frontContext, 95, 0.24);
+
     const core = frontContext.createRadialGradient(FIREBALL_X, FIREBALL_Y, 0, FIREBALL_X, FIREBALL_Y, radius * 0.6);
     core.addColorStop(0, 'rgba(255, 255, 245, 0.95)');
     core.addColorStop(1, 'rgba(255, 220, 140, 0)');
@@ -396,6 +430,21 @@ export function createFireScene(back: HTMLCanvasElement, front: HTMLCanvasElemen
     },
     update,
     render,
+    point(x, y) {
+      if (light.level < 0.01) {
+        // Lighting up from dark: start where the pointer is, not where it last left.
+        light.x = x;
+        light.y = y;
+      } else {
+        light.stir = Math.min(1, light.stir + Math.hypot(x - light.targetX, y - light.targetY) / 120);
+      }
+      light.targetX = x;
+      light.targetY = y;
+      light.isOn = true;
+    },
+    unpoint() {
+      light.isOn = false;
+    },
     stoke() {
       flare = 1.75;
       for (let count = 0; count < 160; count++) {
