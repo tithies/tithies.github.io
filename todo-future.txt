@@ -1,25 +1,25 @@
-new feature: if a user has multiple account, tithies should support this and not mix data from different moxfield accounts. In runs page, we can add a column to know which account was used. In detail we can add also the account source.
-In mismatch page, add a selector to know which account to use.
-Accounts list should probably be accumulated while interacting with tithies.
-In the future, we will support archidekt, so make sure the code is not planned for only moxfield
+new feature: if a user has multiple account, tithies should support this and not mix data from different moxfield accounts. In the header bar, add on the right side, the account selector. Accounts list should probably be accumulated while interacting with tithies. If an action from moxfield is made and starts a process in tithies, it should be done under that account and switch automatically to that account, so when visiting tithies, user will see the last account used. All pages should not mix the different accounts. So runs should only show runs from current account. In the future, we will support another similar website to moxfield (archidekt), so make sure the code is clean enough to plug a new website easily. Global settings are shared. We should display also the account type icon (moxfield for now). It's possible also to have multiple accounts in the same website, like multiple moxfield accounts.
 
-page content background should have the big tithies banner faded like in the website
+add a global setting to ignore basic lands (default true) when starting a selling runs. There should be a checkbox also in moxfield popup to override it for the run (default to the current global setting value), and it is displayed under "advanced settings" that needs to be clicked to expand it
 
-website: use     background: url(img/banner.webp) center top / contain no-repeat;  and remove opacity
+add the possibility to start a selling run from a deck. Same as "ignore basic land" setting, there are also checkboxes for boards (only mainboard, sideboard, commanders) in global settings, and we can override for the run in the popup in advanced settings as well.
+
+page content background should have the big tithies banner faded like in the website but use the new image I added (Mystical Tithies Sorceress Medallion (1).png)
+
+website: background remove opacity. Also use the new image (Mystical Tithies Sorceress Medallion (1).png).
 
 settings for request gap etc ... it seems we only have for f2f. What about moxfield or others ? Moxfield can be faster
 
 support french
 
-new page: show list of all cards in collection that are not used in any deck. Same as collection mismatches: we can select which folder/decks to take into account. Also the options are the same. (although "deck cards missing from the collection" and collection "cards not in any deck" checkboxes do not make sense here). Options are also save in the settings, but dont share the same as collection mismatches. We should also have a button to sync decks, and a button to start the process (which also sync decks). This page should be able to export the result to an account which has to be different than the one we are using here. All those are risky operations, so confirmations are necessary. Logging every mutation call globally and have a log page to show them all in detail is necessary to be able to roll back. Preview of what will be updated/added/delete/mutated is necessary as well.
+some panels are clickable but the style is same as other panels. Make it obvious it's clickable
 
-in "runs" page: same as the new page: should have options in filters to exclude cards already in decks. Algorithm is same as the new page basically. And settings are also not shared.
+feature: collection mismatches => rename to collection comparisons instead
+- the "show" options can be removed. Their helper text can be put in the panels directly
+- possibility to save all the configuration under a name. We could have multiple, and switch between them easily. This way the user doesnt have to reconfigure everything every time.
+- we should be able to export the result to an account which has to be different than the one we are using here. All those are risky operations, so confirmations are necessary. Logging every mutation call globally and have a log page to show them all in detail is necessary to be able to roll back. Preview of what will be updated/added/delete/mutated is necessary as well.
 
-Settings should probably not belong to parent menu
-
-in collection mismatches, there is "likely wrong print only", what does it mean ?
-
-Make the dashboard darker in dark mode.
+in "runs" page: same as the new page: should have options in filters to exclude cards already in decks. Algorithm is same as the comparison page basically. Settings are not shared with comparison page. We can't have multiple configs like in comparison page, juste one
 
 New page: a page where we can paste a deck list and find best prices across multiple vendors. We will start by having just f2f shop for now. There should be a checkbox per shop to search in. Checkboxes are disabled by default. Settings saved like usual. Multiple decklist formats are accepted. We should also be able to run this process directly from a deck in moxfield. There should be also a checkbox to exclude cards that are in collection and still unused. If not exact same print, let the user know, and he will select which ones to include/exclude manually. If exact print, ignore fetching but let user know in the results that it's already in collection unused. Have also a checkbox to exclude basic lands. For each card, search for all prints even if the list has details about that. Although, the result should focus on both the cheapest found and the cheapest for the exact print (if specified). Put this page menu in a "Buying" parent menu.
 
@@ -29,12 +29,8 @@ new feature: selling page should has some system to add cards we want to sell an
 
 new feature: same as selling page, buying page should also have a system to add cards we want to buy and submit all at once. Same also for moxfield where we can add them directly to collection and decks via configurations to where each card go in which deck. Although, sometimes when buying the card, shops be out of stock for the specific print, and ask you if it's ok for you to have another print => it means we should be able to update that quickly in the page.
 
-new feature: have button to manually check new update does
-
-fix: save button doesnt react when clicking restore defaults button. Also dont have a save button, just save everytime we edit.
+new feature: have button to manually check new extension update, and also lower time of check, 1 day is too much. Maybe we can poke once everytime the page is refreshed
 
 feature: have a "global" restore defaults in other pages that have their own settings as well
-
-feature: in settings, the panel where we can clear cache, display more details about what is in the cache. Also seems we cant delete all cache there is, just some. Maybe have multiple checkbox to specify what should be deleted
 
 new feature Scanner cards: upload list of images, it scans all cards in it and list them. Then we can just like the buylist page, add to collection directly
