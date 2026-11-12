@@ -1,14 +1,8 @@
-new feature: if a user has multiple account, tithies should support this and not mix data from different moxfield accounts. In the header bar, add on the right side, the account selector. Accounts list should probably be accumulated while interacting with tithies. If an action from moxfield is made and starts a process in tithies, it should be done under that account and switch automatically to that account, so when visiting tithies, user will see the last account used. All pages should not mix the different accounts. So runs should only show runs from current account. In the future, we will support another similar website to moxfield (archidekt), so make sure the code is clean enough to plug a new website easily. Global settings are shared. We should display also the account type icon (moxfield for now). It's possible also to have multiple accounts in the same website, like multiple moxfield accounts.
-
 add a global setting to ignore basic lands (default true) when starting a selling runs. There should be a checkbox also in moxfield popup to override it for the run (default to the current global setting value), and it is displayed under "advanced settings" that needs to be clicked to expand it
 
 add the possibility to start a selling run from a deck. Same as "ignore basic land" setting, there are also checkboxes for boards (only mainboard, sideboard, commanders) in global settings, and we can override for the run in the popup in advanced settings as well.
 
-settings for request gap etc ... it seems we only have for f2f. What about moxfield or others ? Moxfield can be faster
-
 support french
-
-some panels are clickable but the style is same as other panels. Make it obvious it's clickable
 
 feature: collection mismatches => rename to collection comparisons instead
 - the "show" options can be removed. Their helper text can be put in the panels directly
@@ -25,8 +19,6 @@ new feature: selling page should has some system to add cards we want to sell an
 
 new feature: same as selling page, buying page should also have a system to add cards we want to buy and submit all at once. Same also for moxfield where we can add them directly to collection and decks via configurations to where each card go in which deck. Although, sometimes when buying the card, shops be out of stock for the specific print, and ask you if it's ok for you to have another print => it means we should be able to update that quickly in the page.
 
-new feature: have button to manually check new extension update, and also lower time of check, 1 day is too much. Maybe we can poke once everytime the page is refreshed
-
-feature: have a "global" restore defaults in other pages that have their own settings as well
+feature: have a button to remove all data: settings, every storage, everything. It's a full reset
 
 new feature Scanner cards: upload list of images, it scans all cards in it and list them. Then we can just like the buylist page, add to collection directly
