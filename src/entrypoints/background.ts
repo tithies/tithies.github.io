@@ -1,6 +1,7 @@
 import { defineBackground } from '#imports';
 import { browser } from 'wxt/browser';
-import { db } from '@/lib/db';
+import { findRun } from '@/lib/accounts/data';
+import { migrateStorage } from '@/lib/accounts/migrate';
 import { AccountSyncJob } from '@/lib/decks/job';
 import { holdAwake } from '@/lib/keepalive';
 import { onMessage, sendMessage } from '@/lib/messaging';
@@ -10,12 +11,15 @@ import { chromeTabPort, TabTransport } from '@/lib/sites/tab-transport';
 import { parseIdentity } from '@/lib/sites/validate';
 import type { SiteType } from '@/lib/sites/types';
 import { getSettings } from '@/lib/settings';
-import { controlRun, createRun, Runner, toProgress } from '@/features/f2f-buylist/runner';
+import { controlRun, Runner, toProgress } from '@/features/f2f-buylist/runner';
+import { progressFor, startRunFromSite } from '@/features/f2f-buylist/start';
 import type { Run } from '@/features/f2f-buylist/types';
 
 const WATCHDOG = 'tithies-watchdog';
 
 export default defineBackground(() => {
+  void migrateStorage().catch(() => {});
+
   const notify = (run: Run, message?: string) => {
     const tabId = run.source.tabId;
     if (tabId == null) return;
@@ -34,7 +38,7 @@ export default defineBackground(() => {
     SITE_TYPES.map((type) => {
       const site = siteOf(type);
       const job = new AccountSyncJob(site, {
-        createTransport: (ctl) => new TabTransport(site, ctl),
+        createTransport: ({ expect, ...ctl }) => new TabTransport(site, { ...ctl, expect }),
         onActiveChange: (active) => holdAwake(`${type}-sync`, active),
       });
       return [type, job];
@@ -47,7 +51,7 @@ export default defineBackground(() => {
 
   onMessage('startRun', async ({ data, sender }) => {
     const settings = await getSettings();
-    const res = await createRun({ ...data.source, tabId: sender.tab?.id }, data.entries, settings.creditBonus);
+    const res = await startRunFromSite(data, sender.tab?.id, settings.creditBonus);
     runner.kick();
     return res;
   });
@@ -55,24 +59,20 @@ export default defineBackground(() => {
   onMessage('controlRun', async ({ data }) => {
     const ok = await controlRun(data.runId, data.action);
     if (ok && (data.action === 'resume' || data.action === 'retryErrors')) runner.kick();
-    const run = await db.runs.get(data.runId);
+    const run = await findRun(data.runId);
     if (run) notify(run);
     return { ok, error: ok ? undefined : 'Action not available for this run' };
   });
 
   onMessage('openDashboard', ({ data }) => void openDashboard(data.runId));
 
-  onMessage('startAccountSync', ({ data }) => syncJobs[data.type].start({ collection: data.collection }));
+  onMessage('startAccountSync', ({ data }) => {
+    if (!isSiteType(data.type)) return { ok: false, code: 'no_account', error: 'Unknown site.' } as const;
+    return syncJobs[data.type].start({ accountKey: data.accountKey ?? null, collection: data.collection === true });
+  });
   onMessage('cancelAccountSync', ({ data }) => ({ ok: syncJobs[data.type].cancel() }));
 
-  onMessage('getProgress', async ({ data, sender }) => {
-    let run = data.runId ? await db.runs.get(data.runId) : undefined;
-    if (!run && sender.tab?.id != null) {
-      const tabRuns = await db.runs.filter((r) => r.source.tabId === sender.tab!.id).toArray();
-      run = tabRuns.sort((a, b) => b.createdAt - a.createdAt)[0];
-    }
-    return run ? toProgress(run) : null;
-  });
+  onMessage('getProgress', ({ data, sender }) => progressFor(data, sender.tab?.id));
 
   // Which account each open site tab is logged in as (dashboard dot and hints; never adds accounts).
   const sessions = new SessionRegistry();

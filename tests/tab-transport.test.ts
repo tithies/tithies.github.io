@@ -1,68 +1,8 @@
-import { TabTransport, type TabPort } from '@/lib/sites/tab-transport';
-import type { SiteApiCall, SiteIdentity, SiteResult, SiteTabStatus } from '@/lib/sites/types';
+import { TabTransport } from '@/lib/sites/tab-transport';
+import type { SiteResult } from '@/lib/sites/types';
+import { ALICE, BOB, FakeTabs } from './fake-tabs';
 
-const ALICE: SiteIdentity = { userId: '111111', userName: 'alice' };
-const BOB: SiteIdentity = { userId: '222222', userName: 'bob' };
 const SITE = { label: 'Moxfield', tabPatterns: ['https://moxfield.com/*'], syncTabUrl: 'https://moxfield.com/decks/personal' };
-
-interface FakeTab {
-  id: number;
-  active?: boolean;
-  /** Who is logged in there (null = logged out). */
-  account: SiteIdentity | null;
-  /** Content script from before account checks: answers without `as`. */
-  old?: boolean;
-}
-
-/** Tabs whose pages answer like the Moxfield hook: refuse a request for another account, say who answered. */
-class FakeTabs implements TabPort {
-  tabs: FakeTab[] = [];
-  created: number[] = [];
-  removed: number[] = [];
-  calls: { tabId: number; call: SiteApiCall }[] = [];
-  /** Account a newly created tab comes up logged in as. */
-  newTabAccount: SiteIdentity | null = null;
-  private nextId = 100;
-  private removedListeners: ((id: number) => void)[] = [];
-
-  async query() {
-    return this.tabs.map((t) => ({ id: t.id, active: !!t.active }));
-  }
-  async activeTabId() {
-    return this.tabs.find((t) => t.active)?.id;
-  }
-  async create() {
-    const id = this.nextId++;
-    this.created.push(id);
-    this.tabs.push({ id, account: this.newTabAccount });
-    return id;
-  }
-  async activate() {}
-  async reload() {}
-  async remove(tabId: number) {
-    this.removed.push(tabId);
-    this.tabs = this.tabs.filter((t) => t.id !== tabId);
-  }
-  async status(tabId: number): Promise<SiteTabStatus | null> {
-    const t = this.tabs.find((x) => x.id === tabId);
-    if (!t) return null;
-    return t.old ? { hasAuth: !!t.account, path: '/' } : { hasAuth: !!t.account, identity: t.account, path: '/' };
-  }
-  async call(tabId: number, call: SiteApiCall): Promise<SiteResult> {
-    this.calls.push({ tabId, call });
-    const t = this.tabs.find((x) => x.id === tabId);
-    if (!t) throw new Error('tab gone');
-    const ok: SiteResult = { ok: true, kind: 'deckList', decks: [] };
-    if (t.old) return ok;
-    if (!t.account) return { ok: false, status: 0, code: 'no_auth', message: 'log in', as: null };
-    if (call.expect !== undefined && call.expect !== t.account.userId) return { ok: false, status: 0, code: 'wrong_account', message: `logged in as ${t.account.userName}`, as: t.account };
-    return { ...ok, as: t.account };
-  }
-  onRemoved(l: (id: number) => void) {
-    this.removedListeners.push(l);
-    return () => (this.removedListeners = this.removedListeners.filter((x) => x !== l));
-  }
-}
 
 const opts = { authWaitMs: 50, pollMs: 5, reloadSettleMs: 0 };
 const req = { kind: 'deckList' } as const;

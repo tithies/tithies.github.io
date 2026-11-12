@@ -12,7 +12,7 @@ import { browser } from 'wxt/browser';
 import { sendMessage } from '@/lib/messaging';
 import { abortableSleep } from './client';
 import type { SiteProvider } from './provider';
-import { siteFail, type SiteApiCall, type SiteIdentity, type SiteRequest, type SiteResult, type SiteTabStatus } from './types';
+import { siteFail, type SiteApiCall, type SiteFailure, type SiteIdentity, type SiteRequest, type SiteResult, type SiteTabStatus } from './types';
 
 /** The tab operations the transport needs (the real one is Chrome's; tests pass a fake). */
 export interface TabPort {
@@ -220,6 +220,22 @@ export class TabTransport {
     // Leave the tab open so the user can log in there.
     this.keepOwnTab = true;
     throw new NoTabError(`${label} has no logged-in session. Log in to ${label} (Tithies left a ${label} tab open for you), then try again.`);
+  }
+
+  /**
+   * Finds the tab requests will go through, without making one, and says whose session it is
+   * (with account checks: the expected account, or the one 'first' bound to). Never throws
+   * (except when cancelled).
+   */
+  async connect(): Promise<{ ok: true; identity: SiteIdentity | null } | SiteFailure> {
+    try {
+      if (this.tabId == null) await this.acquire();
+      return { ok: true, identity: this.checked ? this.expected : null };
+    } catch (e) {
+      if (this.opts.signal?.aborted) throw e;
+      if (e instanceof WrongAccountError) return siteFail(0, 'wrong_account', e.message, e.actual);
+      return siteFail(0, 'no_tab', e instanceof Error ? e.message : String(e));
+    }
   }
 
   /** One request. Never throws (except when cancelled): failures come back as `{ ok: false }`. */

@@ -82,6 +82,8 @@ export interface RunSource {
 
 export interface Run {
   id?: number;
+  /** The account whose collection this run checks (see src/lib/accounts). */
+  accountKey: string;
   createdAt: number;
   updatedAt: number;
   finishedAt?: number;
@@ -98,6 +100,8 @@ export interface Run {
 
 export interface Item {
   runId: number;
+  /** Same as the run's. */
+  accountKey: string;
   key: string;
   status: ItemStatus;
   // --- from Moxfield
@@ -148,6 +152,7 @@ export interface CacheEntry {
 
 export interface RunProgress {
   runId: number;
+  accountKey: string;
   status: RunStatus;
   phase: RunPhase;
   done: number;

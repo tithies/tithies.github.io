@@ -1,4 +1,5 @@
 import type { CardPrint, Finish } from '@/lib/cards/types';
+import type { SiteIdentity } from '@/lib/sites/types';
 
 /** One deck from the deck list (no cards). */
 export interface DeckSummary {
@@ -63,14 +64,14 @@ export interface DeckCardsRow {
   cards: DeckCard[];
 }
 
-/** meta row 'decks' */
+/** Account meta 'decks'. */
 export interface DecksMeta {
   /** Last deck sync that went through to the end. Unset = decks were never synced. */
   lastSuccessAt?: number;
   initialSyncAt?: number;
 }
 
-/** meta row 'moxCollection' */
+/** Account meta 'collection'. */
 export interface CollectionMeta {
   fetchedAt: number;
   entries: number;
@@ -91,9 +92,10 @@ export interface DeckSyncSummary {
   failed: { id: string; name: string; error: string }[];
 }
 
-/** meta row 'moxSync': state of the latest background sync job. */
+/** Account meta 'sync': state of the account's latest background sync job. */
 export interface SyncState {
   jobId: string;
+  accountKey: string;
   status: SyncStatus;
   phase: SyncPhase;
   /** Also read the whole collection after the decks. */
@@ -108,10 +110,16 @@ export interface SyncState {
   heartbeatAt: number;
   finishedAt?: number;
   error?: string;
+  /** wrong_account: the site was logged in as another account (`actual`), nothing was read as it. */
+  code?: 'wrong_account';
+  actual?: SiteIdentity | null;
   requests: number;
   decks?: DeckSyncSummary;
 }
 
-export const META_DECKS = 'decks';
-export const META_COLLECTION = 'moxCollection';
-export const META_SYNC = 'moxSync';
+/** What each account meta key holds. */
+export interface AccountMetaMap {
+  decks: DecksMeta;
+  collection: CollectionMeta;
+  sync: SyncState;
+}

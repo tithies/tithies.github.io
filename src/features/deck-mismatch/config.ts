@@ -23,21 +23,26 @@ export const DEFAULT_MISMATCH_CONFIG: MismatchConfig = mismatchConfigSchema.pars
 export const parseMismatchConfig = (raw: unknown): MismatchConfig =>
   mismatchConfigSchema.parse(raw && typeof raw === 'object' ? raw : {});
 
-export const mismatchConfigItem = storage.defineItem<MismatchConfig>('local:deckMismatchConfig', { fallback: DEFAULT_MISMATCH_CONFIG });
+/** Extension-storage key of one account's Mismatches options. */
+export const mismatchConfigKey = (accountKey: string) => `local:deckMismatchConfig:${accountKey}` as const;
 
-/** The saved config; every `update` is saved at once. `config` is null while loading. */
-export function useMismatchConfig() {
+/** One account's saved options; every `update` is saved at once. `config` is null while loading (or without account). */
+export function useMismatchConfig(accountKey: string | null) {
   const [config, setConfig] = useState<MismatchConfig | null>(null);
   const latest = useRef<MismatchConfig | null>(null);
 
   useEffect(() => {
+    latest.current = null;
+    setConfig(null);
+    if (!accountKey) return;
+    const key = mismatchConfigKey(accountKey);
     let alive = true;
-    void mismatchConfigItem.getValue().then((v) => {
+    void storage.getItem<MismatchConfig>(key).then((v) => {
       if (!alive) return;
       latest.current = parseMismatchConfig(v);
       setConfig(latest.current);
     });
-    const unwatch = mismatchConfigItem.watch((v) => {
+    const unwatch = storage.watch<MismatchConfig>(key, (v) => {
       latest.current = parseMismatchConfig(v);
       setConfig(latest.current);
     });
@@ -45,14 +50,18 @@ export function useMismatchConfig() {
       alive = false;
       unwatch();
     };
-  }, []);
+  }, [accountKey]);
 
-  const update = useCallback((patch: Partial<MismatchConfig>) => {
-    const next = parseMismatchConfig({ ...(latest.current ?? DEFAULT_MISMATCH_CONFIG), ...patch });
-    latest.current = next;
-    setConfig(next);
-    void mismatchConfigItem.setValue(next);
-  }, []);
+  const update = useCallback(
+    (patch: Partial<MismatchConfig>) => {
+      if (!accountKey) return;
+      const next = parseMismatchConfig({ ...(latest.current ?? DEFAULT_MISMATCH_CONFIG), ...patch });
+      latest.current = next;
+      setConfig(next);
+      void storage.setItem(mismatchConfigKey(accountKey), next);
+    },
+    [accountKey],
+  );
 
   return { config, update };
 }

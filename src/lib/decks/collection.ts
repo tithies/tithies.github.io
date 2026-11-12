@@ -1,14 +1,19 @@
-/** Snapshot of a site's whole collection (every row, no filters), replaced on every read. */
-import { db, putMeta } from '@/lib/db';
+/**
+ * Snapshot of an account's whole collection (every row, no filters), replaced on every read.
+ * Every page is read (and checked by the client to come from this account) before the single
+ * write, so a read interrupted or answered by another account leaves the previous snapshot as is.
+ */
+import type { AccountData } from '@/lib/accounts/data';
+import type { CollectionEntry } from '@/lib/cards/types';
 import { CancelledError, type CollectionSource } from '@/lib/sites/client';
 import type { SiteProvider } from '@/lib/sites/provider';
-import type { CollectionEntry } from '@/lib/cards/types';
-import { META_COLLECTION, type CollectionMeta } from './types';
+import type { CollectionMeta } from './types';
 
 const MAX_PAGES = 200;
 
 export async function refreshCollection(
   site: Pick<SiteProvider, 'maxCollectionPageSize'>,
+  data: AccountData,
   client: CollectionSource,
   ctl: { signal?: AbortSignal; onProgress?: (p: { done: number; total: number; entries: number }) => void | Promise<void> } = {},
 ): Promise<CollectionMeta> {
@@ -31,10 +36,6 @@ export async function refreshCollection(
   });
   const entries = [...byId.values()];
   const meta: CollectionMeta = { fetchedAt: Date.now(), entries: entries.length, copies: entries.reduce((s, e) => s + e.qty, 0) };
-  await db.transaction('rw', db.moxCollection, db.meta, async () => {
-    await db.moxCollection.clear();
-    await db.moxCollection.bulkPut(entries);
-    await putMeta(META_COLLECTION, meta);
-  });
+  await data.write((w) => w.collection.replace(entries, meta));
   return meta;
 }

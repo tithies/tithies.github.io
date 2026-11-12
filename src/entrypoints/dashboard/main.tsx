@@ -4,6 +4,7 @@ import './dashboard.css';
 import { Badge, createTheme, MantineProvider } from '@mantine/core';
 import ReactDOM from 'react-dom/client';
 import { createHashRouter, Navigate, RouterProvider } from 'react-router';
+import { AccountProvider } from '@/lib/accounts/AccountProvider';
 import { Layout } from './Layout';
 import { RunsPage } from '@/features/f2f-buylist/ui/RunsPage';
 import { RunDetailPage } from '@/features/f2f-buylist/ui/RunDetailPage';
@@ -48,6 +49,8 @@ const router = createHashRouter([
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <MantineProvider theme={theme} defaultColorScheme="dark">
-    <RouterProvider router={router} />
+    <AccountProvider>
+      <RouterProvider router={router} />
+    </AccountProvider>
   </MantineProvider>,
 );

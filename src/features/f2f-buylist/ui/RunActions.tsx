@@ -2,7 +2,7 @@ import { ActionIcon, Button, Group, Popover, Stack, Text, Tooltip } from '@manti
 import { IconDownload, IconPlayerPause, IconPlayerPlay, IconPlayerStop, IconRefresh, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { db } from '@/lib/db';
+import { itemsOfRun } from '@/lib/accounts/data';
 import { sendMessage, type RunAction } from '@/lib/messaging';
 import { deleteRun } from '../runner';
 import type { Run } from '../types';
@@ -21,7 +21,7 @@ export function RunActions({ run, compact, viewItems }: Props) {
   const act = (action: RunAction) => void sendMessage('controlRun', { runId: run.id!, action });
   const active = run.status === 'running' || run.status === 'queued';
   const resumable = run.status === 'paused' || run.status === 'failed' || run.status === 'cancelled';
-  const exportAll = async () => downloadCsv(run, await db.items.where('runId').equals(run.id!).toArray());
+  const exportAll = async () => downloadCsv(run, await itemsOfRun(run.id!));
 
   const actions = [
     active && { key: 'pause', label: 'Pause', icon: IconPlayerPause, color: 'yellow', onClick: () => act('pause') },

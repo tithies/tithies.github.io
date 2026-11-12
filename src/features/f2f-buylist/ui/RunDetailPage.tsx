@@ -1,12 +1,13 @@
 import { Alert, Anchor, Badge, Button, Group, Paper, Progress, SimpleGrid, Stack, Table, Text, Title, Tooltip } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { IconAlertTriangle, IconArrowLeft, IconBox, IconBuildingStore, IconCash } from '@tabler/icons-react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
 import { useStickyTableHeader } from '@/lib/ui/useStickyTableHeader';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
-import { db } from '@/lib/db';
+import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
+import { useRun, useRunItems } from '@/lib/accounts/hooks';
+import type { AccountKey } from '@/lib/accounts/types';
 import { f2fLinks } from '@/lib/f2f/links';
 import { categoryOf, type Item } from '../types';
 import { summarize } from '../summary';
@@ -54,6 +55,20 @@ function CashCreditTable({ rows }: { rows: { label: React.ReactNode; cash: strin
   );
 }
 
+/**
+ * Runs this dashboard tab already switched the current account for. Opening a run of another
+ * account switches to it once; after that (e.g. another tab switched back) it stays put, so two
+ * tabs showing runs of different accounts can't keep switching each other.
+ */
+const switchedFor = new Set<number>();
+
+/** Whether opening run `runId` (of `runAccount`) should make its account current now. */
+export function shouldSwitchForRun(runId: number, runAccount: string, current: string | null, done: Set<number> = switchedFor): boolean {
+  if (runAccount === current || done.has(runId)) return false;
+  done.add(runId);
+  return true;
+}
+
 export function RunDetailPage() {
   const tableRef = useStickyTableHeader();
   const runId = Number(useParams().runId);
@@ -61,9 +76,13 @@ export function RunDetailPage() {
   const [pageSize, setPageSize] = useLocalStorage({ key: 'tithies:f2f:pageSize', defaultValue: 50 });
 
   // null = not found (undefined means "still loading" for useLiveQuery).
-  const run = useLiveQuery(async () => (await db.runs.get(runId)) ?? null, [runId]);
+  const run = useRun(runId);
   const { hidden, save: saveHidden } = useHiddenColumns();
-  const items = useLiveQuery(() => db.items.where('runId').equals(runId).toArray(), [runId]);
+  const items = useRunItems(runId);
+  const { key: currentKey, switchTo } = useCurrentAccount();
+  useEffect(() => {
+    if (run && shouldSwitchForRun(runId, run.accountKey, currentKey)) void switchTo(run.accountKey as AccountKey);
+  }, [run, runId, currentKey, switchTo]);
 
   const filters = useMemo(() => filtersFromParams(params), [params]);
   const sort = useMemo(() => sortFromParams(params), [params]);

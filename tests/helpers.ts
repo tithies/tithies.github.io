@@ -11,3 +11,16 @@ const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
 export const fakeJwt = (userId: string, userName: string, extra: Record<string, unknown> = {}) =>
   `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: userName, [MOX_USER_ID_CLAIM]: userId, exp: 2_000_000_000, iat: 1_999_999_100, ...extra })}.c2ln`;
 export const bearer = (userId: string, userName: string) => `Bearer ${fakeJwt(userId, userName)}`;
+
+/** Empties every table of the test database. */
+export async function resetDb(): Promise<void> {
+  const { db } = await import('@/lib/db');
+  await Promise.all(db.tables.map((t) => t.clear()));
+}
+
+/** A fake Moxfield account, added as an action would add it (it becomes the current account). */
+export async function newAccount(userId: string, userName: string) {
+  const { accountData, addAccountFromAction } = await import('@/lib/accounts/data');
+  const row = await addAccountFromAction('moxfield', { userId, userName });
+  return { key: row.key, row, data: accountData(row.key), identity: { userId, userName } };
+}

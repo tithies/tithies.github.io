@@ -6,6 +6,10 @@ import { DeckTreePicker } from '@/lib/decks/DeckTreePicker';
 import { cancelSync, startSync, useCollectionMeta, useDeckData, useDecks, useDecksMeta, useSyncState } from '@/lib/decks/hooks';
 import { GettingStarted } from '@/lib/ui/GettingStarted';
 import { markDecksSeen } from '@/lib/decks/sync';
+import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
+import { accountData } from '@/lib/accounts/data';
+import type { AccountKey } from '@/lib/accounts/types';
+import type { SiteProvider } from '@/lib/sites/provider';
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
 import { timeAgo } from '@/lib/format';
 import { siteOf } from '@/lib/sites/registry';
@@ -16,29 +20,43 @@ import { mismatchFiltersFromParams, mismatchSortFromParams, writeMismatchParams 
 import { MismatchTable } from './MismatchTable';
 import { SyncProgress } from './SyncProgress';
 
-/** The site whose decks are compared. */
-const site = siteOf('moxfield');
+/** The current account, and the site its decks come from (Moxfield before any account exists). */
+function usePageAccount(): { key: AccountKey | null; site: SiteProvider } {
+  const { key, account } = useCurrentAccount();
+  return { key, site: siteOf(account?.type ?? 'moxfield') };
+}
 
 /** Boards always offered, even before any deck uses them. */
 const BASE_BOARDS = ['commanders', 'mainboard', 'sideboard', 'maybeboard'];
 
+/**
+ * Starts (or joins) the current account's sync. Without an account, syncs whoever is logged in on
+ * the site: that account is added and becomes current (the page then shows it).
+ */
 function useStartSync() {
+  const { key, site } = usePageAccount();
   const [error, setError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
   const start = async (collection: boolean) => {
     setError(null);
+    setStarting(true);
     try {
-      await startSync(site.type, collection);
+      const res = await startSync(site.type, key, collection);
+      if (!res.ok && res.code !== 'cancelled') setError(res.error);
     } catch (e) {
       setError(`Couldn't start the sync: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setStarting(false);
     }
   };
-  return { start, error };
+  return { start, error, starting };
 }
 
 function FirstSync({ decks }: { decks: DeckRow[] }) {
-  const sync = useSyncState();
-  const { start, error } = useStartSync();
-  const running = sync?.status === 'running';
+  const { key, site } = usePageAccount();
+  const sync = useSyncState(key);
+  const { start, error, starting } = useStartSync();
+  const running = sync?.status === 'running' || starting;
   const partial = decks.filter((d) => d.cardsUpdatedAt).length;
   return (
     <GettingStarted title={`First, sync your ${site.label} decks`}>
@@ -95,9 +113,10 @@ function OptionsCard({
   decksSyncedAt?: number;
   collectionAt?: number;
 }) {
-  const sync = useSyncState();
-  const { start, error } = useStartSync();
-  const running = sync?.status === 'running';
+  const { key, site } = usePageAccount();
+  const sync = useSyncState(key);
+  const { start, error, starting } = useStartSync();
+  const running = sync?.status === 'running' || starting;
   const ignored = new Set(config.ignoredBoards);
   const boardKeys = [...boards.keys()].filter((b) => BASE_BOARDS.includes(b) || (boards.get(b) ?? 0) > 0).sort((a, b) => site.boardOrder(a) - site.boardOrder(b));
   const toggleBoard = (b: string, count: boolean) => update({ ignoredBoards: count ? config.ignoredBoards.filter((x) => x !== b) : [...ignored, b] });
@@ -185,11 +204,12 @@ function OptionsCard({
 }
 
 export function MismatchPage() {
-  const decks = useDecks();
-  const decksMeta = useDecksMeta();
-  const sync = useSyncState();
-  const collectionMeta = useCollectionMeta();
-  const { config, update } = useMismatchConfig();
+  const { key, site } = usePageAccount();
+  const decks = useDecks(key);
+  const decksMeta = useDecksMeta(key);
+  const sync = useSyncState(key);
+  const collectionMeta = useCollectionMeta(key);
+  const { config, update } = useMismatchConfig(key);
   // The "Likely wrong print" card toggles the table's filter of the same name (kept in the URL).
   const [params, setParams] = useSearchParams();
   const hintedOnly = params.get('hint') === '1';
@@ -200,7 +220,7 @@ export function MismatchPage() {
 
   // Big tables are reloaded when a sync job ends, not on every deck it writes.
   const version = `${sync?.jobId ?? ''}:${sync?.status === 'running' ? 'running' : 'idle'}:${collectionMeta?.fetchedAt ?? 0}:${decksMeta?.lastSuccessAt ?? 0}`;
-  const { deckCards, collection, loaded } = useDeckData(version);
+  const { deckCards, collection, loaded } = useDeckData(key, version);
 
   const deckById = useMemo(() => new Map((decks ?? []).map((d) => [d.id, d])), [decks]);
   // The comparison only needs deck ids; names are looked up at render time.
@@ -230,8 +250,6 @@ export function MismatchPage() {
     [result, config],
   );
 
-  if (decks === undefined || decksMeta === undefined || config === null) return <Text c="dimmed">Loading…</Text>;
-
   const header = (
     <Stack gap={4}>
       <Title order={2}>Deck ↔ collection mismatches</Title>
@@ -241,6 +259,17 @@ export function MismatchPage() {
       </Text>
     </Stack>
   );
+
+  // No account yet: the first sync adds the account logged in on the site.
+  if (!key) {
+    return (
+      <Stack>
+        {header}
+        <FirstSync decks={[]} />
+      </Stack>
+    );
+  }
+  if (decks === undefined || decksMeta === undefined || config === null) return <Text c="dimmed">Loading…</Text>;
 
   if (!decksMeta.lastSuccessAt) {
     return (
@@ -267,7 +296,7 @@ export function MismatchPage() {
                   <Text size="xs" c="green">
                     {newDecks.length} new deck{newDecks.length === 1 ? '' : 's'} (included)
                   </Text>
-                  <Anchor size="xs" component="button" type="button" onClick={() => void markDecksSeen()}>
+                  <Anchor size="xs" component="button" type="button" onClick={() => void markDecksSeen(accountData(key))}>
                     Mark as seen
                   </Anchor>
                 </Group>

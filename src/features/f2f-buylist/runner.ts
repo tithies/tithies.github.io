@@ -44,7 +44,8 @@ export const splitParts = (prints: number, total: number) =>
 // ---------------------------------------------------------------------------------------------
 // Run creation
 
-export async function createRun(source: RunSource, entries: CollectionEntry[], creditBonus: number): Promise<{ runId: number; prints: number }> {
+/** A new run of `accountKey`'s collection entries (the account must exist: see src/lib/accounts). */
+export async function createRun(accountKey: string, source: RunSource, entries: CollectionEntry[], creditBonus: number): Promise<{ runId: number; prints: number }> {
   const groups = groupPrints(entries);
   const now = Date.now();
   const totals = emptyTotals();
@@ -53,6 +54,7 @@ export async function createRun(source: RunSource, entries: CollectionEntry[], c
   totals.copies = groups.reduce((s, g) => s + g.qty, 0);
   return db.transaction('rw', db.runs, db.items, async () => {
     const runId = (await db.runs.add({
+      accountKey,
       createdAt: now,
       updatedAt: now,
       status: 'queued',
@@ -65,6 +67,7 @@ export async function createRun(source: RunSource, entries: CollectionEntry[], c
     })) as number;
     const items: Item[] = groups.map((g) => ({
       runId,
+      accountKey,
       key: g.key,
       status: 'pending',
       name: g.card.name,
@@ -105,6 +108,7 @@ export async function recomputeTotals(runId: number): Promise<Run | undefined> {
 
 export const toProgress = (run: Run, message?: string): RunProgress => ({
   runId: run.id!,
+  accountKey: run.accountKey,
   status: run.status,
   phase: run.phase,
   done: run.totals.done,
@@ -287,17 +291,24 @@ export class Runner {
         updates.push(this.finalize(item, { match: c.match, doc: c.doc, note: c.matchNote }, rates, run.creditBonus, true));
       }
     });
-    if (updates.length) await db.items.bulkPut(updates);
+    if (!updates.length) return;
+    await db.transaction('rw', db.items, db.runs, async () => {
+      if (await db.runs.get(run.id!)) await db.items.bulkPut(updates);
+    });
   }
 
   private async fail(run: Run, items: Item[], error: unknown) {
     const message = describeError(error);
     // Re-read: parts of the same batch may have committed (and reset the counter) since `run` was loaded.
     const failures = ((await db.runs.get(run.id!))?.consecutiveFailures ?? run.consecutiveFailures) + 1;
-    await db.transaction('rw', db.items, db.runs, async () => {
+    const live = await db.transaction('rw', db.items, db.runs, async () => {
+      // Deleted meanwhile (or its account forgotten): write nothing for it.
+      if (!(await db.runs.get(run.id!))) return false;
       await db.items.bulkPut(items.map((i) => ({ ...i, status: 'error' as const, error: message, updatedAt: Date.now() })));
       await db.runs.update(run.id!, { consecutiveFailures: failures, requests: this.client.requests, updatedAt: Date.now() });
+      return true;
     });
+    if (!live) throw new StopRun();
     // Totals first, then the status flip, so anything watching "paused" sees final numbers.
     await recomputeTotals(run.id!);
     if (failures >= MAX_CONSECUTIVE_FAILURES) {
@@ -389,11 +400,15 @@ export class Runner {
   }
 
   private async commit(run: Run, updates: Item[], cache: CacheEntry[]) {
-    await db.transaction('rw', db.items, db.runs, db.f2fCache, async () => {
+    const live = await db.transaction('rw', db.items, db.runs, db.f2fCache, async () => {
+      // A batch answered after its run was deleted (or its account forgotten): write nothing for it.
+      if (!(await db.runs.get(run.id!))) return false;
       await db.items.bulkPut(updates);
       if (cache.length) await db.f2fCache.bulkPut(cache);
       await db.runs.update(run.id!, { consecutiveFailures: 0, requests: this.client.requests, updatedAt: Date.now() });
+      return true;
     });
+    if (!live) throw new StopRun();
     await this.emit(run.id!);
   }
 

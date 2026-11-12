@@ -1,21 +1,26 @@
-/** Dashboard-side access to the deck cache and the background sync job. */
+/** Dashboard-side access to an account's deck cache and the background sync job. */
 import { liveQuery } from 'dexie';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
-import { db, getMeta } from '@/lib/db';
+import { accountData } from '@/lib/accounts/data';
+import { useAccountLive } from '@/lib/accounts/hooks';
+import type { AccountKey } from '@/lib/accounts/types';
+import type { CollectionEntry } from '@/lib/cards/types';
 import { sendMessage } from '@/lib/messaging';
 import type { SiteType } from '@/lib/sites/types';
-import type { CollectionEntry } from '@/lib/cards/types';
-import { META_COLLECTION, META_DECKS, META_SYNC, type CollectionMeta, type DeckCardsRow, type DeckRow, type DecksMeta, type SyncState } from './types';
+import type { CollectionMeta, DeckCardsRow, DeckRow, DecksMeta, SyncState } from './types';
 
-/** Starts (or joins) the background sync of a site. `collection` also re-reads the whole collection afterwards. */
-export const startSync = (type: SiteType, collection: boolean) => sendMessage('startAccountSync', { type, collection });
+/**
+ * Starts (or joins) the background sync of an account. `collection` also re-reads the whole
+ * collection afterwards. With no account (`null`), syncs whoever is logged in on the site and
+ * adds that account. Answers once a tab of the account is found.
+ */
+export const startSync = (type: SiteType, accountKey: AccountKey | null, collection: boolean) => sendMessage('startAccountSync', { type, accountKey, collection });
 export const cancelSync = (type: SiteType) => sendMessage('cancelAccountSync', { type });
 
-/** Resolves with the final state once job `jobId` has stopped running. */
-export function waitForSync(jobId: string): Promise<SyncState> {
+/** Resolves with the final state once job `jobId` of the account has stopped running. */
+export function waitForSync(key: AccountKey, jobId: string): Promise<SyncState> {
   return new Promise((resolve, reject) => {
-    const sub = liveQuery(() => getMeta<SyncState>(META_SYNC)).subscribe({
+    const sub = liveQuery(() => accountData(key).meta.get('sync')).subscribe({
       next: (s) => {
         if (s && (s.jobId !== jobId || s.status !== 'running')) {
           sub.unsubscribe();
@@ -28,28 +33,37 @@ export function waitForSync(jobId: string): Promise<SyncState> {
 }
 
 /** Light deck rows (no cards). undefined while loading. */
-export const useDecks = () => useLiveQuery(() => db.decks.toArray(), []);
-export const useDecksMeta = () => useLiveQuery(async () => (await getMeta<DecksMeta>(META_DECKS)) ?? {}, []);
-export const useSyncState = () => useLiveQuery(async () => (await getMeta<SyncState>(META_SYNC)) ?? null, []);
-export const useCollectionMeta = () => useLiveQuery(async () => (await getMeta<CollectionMeta>(META_COLLECTION)) ?? null, []);
+export const useDecks = (key: AccountKey | null) => useAccountLive(key, (d) => d.decks.list());
+export const useDecksMeta = (key: AccountKey | null) => useAccountLive<DecksMeta>(key, async (d) => (await d.meta.get('decks')) ?? {});
+export const useSyncState = (key: AccountKey | null) => useAccountLive<SyncState | null>(key, async (d) => (await d.meta.get('sync')) ?? null);
+export const useCollectionMeta = (key: AccountKey | null) => useAccountLive<CollectionMeta | null>(key, async (d) => (await d.meta.get('collection')) ?? null);
 
 /**
  * Deck cards and the collection snapshot are big, so they are loaded once and again only when
  * `version` changes (e.g. when a sync job finishes), not on every per-deck write during a sync.
  */
-export function useDeckData(version: string): { deckCards: DeckCardsRow[]; collection: CollectionEntry[]; loaded: boolean } {
-  const [state, setState] = useState<{ deckCards: DeckCardsRow[]; collection: CollectionEntry[]; version: string | null }>({ deckCards: [], collection: [], version: null });
+export function useDeckData(key: AccountKey | null, version: string): { deckCards: DeckCardsRow[]; collection: CollectionEntry[]; loaded: boolean } {
+  const [state, setState] = useState<{ deckCards: DeckCardsRow[]; collection: CollectionEntry[]; key: AccountKey | null; version: string | null }>({
+    deckCards: [],
+    collection: [],
+    key: null,
+    version: null,
+  });
   useEffect(() => {
+    if (!key) return;
     let alive = true;
-    void Promise.all([db.deckCards.toArray(), db.moxCollection.toArray()]).then(([deckCards, collection]) => {
-      if (alive) setState({ deckCards, collection, version });
+    const data = accountData(key);
+    void Promise.all([data.deckCards.list(), data.collection.list()]).then(([deckCards, collection]) => {
+      if (alive) setState({ deckCards, collection, key, version });
     });
     return () => {
       alive = false;
     };
-  }, [version]);
-  // Not "loaded" while reloading: mixing the new decks with the old collection would show wrong numbers.
-  return { deckCards: state.deckCards, collection: state.collection, loaded: state.version === version };
+  }, [key, version]);
+  // Never another account's data. Not "loaded" while reloading: mixing the new decks with the old
+  // collection would show wrong numbers (the previous data stays meanwhile).
+  const mine = state.key === key;
+  return { deckCards: mine ? state.deckCards : [], collection: mine ? state.collection : [], loaded: mine && state.version === version };
 }
 
 export type { DeckRow };

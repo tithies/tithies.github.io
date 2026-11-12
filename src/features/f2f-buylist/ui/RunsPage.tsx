@@ -1,10 +1,10 @@
 import { Anchor, Badge, Button, Group, List, Paper, Progress, Stack, Text, Title } from '@mantine/core';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { DataTable } from 'mantine-datatable';
 import { GettingStarted } from '@/lib/ui/GettingStarted';
 import { useStickyTableHeader } from '@/lib/ui/useStickyTableHeader';
 import { Link, useNavigate } from 'react-router';
-import { db } from '@/lib/db';
+import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
+import { useRuns } from '@/lib/accounts/hooks';
 import { f2fLinks } from '@/lib/f2f/links';
 import type { Run } from '../types';
 import { RunActions } from './RunActions';
@@ -12,7 +12,9 @@ import { dateTime, money, PHASE_LABEL, STATUS_COLOR, STATUS_LABEL } from './form
 
 export function RunsPage() {
   const tableRef = useStickyTableHeader();
-  const runs = useLiveQuery(() => db.runs.orderBy('createdAt').reverse().toArray(), []);
+  const { key } = useCurrentAccount();
+  // Only the current account's runs.
+  const runs = useRuns(key);
   const navigate = useNavigate();
 
   return (
@@ -32,7 +34,7 @@ export function RunsPage() {
         </Group>
       </Group>
 
-      {runs && runs.length === 0 ? (
+      {!key || (runs && runs.length === 0) ? (
         <GettingStarted title="Check what F2F pays for your cards">
           <List type="ordered" size="sm" spacing={6}>
             <List.Item>

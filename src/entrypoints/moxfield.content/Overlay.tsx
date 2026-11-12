@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 // Inlined as a data: URL. A file URL would need web_accessible_resources, which lets any page detect the extension.
 import iconUrl from '@/assets/tithies-icon.webp?inline';
+import { accountKey } from '@/lib/accounts/types';
 import { bridge, type CaptureInfo } from '@/lib/sites/moxfield/bridge';
+import { parseIdentity } from '@/lib/sites/validate';
+import type { SiteIdentity } from '@/lib/sites/types';
 import { groupPrints, isEligible } from '@/lib/cards/prints';
 import { describeQuery } from '@/lib/sites/moxfield/normalize';
 import { onMessage, sendMessage } from '@/lib/messaging';
@@ -20,6 +23,8 @@ const ACTIVE = new Set(['queued', 'running']);
 
 export function Overlay() {
   const [capture, setCapture] = useState<CaptureInfo>({ hasCapture: false });
+  /** Who this tab is logged in as now (it may differ from the captured request's account). */
+  const [tabAccount, setTabAccount] = useState<SiteIdentity | null>(null);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   // null until read from storage, so a minimised panel doesn't flash open on page load.
   const [collapsed, setCollapsed] = useState<boolean | null>(null);
@@ -31,21 +36,26 @@ export function Overlay() {
       bridge.onMessage('captureUpdated', ({ data }) => setCapture(data)),
       bridge.onMessage('collectionProgress', ({ data }) => setPhase({ kind: 'reading', ...data })),
       onMessage('runProgress', ({ data }) => {
+        // Only runs of the account this panel reads (a tab id can be reused by another account's run).
+        if (data.accountKey !== keyRef.current) return;
         if (runIdRef.current == null || data.runId === runIdRef.current) {
           runIdRef.current = data.runId;
           setPhase({ kind: 'run', progress: data });
         }
       }),
     ];
-    const poll = setInterval(() => void bridge.sendMessage('getCaptureInfo', undefined).then(setCapture).catch(() => {}), 1500);
-    void bridge.sendMessage('getCaptureInfo', undefined).then(setCapture).catch(() => {});
-    // Re-attach to a run started from this tab earlier (e.g. after the overlay remounted).
-    void sendMessage('getProgress', {}).then((p) => {
-      if (p && ACTIVE.has(p.status)) {
-        runIdRef.current = p.runId;
-        setPhase({ kind: 'run', progress: p });
-      }
-    });
+    const refresh = () => {
+      void bridge
+        .sendMessage('getCaptureInfo', undefined)
+        .then((c) => setCapture({ ...c, account: parseIdentity(c?.account) }))
+        .catch(() => {});
+      void bridge
+        .sendMessage('getStatus', undefined)
+        .then((st) => setTabAccount(st?.hasAuth ? parseIdentity(st.identity) : null))
+        .catch(() => {});
+    };
+    const poll = setInterval(refresh, 1500);
+    refresh();
     return () => {
       offs.forEach((off) => off());
       clearInterval(poll);
@@ -61,6 +71,22 @@ export function Overlay() {
     if (capture.url) setSummary(describeQuery(capture.url).summary);
   }, [capture.url]);
 
+  // The account whose collection this panel reads (the captured request's own session).
+  const account = capture.account ?? null;
+  const key = account ? accountKey('moxfield', account.userId) : null;
+  const keyRef = useRef<string | null>(null);
+  keyRef.current = key;
+  useEffect(() => {
+    if (!key) return;
+    // Re-attach to a run of this account started from this tab earlier (e.g. after the overlay remounted).
+    void sendMessage('getProgress', { accountKey: key }).then((p) => {
+      if (p && p.accountKey === keyRef.current && ACTIVE.has(p.status)) {
+        runIdRef.current = p.runId;
+        setPhase({ kind: 'run', progress: p });
+      }
+    });
+  }, [key]);
+
   const busy = phase.kind === 'reading' || phase.kind === 'starting' || (phase.kind === 'run' && ACTIVE.has(phase.progress.status));
 
   async function start() {
@@ -68,6 +94,11 @@ export function Overlay() {
       const settings = await getSettings();
       setPhase({ kind: 'reading', page: 0, totalPages: 0, fetched: 0 });
       const res = await bridge.sendMessage('fetchCollection', { pageSize: settings.moxfieldPageSize, delayMs: 350 });
+      const readAs = parseIdentity(res.account);
+      if (!readAs) {
+        setPhase({ kind: 'error', message: "Couldn't tell which Moxfield account this collection belongs to. Reload the page, then try again." });
+        return;
+      }
       const eligible = res.entries.filter(isEligible);
       if (!eligible.length) {
         setPhase({ kind: 'error', message: `No English, non-proxy cards in this view (${res.entries.length} rows read).` });
@@ -75,14 +106,16 @@ export function Overlay() {
       }
       setPhase({ kind: 'starting' });
       const { query, summary: s } = describeQuery(res.url);
-      const { runId, prints } = await sendMessage('startRun', {
+      const { runId, prints, accountKey: runAccount } = await sendMessage('startRun', {
+        type: 'moxfield',
+        account: readAs,
         source: { url: res.url, pageUrl: location.href, query, summary: s },
         entries: eligible,
       });
       runIdRef.current = runId;
       setPhase({
         kind: 'run',
-        progress: { runId, status: 'queued', phase: 'bulk_rates', done: 0, total: prints, buylistPrints: 0, buylistCash: 0, buylistCredit: 0 },
+        progress: { runId, accountKey: runAccount, status: 'queued', phase: 'bulk_rates', done: 0, total: prints, buylistPrints: 0, buylistCash: 0, buylistCredit: 0 },
       });
     } catch (e) {
       setPhase({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
@@ -148,6 +181,14 @@ export function Overlay() {
       <div className="ti-line ti-dim" title={capture.url}>
         {capture.hasCapture ? `Filters: ${summary}` : 'Waiting for Moxfield to load your collection…'}
       </div>
+      {capture.hasCapture && (
+        <div className="ti-line ti-dim">{account ? `As ${account.userName}` : "Couldn't tell which account is logged in: reload the page"}</div>
+      )}
+      {account && tabAccount && tabAccount.userId !== account.userId && (
+        <div className="ti-line ti-warn">
+          This view was loaded as {account.userName}, but the tab is now logged in as {tabAccount.userName}. Reload the page to check {tabAccount.userName}'s collection.
+        </div>
+      )}
       {body}
       {(phase.kind === 'reading' || phase.kind === 'run') && (
         <div className="ti-progress">
@@ -155,7 +196,7 @@ export function Overlay() {
         </div>
       )}
       <div className="ti-actions">
-        <button className="ti-btn ti-primary" disabled={!capture.hasCapture || busy} onClick={start}>
+        <button className="ti-btn ti-primary" disabled={!capture.hasCapture || !account || busy} onClick={start}>
           Check selling prices on F2F
         </button>
         {phase.kind === 'run' && ACTIVE.has(phase.progress.status) && (

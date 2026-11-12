@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 import type { CollectionEntry } from '@/lib/cards/types';
 import { normalizeEntry } from '@/lib/sites/moxfield/normalize';
 import { saveSettings } from '@/lib/settings';
-import { clearCaches, controlRun, createRun, Runner } from '@/features/f2f-buylist/runner';
+import { clearCaches, controlRun, createRun, deleteRun, Runner } from '@/features/f2f-buylist/runner';
 import { PRICE_CHECK_NOTE } from '@/features/f2f-buylist/matcher';
 import { parseSuggest, productJsUrl, type ProductJs, type SuggestResponse } from '@/lib/f2f/shopify';
 import { docs, fixture } from './helpers';
@@ -97,7 +97,7 @@ describe('Runner', () => {
   const startRunner = () => runner.kick();
 
   it('processes a run end to end: buylist, bulk, fallback, totals', async () => {
-    const { runId, prints } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: 'Whole collection' }, ENTRIES, 0.3);
+    const { runId, prints } = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: 'Whole collection' }, ENTRIES, 0.3);
     expect(prints).toBe(ENTRIES.length);
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
@@ -124,14 +124,14 @@ describe('Runner', () => {
   });
 
   it('reuses cached results on the next run', async () => {
-    const first = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
+    const first = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
     startRunner();
     await waitFor(async () => (await db.runs.get(first.runId))?.status === 'completed');
     const firstItems = await db.items.where('runId').equals(first.runId).toArray();
     const misses = firstItems.filter((i) => i.match === 'not_found');
     expect(misses.length).toBeGreaterThan(0);
     urls.length = 0;
-    const second = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
+    const second = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
     startRunner();
     await waitFor(async () => (await db.runs.get(second.runId))?.status === 'completed');
     const secondItems = await db.items.where('runId').equals(second.runId).toArray();
@@ -143,7 +143,7 @@ describe('Runner', () => {
   });
 
   it('pauses and resumes without redoing finished batches', async () => {
-    const { runId, prints } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
+    const { runId, prints } = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
     startRunner();
     await waitFor(async () => (await db.items.where('[runId+status]').equals([runId, 'pending']).count()) <= prints - 5);
     await controlRun(runId, 'pause');
@@ -163,7 +163,7 @@ describe('Runner', () => {
 
   it("marks cards as errors (not 'not on F2F') when the F2F set list can't be loaded", async () => {
     vi.spyOn(F2FClient.prototype, 'facetValues').mockRejectedValue(new Error('HTTP 503'));
-    const { runId } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
+    const { runId } = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
     const items = await db.items.where('runId').equals(runId).toArray();
@@ -179,10 +179,23 @@ describe('Runner', () => {
     expect((await db.items.get([runId, 'fca|27|nonFoil']))?.match).toBe('exact');
   });
 
+  it('runs and their results carry the account; a run deleted mid-batch leaves no orphan results', async () => {
+    const { runId } = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
+    expect((await db.runs.get(runId))!.accountKey).toBe('moxfield:111111');
+    expect((await db.items.where('runId').equals(runId).toArray()).every((i) => i.accountKey === 'moxfield:111111')).toBe(true);
+    // Delete the run while its first name batch is in flight (the mock answers after 40 ms).
+    startRunner();
+    await waitFor(async () => urls.some((u) => u.includes('/Card%20Name/')));
+    await deleteRun(runId);
+    await waitFor(async () => !runner.isActive);
+    expect(await db.items.where('runId').equals(runId).count()).toBe(0);
+    expect(await db.runs.get(runId)).toBeUndefined();
+  });
+
   it('falls back to an older cached set list when F2F is unreachable', async () => {
     await db.meta.put({ key: 'f2fSets', value: { fetchedAt: 0, sets: f2fSets }, updatedAt: 0 });
     vi.spyOn(F2FClient.prototype, 'facetValues').mockRejectedValue(new Error('HTTP 503'));
-    const { runId } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
+    const { runId } = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
     expect(await db.items.where('[runId+status]').equals([runId, 'error']).count()).toBe(0);
@@ -190,7 +203,7 @@ describe('Runner', () => {
   });
 
   it('"Clear cache" removes every cached F2F answer but keeps runs', async () => {
-    const { runId } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
+    const { runId } = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
     expect(await db.f2fCache.count()).toBeGreaterThan(0);
@@ -239,7 +252,7 @@ describe('Runner', () => {
       return { total: all.length, docs: all.slice((page - 1) * 100, page * 100) };
     });
     const entries = Array.from({ length: 20 }, (_, i) => entry(`Card ${i + 1}`, 'big', 'Big Set', String(i + 1), 'nonFoil'));
-    const { runId } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, entries, 0.3);
+    const { runId } = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, entries, 0.3);
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
 
@@ -266,7 +279,7 @@ describe('Runner', () => {
     const scheme = entry('Chaos Is My Plaything', 'dsc', 'Duskmourn: House of Horror Commander', '329', 'nonFoil');
     scheme.card = { ...scheme.card, typeLine: 'Scheme' };
     const entries = [entry('Avacyn, Guardian Angel', 'm15', 'Magic 2015', '3', 'nonFoil'), entry('Not A Real Card', 'zzz', 'Nowhere', '999', 'nonFoil', 'mythic'), scheme];
-    const { runId } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, entries, 0.3);
+    const { runId } = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, entries, 0.3);
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
 
@@ -289,7 +302,7 @@ describe('Runner', () => {
       shopUrls.push(url);
       return { total: 10, docs: [] };
     });
-    const { runId } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, [entry('Not A Real Card', 'zzz', 'Nowhere', '999', 'nonFoil')], 0.3);
+    const { runId } = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, [entry('Not A Real Card', 'zzz', 'Nowhere', '999', 'nonFoil')], 0.3);
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
     expect(shopUrls.map((u) => decodeURIComponent(new URL(u).searchParams.get('q') ?? ''))).toEqual(['Not A Real Card', 'Not A Real Card Nowhere']);
@@ -301,7 +314,7 @@ describe('Runner', () => {
       if (url.includes('/collections/616828141940/')) return { total: bulkDocs.length, docs: bulkDocs };
       throw new Error('boom');
     });
-    const { runId, prints } = await createRun({ url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
+    const { runId, prints } = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, ENTRIES, 0.3);
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'paused');
     const run = (await db.runs.get(runId))!;

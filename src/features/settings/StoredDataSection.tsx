@@ -3,8 +3,11 @@ import { IconAlertTriangle, IconCheck, IconDatabase, IconRefresh, IconTrash } fr
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import type { BulkRates } from '@/features/f2f-buylist/types';
+import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
+import { accountData } from '@/lib/accounts/data';
+import { accountLabel, type AccountKey } from '@/lib/accounts/types';
 import { db, getMeta } from '@/lib/db';
-import { META_COLLECTION, META_DECKS, META_SYNC, type CollectionMeta, type DecksMeta, type SyncState } from '@/lib/decks/types';
+import { siteOf } from '@/lib/sites/registry';
 import { timeAgo } from '@/lib/format';
 import { getSettings, settingsItem } from '@/lib/settings';
 import { SettingsSection } from '@/lib/ui/SettingsSection';
@@ -14,28 +17,31 @@ const n = (v: number) => v.toLocaleString('en-CA');
 const ago = (t?: number) => (t ? timeAgo(t) : 'never');
 const megabytes = (bytes: number) => (bytes >= 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : bytes > 0 ? `${Math.max(1, Math.round(bytes / 1e3))} KB` : '0 KB');
 
-/** Counts and dates for every group, live (they follow runs and syncs while the page is open). */
-function useStats(ttlHours: number) {
+/** Counts and dates for every group (the account's for account data), live while the page is open. */
+function useStats(ttlHours: number, key: AccountKey | null) {
   return useLiveQuery(async () => {
     const cutoff = Date.now() - ttlHours * 3600_000;
+    const data = key ? accountData(key) : null;
+    const zero = Promise.resolve(0);
+    const none = Promise.resolve(undefined);
     const [lookups, fresh, oldest, bulk, sets, decks, deckCards, decksMeta, sync, collection, collectionMeta, runs, items, activeRuns] = await Promise.all([
       db.f2fCache.count(),
       ttlHours > 0 ? db.f2fCache.where('fetchedAt').aboveOrEqual(cutoff).count() : 0,
       db.f2fCache.orderBy('fetchedAt').first(),
       getMeta<BulkRates>('bulkRates'),
       getMeta<{ fetchedAt: number; sets: string[] }>('f2fSets'),
-      db.decks.count(),
-      db.deckCards.count(),
-      getMeta<DecksMeta>(META_DECKS),
-      getMeta<SyncState>(META_SYNC),
-      db.moxCollection.count(),
-      getMeta<CollectionMeta>(META_COLLECTION),
-      db.runs.count(),
-      db.items.count(),
-      db.runs.where('status').anyOf('running', 'queued').count(),
+      data ? data.decks.count() : zero,
+      data ? data.deckCards.count() : zero,
+      data ? data.meta.get('decks') : none,
+      data ? data.meta.get('sync') : none,
+      data ? data.collection.count() : zero,
+      data ? data.meta.get('collection') : none,
+      data ? data.runs.count() : zero,
+      data ? data.items.count() : zero,
+      data ? data.runs.activeIds().then((ids) => ids.length) : zero,
     ]);
     return { lookups, fresh, oldest: oldest?.fetchedAt, bulk, sets, decks, deckCards, decksMeta, syncing: sync?.status === 'running', collection, collectionMeta, runs, items, activeRuns };
-  }, [ttlHours]);
+  }, [ttlHours, key]);
 }
 
 interface Row {
@@ -51,11 +57,14 @@ interface Row {
 }
 
 const CACHE = { label: 'Cache', color: 'gray' };
-const SYNCED = { label: 'Copy of Moxfield', color: 'blue' };
+const synced = (label: string) => ({ label: `Copy of ${label}`, color: 'blue' });
 const YOURS = { label: 'Your data', color: 'red' };
 
 /** Settings → Stored data: what Tithies keeps in IndexedDB, with checkboxes to clear any of it. */
 export function StoredDataSection() {
+  const { key, account } = useCurrentAccount();
+  const site = siteOf(account?.type ?? 'moxfield');
+  const who = account ? ` (${accountLabel(account)})` : '';
   const [ttlHours, setTtlHours] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<DataGroup>>(new Set());
   const [confirming, setConfirming] = useState(false);
@@ -66,7 +75,7 @@ export function StoredDataSection() {
   /** What each group's data weighs: measured on demand, it reads every row. */
   const [sizes, setSizes] = useState<Record<DataGroup, number> | null>(null);
   const [measuring, setMeasuring] = useState(false);
-  const stats = useStats(ttlHours ?? 1);
+  const stats = useStats(ttlHours ?? 1, key);
 
   useEffect(() => {
     void getSettings().then((s) => setTtlHours(s.cacheTtlHours));
@@ -75,7 +84,7 @@ export function StoredDataSection() {
   const measure = () => {
     setMeasuring(true);
     void navigator.storage?.estimate?.().then((e) => setUsage(e.usage ?? null));
-    void measureStoredData()
+    void measureStoredData(key)
       .then(setSizes)
       .finally(() => setMeasuring(false));
   };
@@ -83,7 +92,7 @@ export function StoredDataSection() {
 
   if (!stats || ttlHours == null) return null;
   const s = stats;
-  const syncBlock = s.syncing ? 'A Moxfield sync is running: wait for it to finish, or cancel it on the Mismatches page.' : undefined;
+  const syncBlock = s.syncing ? `A ${site.label} sync is running: wait for it to finish, or cancel it on the Mismatches page.` : undefined;
 
   const rows: Row[] = [
     {
@@ -99,26 +108,26 @@ export function StoredDataSection() {
       empty: !s.lookups && !s.bulk && !s.sets,
     },
     {
-      id: 'moxDecks',
-      title: 'Moxfield decks',
-      kind: SYNCED,
+      id: 'decks',
+      title: `${site.label} decks${who}`,
+      kind: synced(site.label),
       details: [`${n(s.decks)} decks, ${n(s.deckCards)} with their cards read`, `Last complete sync ${ago(s.decksMeta?.lastSuccessAt)}`],
-      effect: 'The next sync reads every deck again (about one second per deck). Your decks on Moxfield are not touched.',
+      effect: `The next sync reads every deck again (about one second per deck). Your decks on ${site.label} are not touched.`,
       empty: !s.decks && !s.deckCards && !s.decksMeta,
       blocked: syncBlock,
     },
     {
-      id: 'moxCollection',
-      title: 'Moxfield collection',
-      kind: SYNCED,
+      id: 'collection',
+      title: `${site.label} collection${who}`,
+      kind: synced(site.label),
       details: [s.collectionMeta ? `${n(s.collectionMeta.entries)} rows (${n(s.collectionMeta.copies)} copies), read ${ago(s.collectionMeta.fetchedAt)}` : `${n(s.collection)} rows`],
-      effect: 'Read again the next time you click "Find mismatches". Your collection on Moxfield is not touched.',
+      effect: `Read again the next time you click "Find mismatches". Your collection on ${site.label} is not touched.`,
       empty: !s.collection && !s.collectionMeta,
       blocked: syncBlock,
     },
     {
       id: 'runs',
-      title: 'Selling runs',
+      title: `Selling runs${who}`,
       kind: YOURS,
       details: [`${n(s.runs)} runs, ${n(s.items)} card results`, ...(s.activeRuns ? [`${s.activeRuns} still running: cancelled first`] : [])],
       effect: 'Deletes every run and its results, for good. Export the ones you want to keep to CSV first.',
@@ -140,7 +149,10 @@ export function StoredDataSection() {
   const clear = async () => {
     setBusy(true);
     try {
-      await clearStoredData(chosen.map((r) => r.id));
+      await clearStoredData(
+        chosen.map((r) => r.id),
+        key,
+      );
       setCleared(chosen.map((r) => r.title).join(', '));
       setSelected(new Set());
       measure();
