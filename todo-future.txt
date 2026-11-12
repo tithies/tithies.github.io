@@ -4,10 +4,6 @@ add a global setting to ignore basic lands (default true) when starting a sellin
 
 add the possibility to start a selling run from a deck. Same as "ignore basic land" setting, there are also checkboxes for boards (only mainboard, sideboard, commanders) in global settings, and we can override for the run in the popup in advanced settings as well.
 
-page content background should have the big tithies banner faded like in the website but use the new image I added (Mystical Tithies Sorceress Medallion (1).png)
-
-website: background remove opacity. Also use the new image (Mystical Tithies Sorceress Medallion (1).png).
-
 settings for request gap etc ... it seems we only have for f2f. What about moxfield or others ? Moxfield can be faster
 
 support french

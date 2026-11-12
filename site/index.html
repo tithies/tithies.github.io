@@ -32,6 +32,7 @@
       --orange: #ffa94d;
       --code: #2a2c31;
       --shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+      --hero-text-shadow: 0 2px 14px rgba(0, 0, 0, 0.85);
     }
     @media (prefers-color-scheme: light) {
       :root {
@@ -47,6 +48,7 @@
         --orange: #d9480f;
         --code: #eef0f3;
         --shadow: 0 10px 30px rgba(16, 24, 40, 0.1);
+        --hero-text-shadow: 0 1px 12px rgba(255, 255, 255, 0.9);
       }
     }
     * { box-sizing: border-box; }
@@ -88,15 +90,25 @@
     .nav a { color: var(--muted); }
     @media (max-width: 640px) { .nav { display: none; } }
 
-    /* hero: the emblem art as a faded backdrop */
-    .hero-band { position: relative; overflow: hidden; isolation: isolate; }
-    .hero-band::before, .hero-band::after { content: ''; position: absolute; inset: 0; z-index: -1; }
-    .hero-band::before { background: url(img/banner.webp) center 200% / cover no-repeat; opacity: 0.55; }
-    .hero-band::after { background: radial-gradient(ellipse 60% 75% at 50% 45%, color-mix(in srgb, var(--bg) 82%, transparent), color-mix(in srgb, var(--bg) 65%, transparent) 70%), linear-gradient(to bottom, transparent 55%, var(--bg)); }
-    /* Tall top padding: the emblem art shows above the title. */
-    .hero { padding: 515px 0 56px; text-align: center; }
-    @media (max-width: 640px) { .hero { padding-top: 228px; } }
-    .hero h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); letter-spacing: -0.02em; }
+    /* hero: the medallion art (img/hero.webp, a 1254 px square) at full strength, centered.
+       Its focal area, the sorceress (pixels 514–765 × 385–785), is never covered: the text and
+       the fade behind it only start below the TITHIES scroll (pixel 852), and the round fade at
+       the art's edges stays far outside it. The fractions below are those pixels ÷ 1254. */
+    .hero-band {
+      --art: clamp(520px, 75vw, 1100px);                 /* drawn size of the art */
+      --art-top: calc(var(--art) * -0.17);               /* its top ornament slides under the header */
+      --clear-bottom: calc(var(--art-top) + var(--art) * 0.68);
+      position: relative; overflow: hidden; isolation: isolate;
+    }
+    .hero-band::before, .hero-band::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+    .hero-band::before {
+      background: url(img/hero.webp) 50% var(--art-top) / var(--art) var(--art) no-repeat;
+      -webkit-mask: radial-gradient(circle calc(var(--art) / 2) at 50% calc(var(--art-top) + var(--art) / 2), #000 82%, transparent);
+      mask: radial-gradient(circle calc(var(--art) / 2) at 50% calc(var(--art-top) + var(--art) / 2), #000 82%, transparent);
+    }
+    .hero-band::after { background: linear-gradient(to bottom, transparent var(--clear-bottom), color-mix(in srgb, var(--bg) 86%, transparent) calc(var(--clear-bottom) + 56px), var(--bg) calc(100% - 4px)); }
+    .hero { padding: calc(var(--clear-bottom) + 16px) 0 56px; text-align: center; }
+    .hero h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); letter-spacing: -0.02em; text-shadow: var(--hero-text-shadow); }
     .hero .lead { font-size: 1.2rem; color: var(--muted); max-width: 680px; margin: 0 auto 28px; }
     .cta { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
     .btn {
