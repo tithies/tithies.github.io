@@ -6,6 +6,7 @@
   --ti-header-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 14px rgba(16, 24, 40, 0.06);
   --ti-navbar-shadow: 1px 0 10px rgba(16, 24, 40, 0.04);
   --ti-card-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 14px rgba(16, 24, 40, 0.05);
+  --ti-art-opacity: 0.1;
 }
 [data-mantine-color-scheme='dark'] {
   --ti-canvas: var(--mantine-color-dark-9);
@@ -13,12 +14,30 @@
   --ti-header-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.03), 0 4px 18px rgba(0, 0, 0, 0.6);
   --ti-navbar-shadow: 4px 0 18px rgba(0, 0, 0, 0.4);
   --ti-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025), 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --ti-art-opacity: 0.16;
 }
 body {
   background: var(--ti-canvas);
 }
+/* The page background holds the Tithies medallion art, faded and centered in the content area.
+   It stays put while the page scrolls, and sits under the content (z-index -1 inside main). */
 .mantine-AppShell-main {
   background: var(--ti-canvas);
+  isolation: isolate;
+}
+.mantine-AppShell-main::before {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  top: var(--app-shell-header-offset, 0px);
+  left: var(--app-shell-navbar-offset, 0px);
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: url('../../assets/tithies-art.webp') center / contain no-repeat;
+  opacity: var(--ti-art-opacity);
+  -webkit-mask: radial-gradient(circle closest-side, #000 72%, transparent);
+  mask: radial-gradient(circle closest-side, #000 72%, transparent);
 }
 /* Same colour as the menu; above it, so its shadow falls on it. */
 .mantine-AppShell-header {
