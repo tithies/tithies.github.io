@@ -63,24 +63,45 @@ body {
   background: var(--ti-navbar);
   box-shadow: var(--ti-navbar-shadow);
 }
-/* The fire mage art fills the bottom of the menu, under its links (the fixed menu is its own
-   stacking context, so z-index -1 still paints over the menu's background). Its top fades out
-   into the menu colour along an eased curve, so there is no visible edge; its bottom darkens to
-   black under the Settings link, the same in both themes (see .ti-nav-on-art). */
-.mantine-AppShell-navbar::before {
-  content: '';
+/* The fire mage art (MenuArt.tsx) fills the bottom of the menu, under its links (the fixed menu
+   is its own stacking context, so z-index -1 still paints over the menu's background). Its top
+   fades out into the menu colour along an eased curve, so there is no visible edge; its bottom
+   darkens to black under the Settings link, the same in both themes (see .ti-nav-on-art). */
+.ti-menu-art {
   position: absolute;
   z-index: -1;
   left: 0;
   right: 0;
   bottom: 0;
-  aspect-ratio: 516 / 699;
-  pointer-events: none;
-  background:
-    linear-gradient(to top, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.75) 10%, rgba(0, 0, 0, 0.42) 22%, rgba(0, 0, 0, 0.14) 34%, transparent 46%),
-    url('../../assets/tithies-menu-art.webp') center bottom / 100% auto no-repeat;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background: #1b0a0e;
   -webkit-mask: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.12) 12%, rgba(0, 0, 0, 0.4) 24%, rgba(0, 0, 0, 0.75) 36%, #000 48%);
   mask: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.12) 12%, rgba(0, 0, 0, 0.4) 24%, rgba(0, 0, 0, 0.75) 36%, #000 48%);
+}
+.ti-menu-art[data-interactive] {
+  cursor: pointer;
+}
+.ti-menu-art-layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ti-menu-art-vignette {
+  background: radial-gradient(ellipse 78% 72% at 45% 42%, transparent 58%, rgba(8, 3, 5, 0.72) 100%);
+}
+.ti-menu-art-shade {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.75) 10%, rgba(0, 0, 0, 0.42) 22%, rgba(0, 0, 0, 0.14) 34%, transparent 46%);
+}
+/* Clicks on the menu's empty space go through to the art; its links, buttons and fields still
+   take their own hover and clicks first, the art only gets what lands beside them. */
+.mantine-AppShell-navbar > .mantine-AppShell-section {
+  pointer-events: none;
+}
+.mantine-AppShell-navbar > .mantine-AppShell-section :is(a, button, input, select, textarea, label, [tabindex]) {
+  pointer-events: auto;
 }
 /* Menu links drawn over the art's black bottom: white text in both themes, and hover/active
    backgrounds that stay dark enough for it (Mantine's light-theme ones are pale). */

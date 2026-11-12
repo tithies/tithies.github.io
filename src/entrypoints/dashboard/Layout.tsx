@@ -7,6 +7,7 @@ import { AccountSelector } from '@/lib/ui/AccountSelector';
 import { UpdateBanner } from '@/lib/ui/UpdateBanner';
 import { UpdateCheckButton } from '@/lib/ui/UpdateCheck';
 import iconUrl from '@/assets/tithies-icon.webp';
+import { MenuArt } from './MenuArt';
 
 /** Each feature contributes a section to the navbar. Its settings go in a section of the global Settings page. */
 const NAV = [
@@ -55,6 +56,7 @@ export function Layout() {
         </Group>
       </AppShell.Header>
       <AppShell.Navbar p="xs">
+        <MenuArt />
         <AppShell.Section grow>
           {NAV.map((section) => (
             <NavLink key={section.label} label={section.label} leftSection={<section.icon size={18} />} defaultOpened childrenOffset={12}>
