@@ -36,12 +36,12 @@ export function Overlay() {
       bridge.onMessage('captureUpdated', ({ data }) => setCapture(data)),
       bridge.onMessage('collectionProgress', ({ data }) => setPhase({ kind: 'reading', ...data })),
       onMessage('runProgress', ({ data }) => {
-        // Only runs of the account this panel reads (a tab id can be reused by another account's run).
-        if (data.accountKey !== keyRef.current) return;
-        if (runIdRef.current == null || data.runId === runIdRef.current) {
-          runIdRef.current = data.runId;
-          setPhase({ kind: 'run', progress: data });
-        }
+        // The run this panel follows keeps updating even after a sign-out (it only talks to F2F).
+        // Any other run must be of the account this panel reads (a tab id can be reused by another account's run).
+        const followed = runIdRef.current != null && data.runId === runIdRef.current;
+        if (!followed && (runIdRef.current != null || data.accountKey !== keyRef.current)) return;
+        runIdRef.current = data.runId;
+        setPhase({ kind: 'run', progress: data });
       }),
     ];
     const refresh = () => {
