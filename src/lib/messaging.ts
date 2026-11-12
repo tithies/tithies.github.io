@@ -31,6 +31,10 @@ interface ProtocolMap {
   siteApi(data: SiteApiCall): SiteResult;
   /** site tab → background: the tab's session appeared, went away, or changed account. */
   siteSessionChanged(data: { type: SiteType; hasAuth: boolean; identity: SiteIdentity | null }): void;
+  /** site tab → background: the user signed out in this tab (so every tab of the site is logged out). */
+  siteLoggedOut(data: { type: SiteType }): void;
+  /** background → site tab: another tab signed out, forget this tab's session too. */
+  siteDropSession(): boolean;
   /** dashboard → background: drop sessions of tabs that are gone or left the site. */
   pruneSessions(): void;
   /** dashboard → background: stop everything working for the account, then delete all of its data. */

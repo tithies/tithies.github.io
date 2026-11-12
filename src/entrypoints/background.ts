@@ -113,6 +113,17 @@ export default defineBackground(() => {
     void sessions.report({ tabId, type: data.type, hasAuth, identity: hasAuth ? parseIdentity(data.identity) : null });
   });
   onMessage('pruneSessions', () => pruneSessions());
+  // One sign-out ends the site's session in every tab of this browser profile (they share its
+  // cookies), but the other tabs' pages keep their token in memory: tell them to forget it.
+  onMessage('siteLoggedOut', async ({ data, sender }) => {
+    if (!isSiteType(data?.type) || sender.tab?.id == null) return;
+    const from = sender.tab;
+    const tabs = await browser.tabs.query({ url: siteOf(data.type).tabPatterns }).catch(() => []);
+    for (const t of tabs) {
+      if (t.id == null || t.id === from.id || t.incognito !== from.incognito) continue;
+      void sendMessage('siteDropSession', undefined, t.id).catch(() => {});
+    }
+  });
   browser.tabs.onRemoved.addListener((tabId) => void sessions.forget(tabId));
   browser.tabs.onReplaced.addListener((_added, removed) => void sessions.forget(removed));
   void pruneSessions();

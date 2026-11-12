@@ -1,7 +1,7 @@
 import { defineContentScript } from '#imports';
 import { bridge } from '@/lib/sites/moxfield/bridge';
 import { MOX_API_HOST } from '@/lib/sites/moxfield/constants';
-import { STARTUP_PATH } from '@/lib/sites/moxfield/identity';
+import { isLogoutPath, STARTUP_PATH } from '@/lib/sites/moxfield/identity';
 import { MoxPageSession } from '@/lib/sites/moxfield/page-api';
 
 /**
@@ -47,6 +47,12 @@ export default defineContentScript({
       }
     };
 
+    /** The page's "Sign out" answered: the session ends here and, through the background, in every tab. */
+    const noteLogout = () => {
+      const identity = session.logout();
+      void bridge.sendMessage('loggedOut', { identity }).catch(() => {});
+    };
+
     /** The page's own token refresh / login (`startup/authenticated`) answered. */
     const noteStartup = (status: number, readBody: () => Promise<unknown>) => {
       void readBody()
@@ -56,12 +62,14 @@ export default defineContentScript({
 
     window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
       let startup = false;
+      let logout = false;
       try {
         const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
         const u = apiUrl(url);
         if (u) {
           noteRequest(u, { ...(input instanceof Request ? headersToObject(input.headers) : {}), ...headersToObject(init?.headers) });
           startup = u.pathname === STARTUP_PATH;
+          logout = isLogoutPath(u.pathname);
         }
       } catch {
         /* never break the page */
@@ -73,6 +81,7 @@ export default defineContentScript({
           () => {},
         );
       }
+      if (logout) void p.then(noteLogout, () => {});
       return p;
     };
 
@@ -93,6 +102,7 @@ export default defineContentScript({
         const u = m && apiUrl(m.url);
         if (m && u) {
           noteRequest(u, m.headers);
+          if (isLogoutPath(u.pathname)) this.addEventListener('load', noteLogout);
           if (u.pathname === STARTUP_PATH) {
             const xhr = this;
             xhr.addEventListener('load', () =>
@@ -113,6 +123,12 @@ export default defineContentScript({
     bridge.onMessage('getCaptureInfo', () => session.captureInfo());
 
     bridge.onMessage('getStatus', () => session.status(location.pathname));
+
+    // Another tab signed out: the browser's Moxfield session is over here too.
+    bridge.onMessage('dropSession', () => {
+      session.logout();
+      return true;
+    });
 
     // One request per call: throttling, retries and progress live in the extension's background worker.
     bridge.onMessage('api', ({ data }) => session.api(data, pageFetch));

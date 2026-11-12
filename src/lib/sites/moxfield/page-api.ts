@@ -53,13 +53,29 @@ const toIdentity = (t: TokenInfo | null): SiteIdentity | null => (t ? { userId: 
 interface Snapshot {
   headers: Headers;
   identity: SiteIdentity | null;
+  /** The token's own expiry (ms), when it says. */
+  expiresAt?: number;
   at: number;
 }
+
+/** A token is still used this long past its expiry (clock differences); Moxfield refuses it anyway after that. */
+const EXPIRY_GRACE_MS = 60_000;
+/** Tokens of logged-out sessions remembered, so a late request carrying one can't bring the session back. */
+const MAX_REVOKED = 20;
 
 export class MoxPageSession {
   private auth: Snapshot | null = null;
   private captured: (Snapshot & { url: string }) | null = null;
   private last: SessionInfo = { hasAuth: false, identity: null };
+  /**
+   * Tokens of sessions that were logged out. Moxfield doesn't invalidate its access token on
+   * logout (verified 2026-11-12: requests with it still answer 200 afterwards), so Tithies must
+   * stop using it by itself.
+   */
+  private revoked = new Set<string>();
+  /** Counts logouts (a read in progress stops when it changes). */
+  private logouts = 0;
+  private expiryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     /** Called when the session appears, goes away, or changes account. */
@@ -75,13 +91,41 @@ export class MoxPageSession {
     this.onChange(next);
   }
 
+  private snapshot(headers: Headers): Snapshot {
+    const token = identityFromAuthorization(headers.authorization);
+    return { headers, identity: toIdentity(token), expiresAt: token?.expiresAt, at: this.now() };
+  }
+
   private set(headers: Headers) {
-    this.auth = { headers, identity: toIdentity(identityFromAuthorization(headers.authorization)), at: this.now() };
+    if (this.revoked.has(headers.authorization)) return;
+    this.auth = this.snapshot(headers);
     this.emitIfChanged();
+    this.watchExpiry();
+  }
+
+  /** Reports the session as gone once its token has expired (the page refreshes it while it is used). */
+  private watchExpiry() {
+    if (this.expiryTimer) clearTimeout(this.expiryTimer);
+    this.expiryTimer = null;
+    const exp = this.auth?.expiresAt;
+    if (exp === undefined) return;
+    // setTimeout's longest delay is ~24.8 days.
+    this.expiryTimer = setTimeout(() => this.emitIfChanged(), Math.min(2_147_483_647, Math.max(0, exp + EXPIRY_GRACE_MS - this.now()) + 1000));
+  }
+
+  private live(s: Snapshot | null): s is Snapshot {
+    return s != null && (s.expiresAt === undefined || this.now() <= s.expiresAt + EXPIRY_GRACE_MS);
+  }
+
+  private revoke(authorization: string | undefined) {
+    if (!authorization) return;
+    this.revoked.add(authorization);
+    if (this.revoked.size > MAX_REVOKED) this.revoked.delete(this.revoked.values().next().value as string);
   }
 
   info(): SessionInfo {
-    return { hasAuth: this.auth != null, identity: this.auth?.identity ?? null };
+    const live = this.live(this.auth);
+    return { hasAuth: live, identity: live ? (this.auth?.identity ?? null) : null };
   }
 
   /** Headers of a request the page itself made to the API (it refreshes its token by itself). */
@@ -108,14 +152,32 @@ export class MoxPageSession {
     this.emitIfChanged();
   }
 
+  /**
+   * The user logged out (the page's own logout call answered, or another tab of this browser
+   * did it: one logout ends the session of every tab). The session and the panel's captured
+   * request are forgotten, and their tokens are never used again. Returns who was logged in.
+   */
+  logout(): SiteIdentity | null {
+    const who = this.auth?.identity ?? this.captured?.identity ?? null;
+    this.revoke(this.auth?.headers.authorization);
+    this.revoke(this.captured?.headers.authorization);
+    this.captured = null;
+    this.auth = null;
+    this.logouts++;
+    this.emitIfChanged();
+    return who;
+  }
+
   status(path: string): SiteTabStatus {
-    return { hasAuth: this.auth != null, identity: this.auth?.identity ?? null, authAt: this.auth?.at, path };
+    const { hasAuth, identity } = this.info();
+    return { hasAuth, identity, authAt: this.auth?.at, path };
   }
 
   /** The collection page made a search: remember it (URL = the filters, headers = the session). Returns whether it was one. */
   noteCollectionSearch(absUrl: string, headers: Headers): boolean {
     if (!isCollectionSearchUrl(absUrl)) return false;
-    this.captured = { url: absUrl, headers, identity: toIdentity(identityFromAuthorization(headers.authorization)), at: this.now() };
+    if (this.revoked.has(headers.authorization)) return false;
+    this.captured = { ...this.snapshot(headers), url: absUrl };
     return true;
   }
 
@@ -131,7 +193,9 @@ export class MoxPageSession {
    */
   async api({ req, expect }: SiteApiCall, doFetch: PageFetch): Promise<SiteResult> {
     const snap = this.auth;
-    if (!snap) return siteFail(0, 'no_auth', 'No Moxfield session in this tab yet: log in to Moxfield, or reload the page.', null);
+    if (!this.live(snap)) {
+      return siteFail(0, 'no_auth', snap ? 'The Moxfield session in this tab has expired: reload the page.' : 'No Moxfield session in this tab: log in to Moxfield, or reload the page.', null);
+    }
     const as = snap.identity;
     if (expect !== undefined) {
       if (!as) return siteFail(0, 'wrong_account', "Couldn't tell which Moxfield account is logged in in this tab.", null);
@@ -175,11 +239,19 @@ export class MoxPageSession {
         if (e) entries.push(e);
       }
     };
+    // Logged out meanwhile: stop reading with the old session.
+    const logouts = this.logouts;
+    const checkStillCaptured = () => {
+      if (this.logouts !== logouts) throw new Error('You logged out of Moxfield while the collection was being read. Log in and try again.');
+    };
+    checkStillCaptured();
     push(first);
     onProgress({ page: 1, totalPages, fetched: entries.length });
     for (let page = 2; page <= totalPages; page++) {
       await sleep(opts.delayMs);
+      checkStillCaptured();
       push(await getPage(page, size));
+      checkStillCaptured();
       onProgress({ page, totalPages, fetched: entries.length });
     }
     return { url, entries, totalResults: first.totalResults ?? entries.length, pages: totalPages, account: identity };

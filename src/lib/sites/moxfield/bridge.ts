@@ -1,5 +1,5 @@
 import { defineCustomEventMessaging } from '@webext-core/messaging/page';
-import type { SiteApiCall, SiteResult, SiteTabStatus } from '@/lib/sites/types';
+import type { SiteApiCall, SiteIdentity, SiteResult, SiteTabStatus } from '@/lib/sites/types';
 import type { CaptureInfo, CollectionResult, SessionInfo } from './page-api';
 
 export type { CaptureInfo, CollectionResult, SessionInfo };
@@ -17,6 +17,10 @@ interface BridgeProtocol {
   collectionProgress(data: { page: number; totalPages: number; fetched: number }): void;
   /** main → isolated: the session appeared, went away, or now belongs to another account. */
   sessionChanged(data: SessionInfo): void;
+  /** main → isolated: the user signed out in this tab (which ends the session of every tab). */
+  loggedOut(data: { identity: SiteIdentity | null }): void;
+  /** isolated → main: another tab signed out: forget this tab's session too. */
+  dropSession(): boolean;
 }
 
 /**

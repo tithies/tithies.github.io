@@ -15,6 +15,8 @@ import type { SiteIdentity } from '@/lib/sites/types';
 
 export const MOX_USER_ID_CLAIM = 'http://www.moxfield.com/ws/2016/08/identity/claims/UserId';
 export const STARTUP_PATH = '/v1/startup/authenticated';
+/** The page's "Sign out" (verified 2026-11-12: `POST /v2/account/logout`, no page reload). */
+export const isLogoutPath = (path: string) => /\/account\/logout\/?$/i.test(path);
 
 export interface TokenInfo extends SiteIdentity {
   /** Token expiry (ms), when the token says. */

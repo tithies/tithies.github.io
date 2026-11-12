@@ -36,6 +36,7 @@ const cleanStatus = (s: SiteTabStatus): SiteTabStatus => ({
 function registerRelays() {
   const offline = (): SiteTabStatus => ({ hasAuth: false, identity: null, path: location.pathname });
   onMessage('siteStatus', async () => cleanStatus(await withTimeout(bridge.sendMessage('getStatus', undefined), 3000, offline)));
+  onMessage('siteDropSession', () => withTimeout(bridge.sendMessage('dropSession', undefined), 3000, () => false));
   onMessage('siteApi', async ({ data }) => {
     const res = await withTimeout<SiteResult>(bridge.sendMessage('api', data), 90_000, () => siteFail(0, 'timeout', 'Moxfield took too long to answer', null));
     return res && typeof res === 'object' ? { ...res, as: parseIdentity(res.as) } : res;
@@ -54,6 +55,8 @@ function reportSessions() {
     report(c?.hasAuth ?? false, c?.identity ?? null);
   });
   bridge.onMessage('sessionChanged', ({ data }) => report(data?.hasAuth === true, parseIdentity(data?.identity)));
+  // Signed out here: the background ends the session of the other Moxfield tabs too.
+  bridge.onMessage('loggedOut', () => void sendMessage('siteLoggedOut', { type: 'moxfield' }).catch(() => {}));
   window.addEventListener('pagehide', () => report(false, null));
   window.addEventListener('pageshow', (e) => {
     // Back/forward cache: the page (and its session) came back.

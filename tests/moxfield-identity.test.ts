@@ -139,3 +139,74 @@ describe('Moxfield page session', () => {
     expect(res.entries.length).toBeGreaterThan(0);
   });
 });
+
+describe('Moxfield sign-out', () => {
+  const okDeckList = () => new Response(JSON.stringify({ decks: [] }), { status: 200 });
+  const ALICE_ = { userId: '111111', userName: 'alice' };
+  const BOB_ = { userId: '222222', userName: 'bob' };
+  const search = 'https://api2.moxfield.com/v1/collections/search?q=%20&pageNumber=1&pageSize=50';
+
+  it('recognises the sign-out call', async () => {
+    const { isLogoutPath } = await import('@/lib/sites/moxfield/identity');
+    expect(isLogoutPath('/v2/account/logout')).toBe(true);
+    expect(isLogoutPath('/v1/account/logout/')).toBe(true);
+    expect(isLogoutPath('/v2/account/token')).toBe(false);
+  });
+
+  it("forgets the session and the panel's capture, and never takes their token back", async () => {
+    const changes: SessionInfo[] = [];
+    const session = new MoxPageSession((s) => changes.push(s));
+    const old = bearer('111111', 'alice');
+    session.noteRequest({ authorization: old });
+    session.noteCollectionSearch(search, { authorization: old });
+    expect(session.logout()).toEqual(ALICE_);
+    expect(session.info()).toEqual({ hasAuth: false, identity: null });
+    expect(session.captureInfo()).toEqual({ hasCapture: false });
+    expect(changes.at(-1)).toEqual({ hasAuth: false, identity: null });
+    // Moxfield still accepts the old token, so Tithies must refuse to use it by itself.
+    const fetch = vi.fn(async () => okDeckList());
+    expect(await session.api({ req: { kind: 'deckList' } }, fetch)).toMatchObject({ ok: false, code: 'no_auth' });
+    expect(fetch).not.toHaveBeenCalled();
+    // A late request or search carrying the old token doesn't bring it back…
+    session.noteRequest({ authorization: old });
+    expect(session.noteCollectionSearch(search, { authorization: old })).toBe(false);
+    expect(session.info().hasAuth).toBe(false);
+    // …but logging in again (a new token) does.
+    session.noteRequest({ authorization: bearer('222222', 'bob') });
+    expect(session.info()).toEqual({ hasAuth: true, identity: BOB_ });
+  });
+
+  it('stops a collection read when the user signs out meanwhile (not when the filters change)', async () => {
+    const page = fixture<{ data: unknown[] }>('moxfield-page.json');
+    const answer = () => new Response(JSON.stringify({ ...page, pageSize: 50, totalPages: 3, totalResults: 150 }), { status: 200 });
+    const read = async (between: (s: MoxPageSession) => void) => {
+      const session = new MoxPageSession();
+      session.noteRequest({ authorization: bearer('111111', 'alice') });
+      session.noteCollectionSearch(search, { authorization: bearer('111111', 'alice') });
+      let pages = 0;
+      return session.readCapture({ pageSize: 50, delayMs: 0 }, async () => {
+        if (++pages === 2) between(session);
+        return answer();
+      }, undefined, async () => {});
+    };
+    await expect(read((s) => s.noteCollectionSearch(`${search}&setId=x`, { authorization: bearer('111111', 'alice') }))).resolves.toMatchObject({ account: ALICE_ });
+    await expect(read((s) => s.logout())).rejects.toThrow('You logged out of Moxfield');
+  });
+
+  it('a session whose token has expired is not used', async () => {
+    let now = 1_000_000_000_000;
+    const session = new MoxPageSession(undefined, () => now);
+    session.noteRequest({ authorization: `Bearer ${fakeJwt('111111', 'alice', { exp: now / 1000 + 900 })}` });
+    expect(session.info().hasAuth).toBe(true);
+    now += 900_000 + 30_000; // expired, within the grace period
+    expect(session.info().hasAuth).toBe(true);
+    now += 60_000;
+    expect(session.info()).toEqual({ hasAuth: false, identity: null });
+    const fetch = vi.fn(async () => okDeckList());
+    expect(await session.api({ req: { kind: 'deckList' } }, fetch)).toMatchObject({ ok: false, code: 'no_auth', message: expect.stringContaining('expired') });
+    expect(fetch).not.toHaveBeenCalled();
+    // The page refreshed its token: usable again.
+    session.noteRequest({ authorization: `Bearer ${fakeJwt('111111', 'alice', { exp: now / 1000 + 900, jti: 'new' })}` });
+    expect(session.info().hasAuth).toBe(true);
+  });
+});
