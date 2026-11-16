@@ -4,6 +4,8 @@ add the possibility to start a selling run from a deck. Same as "ignore basic la
 
 support french
 
+New feature: move cards from deck to deck and submit, summarize what should be moved
+
 feature: collection mismatches => rename to collection comparisons instead
 - the "show" options can be removed. Their helper text can be put in the panels directly
 - possibility to save all the configuration under a name. We could have multiple, and switch between them easily. This way the user doesnt have to reconfigure everything every time.
@@ -19,6 +21,18 @@ new feature: selling page should has some system to add cards we want to sell an
 
 new feature: same as selling page, buying page should also have a system to add cards we want to buy and submit all at once. Same also for moxfield where we can add them directly to collection and decks via configurations to where each card go in which deck. Although, sometimes when buying the card, shops be out of stock for the specific print, and ask you if it's ok for you to have another print => it means we should be able to update that quickly in the page.
 
+Add exporting to buying page and other pages where we get a list
+
 feature: have a button to remove all data: settings, every storage, everything. It's a full reset
 
 new feature Scanner cards: upload list of images, it scans all cards in it and list them. Then we can just like the buylist page, add to collection directly
+
+edit website
+
+sometimes, some process run in the background and ui say we can close the modal, it will continue. Sure but how can I see it again ??
+
+in got 2 binders in alopier, price estimate shown in moxfield, seems something is different, can you tell what it is ?
+
+in comparator, display a clear button for exports in the little floating component as well. Also the export button should instead of opening a menu with multiple options, open the floating component, and it will contain all those options as well. Rename Review to Preview. Preview should be paginable.
+
+Add exporting to selling as well
