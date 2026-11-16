@@ -4,6 +4,7 @@ import { findRun } from '@/lib/accounts/data';
 import { forgetAccount } from '@/lib/accounts/forget';
 import { parseAccountKey, type AccountKey } from '@/lib/accounts/types';
 import { migrateStorage } from '@/lib/accounts/migrate';
+import { markStaleOps } from '@/lib/changes/log';
 import { AccountSyncJob } from '@/lib/decks/job';
 import { holdAwake } from '@/lib/keepalive';
 import { onMessage, sendMessage } from '@/lib/messaging';
@@ -21,6 +22,8 @@ const WATCHDOG = 'tithies-watchdog';
 
 export default defineBackground(() => {
   void migrateStorage().catch(() => {});
+  // An action that was changing a site when the previous worker died is never resumed.
+  void markStaleOps().catch(() => {});
 
   const notify = (run: Run, message?: string) => {
     const tabId = run.source.tabId;

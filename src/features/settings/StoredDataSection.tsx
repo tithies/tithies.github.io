@@ -6,6 +6,7 @@ import type { BulkRates } from '@/features/f2f-buylist/types';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { accountData, type AccountDataGroup } from '@/lib/accounts/data';
 import { accountLabel, type AccountKey, type AccountRow } from '@/lib/accounts/types';
+import { changeLogCounts } from '@/lib/changes/log';
 import { db, getMeta } from '@/lib/db';
 import { timeAgo } from '@/lib/format';
 import { getSettings, settingsItem } from '@/lib/settings';
@@ -39,21 +40,22 @@ type AccountStats = Awaited<ReturnType<typeof accountStats>>;
 function useStats(ttlHours: number, keys: AccountKey[]) {
   return useLiveQuery(async () => {
     const cutoff = Date.now() - ttlHours * 3600_000;
-    const [lookups, fresh, oldest, bulk, sets, perAccount] = await Promise.all([
+    const [lookups, fresh, oldest, bulk, sets, changes, perAccount] = await Promise.all([
       db.f2fCache.count(),
       ttlHours > 0 ? db.f2fCache.where('fetchedAt').aboveOrEqual(cutoff).count() : 0,
       db.f2fCache.orderBy('fetchedAt').first(),
       getMeta<BulkRates>('bulkRates'),
       getMeta<{ fetchedAt: number; sets: string[] }>('f2fSets'),
+      changeLogCounts(),
       Promise.all(keys.map(accountStats)),
     ]);
     const accounts = Object.fromEntries(keys.map((k, i) => [k, perAccount[i]])) as Record<AccountKey, AccountStats>;
-    return { lookups, fresh, oldest: oldest?.fetchedAt, bulk, sets, accounts };
+    return { lookups, fresh, oldest: oldest?.fetchedAt, bulk, sets, changeOps: changes.ops, changeCalls: changes.calls, changesRunning: changes.running, accounts };
   }, [ttlHours, keys.join(',')]);
 }
 
 interface Row {
-  /** 'f2fCache', or `${accountKey}|${group}`. */
+  /** 'f2fCache', 'changeLog', or `${accountKey}|${group}`. */
   id: string;
   group: DataGroup;
   account: AccountRow | null;
@@ -139,7 +141,7 @@ export function StoredDataSection() {
     void navigator.storage?.estimate?.().then((e) => setUsage(e.usage ?? null));
     void Promise.all([measureStoredData(null), ...keys.map((k) => measureStoredData(k).then((m) => [k, m] as const))])
       .then(([shared, ...perAccount]) => {
-        const out: Record<string, number> = { f2fCache: shared.f2fCache };
+        const out: Record<string, number> = { f2fCache: shared.f2fCache, changeLog: shared.changeLog };
         for (const [k, m] of perAccount) for (const g of ['decks', 'collection', 'runs'] as const) out[`${k}|${g}`] = m[g];
         setSizes(out);
       })
@@ -165,8 +167,20 @@ export function StoredDataSection() {
     effect: 'Shared by every account. The next run looks every card up again, and fetches the bulk rates and the set list again.',
     empty: !s.lookups && !s.bulk && !s.sets,
   };
+  const changeLog: Row = {
+    id: 'changeLog',
+    group: 'changeLog',
+    account: null,
+    title: 'Change log',
+    kind: YOURS,
+    details: [`${n(s.changeOps)} action${s.changeOps === 1 ? '' : 's'} (exports…) of every account`, `${n(s.changeCalls)} changes sent to the sites, in detail`],
+    effect:
+      "The only record of what Tithies changed on your sites (and of the cards an export removed): it is gone for good. Nothing on the sites is touched.",
+    empty: !s.changeOps,
+    blocked: s.changesRunning ? 'An export is running: wait for it to finish.' : undefined,
+  };
   const blocks: { account: AccountRow | null; rows: Row[] }[] = [
-    { account: null, rows: [shared] },
+    { account: null, rows: [shared, changeLog] },
     ...accounts.filter((a) => s.accounts[a.key]).map((a) => ({ account: a, rows: accountRows(a, s.accounts[a.key]) })),
   ];
   const rows = blocks.flatMap((b) => b.rows);
@@ -187,7 +201,8 @@ export function StoredDataSection() {
   const clear = async () => {
     setBusy(true);
     try {
-      if (chosen.some((r) => r.group === 'f2fCache')) await clearStoredData(['f2fCache'], null);
+      const global = chosen.filter((r) => r.group === 'f2fCache' || r.group === 'changeLog').map((r) => r.group);
+      if (global.length) await clearStoredData(global, null);
       for (const a of accounts) {
         const groups = chosen.filter((r) => r.account?.key === a.key).map((r) => r.group);
         if (groups.length) await clearStoredData(groups, a.key);
@@ -362,6 +377,11 @@ export function StoredDataSection() {
               </List.Item>
             ))}
           </List>
+          {chosen.some((r) => r.group === 'changeLog') && (
+            <Alert color="red" variant="light" icon={<IconAlertTriangle size={18} />}>
+              The change log is deleted for good: you won't be able to see what Tithies changed on your sites, or download the cards an export removed.
+            </Alert>
+          )}
           {runsChosen > 0 && (
             <Alert color="red" variant="light" icon={<IconAlertTriangle size={18} />}>
               {n(runsChosen)} Selling run{runsChosen === 1 ? ' is' : 's are'} deleted for good. This can't be undone.

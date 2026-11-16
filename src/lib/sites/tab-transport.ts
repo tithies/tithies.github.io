@@ -238,9 +238,17 @@ export class TabTransport {
     }
   }
 
-  /** One request. Never throws (except when cancelled): failures come back as `{ ok: false }`. */
+  /**
+   * One request. Never throws (except when cancelled): failures come back as `{ ok: false }`.
+   *
+   * A write (`mutate`) is never sent twice: when the tab is lost while it may have been sent, the
+   * answer is `tab_lost` (outcome unknown) instead of trying again in another tab. It is still
+   * sent again when the page refused it before sending (wrong account, expired session).
+   */
   call = async (req: SiteRequest): Promise<SiteResult> => {
     const { label } = this.site;
+    const resend = req.kind !== 'mutate';
+    const lostWrite = () => siteFail(0, 'tab_lost', `Lost the ${label} tab while the change was being sent: check on ${label} whether it was made.`);
     for (;;) {
       let tabId: number;
       try {
@@ -256,11 +264,13 @@ export class TabTransport {
       } catch {
         // The tab was closed, reloaded or navigated away mid-request.
         this.tabId = null;
+        if (!resend) return lostWrite();
         if (this.reacquired++ < this.maxReacquire) continue;
         return siteFail(0, 'tab_lost', `Lost the ${label} tab (closed or reloaded). Try again.`);
       }
       if (res == null) {
         this.tabId = null;
+        if (!resend) return lostWrite();
         if (this.reacquired++ < this.maxReacquire) continue;
         return siteFail(0, 'tab_lost', `The ${label} tab stopped answering. Reload it and try again.`);
       }
@@ -273,6 +283,8 @@ export class TabTransport {
         // The tab now belongs to another account: look for another tab still logged in as the right one.
         // (A failure made as nobody, e.g. "no session", is handled below like any failure.)
         const otherAccount = res.as ? res.as.userId !== this.expected?.userId : res.ok;
+        // A write answered as someone else was made (the page checks the account before sending, so it shouldn't happen): never again.
+        if (!resend && res.ok && otherAccount) return siteFail(0, 'wrong_account', `${label} made the change as another account.`, res.as);
         if ((!res.ok && res.code === 'wrong_account') || otherAccount) {
           this.tabId = null;
           if (this.reacquired++ < this.maxReacquire) continue;

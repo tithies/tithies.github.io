@@ -2,7 +2,7 @@ import { defineContentScript } from '#imports';
 import { bridge } from '@/lib/sites/moxfield/bridge';
 import { MOX_API_HOST } from '@/lib/sites/moxfield/constants';
 import { isLogoutPath, STARTUP_PATH } from '@/lib/sites/moxfield/identity';
-import { MoxPageSession } from '@/lib/sites/moxfield/page-api';
+import { MoxPageSession, type PageFetch } from '@/lib/sites/moxfield/page-api';
 
 /**
  * Runs in Moxfield's own JS world. It watches the API requests the page makes to know its
@@ -19,7 +19,10 @@ export default defineContentScript({
   main() {
     const session = new MoxPageSession((info) => void bridge.sendMessage('sessionChanged', info).catch(() => {}));
     const origFetch = window.fetch.bind(window);
-    const pageFetch = (url: string, headers: Record<string, string>) => origFetch(url, { headers, credentials: 'include' });
+    const pageFetch: PageFetch = (url, headers, init) =>
+      init
+        ? origFetch(url, { method: init.method, headers: init.contentType ? { ...headers, 'content-type': init.contentType } : headers, body: init.body, credentials: 'include' })
+        : origFetch(url, { headers, credentials: 'include' });
 
     const apiUrl = (url: string): URL | null => {
       try {

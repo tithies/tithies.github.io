@@ -1,6 +1,6 @@
 import { ActionIcon, AppShell, Burger, Group, NavLink, Text, Title, Tooltip, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconArrowsDiff, IconCards, IconCash, IconHistory, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
+import { IconArrowsDiff, IconCards, IconCash, IconHistory, IconListDetails, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
 import { Link, Outlet, useLocation } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { AccountSelector } from '@/lib/ui/AccountSelector';
@@ -74,6 +74,14 @@ export function Layout() {
           ))}
         </AppShell.Section>
         <AppShell.Section>
+          <NavLink
+            component={Link}
+            to="/changes"
+            label="Change log"
+            leftSection={<IconListDetails size={18} />}
+            active={pathname === '/changes'}
+            className="ti-nav-on-art"
+          />
           <NavLink
             component={Link}
             to="/settings"

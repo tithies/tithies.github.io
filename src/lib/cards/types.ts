@@ -38,6 +38,10 @@ export interface CollectionEntry {
   isAlter: boolean;
   /** "paper", "mtgo" or "arena" when the site says (collection rows only). */
   game?: string;
+  /** The site's language id (Moxfield: "LD58x" = English), when known. */
+  langId?: string;
+  /** The binder the entry is in (the site's binder id), if any. */
+  binderId?: string;
   card: CardPrint;
 }
 

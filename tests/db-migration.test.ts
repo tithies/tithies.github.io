@@ -27,16 +27,16 @@ async function oldDatabase(name: string, withV2 = true) {
   old.close();
 }
 
-describe('Database upgrade to per-account data (v3)', () => {
+describe('Database upgrade to per-account data (v3, then the change log in v4)', () => {
   for (const [label, withV2] of [['v2', true], ['v1', false]] as const) {
     it(`drops data that has no account and keeps the F2F caches (from ${label})`, async () => {
       const name = `migration-${label}`;
       await oldDatabase(name, withV2);
       const db = new TithiesDB(name);
       await db.open();
-      expect(db.verno).toBe(3);
+      expect(db.verno).toBe(4);
       expect(db.tables.map((t) => t.name).sort()).toEqual(
-        ['accountDeckCards', 'accountDecks', 'accountMeta', 'accounts', 'collectionEntries', 'f2fCache', 'items', 'meta', 'runs'].sort(),
+        ['accountDeckCards', 'accountDecks', 'accountMeta', 'accounts', 'changeCalls', 'changeOps', 'collectionEntries', 'f2fCache', 'items', 'meta', 'runs'].sort(),
       );
       expect(await db.runs.count()).toBe(0);
       expect(await db.items.count()).toBe(0);

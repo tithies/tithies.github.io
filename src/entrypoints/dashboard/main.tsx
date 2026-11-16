@@ -10,6 +10,7 @@ import { RunsPage } from '@/features/f2f-buylist/ui/RunsPage';
 import { RunDetailPage } from '@/features/f2f-buylist/ui/RunDetailPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { ComparisonPage } from '@/features/collection-comparison/ui/ComparisonPage';
+import { ChangeLogPage } from '@/features/change-log/ChangeLogPage';
 
 const theme = createTheme({
   primaryColor: 'blue',
@@ -40,6 +41,7 @@ const router = createHashRouter([
       { path: 'f2f/runs', element: <RunsPage /> },
       { path: 'f2f/runs/:runId', element: <RunDetailPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'changes', element: <ChangeLogPage /> },
       { path: 'f2f/settings', element: <Navigate to="/settings" replace /> },
       { path: 'decks/comparisons', element: <ComparisonPage /> },
       { path: 'decks/mismatches', element: <Navigate to="/decks/comparisons" replace /> },

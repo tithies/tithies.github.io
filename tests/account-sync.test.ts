@@ -50,6 +50,7 @@ function moxTabs(account: SiteIdentity | null = ALICE) {
   port.answer = (as, { req }): SiteResult => {
     if (req.kind === 'deckList') return { ok: true, kind: 'deckList', decks: DECKS[as.userId] ?? [] };
     if (req.kind === 'deck') return { ok: true, kind: 'deck', lastUpdatedAt: '', cards: CARDS };
+    if (req.kind !== 'collection') throw new Error(`unexpected ${req.kind}`);
     const half = Math.ceil(ENTRIES.length / 2);
     const entries = as.userId === ALICE.userId ? (req.pageNumber === 1 ? ENTRIES.slice(0, half) : ENTRIES.slice(half)) : ENTRIES.slice(0, 1);
     return { ok: true, kind: 'collection', entries, totalResults: ENTRIES.length, totalPages: 2, pageSize: req.pageSize };

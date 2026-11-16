@@ -40,6 +40,8 @@ export function normalizeEntry(raw: any): CollectionEntry | null {
     isProxy: Boolean(raw.isProxy),
     isAlter: Boolean(raw.isAlter),
     game: raw.game == null || raw.game === '' ? undefined : str(raw.game).toLowerCase(),
+    ...(raw.language?.id ? { langId: str(raw.language.id) } : {}),
+    ...(raw.tradeBinder?.id ? { binderId: str(raw.tradeBinder.id) } : {}),
     card: {
       id: str(c.id),
       scryfallId: str(c.scryfall_id),

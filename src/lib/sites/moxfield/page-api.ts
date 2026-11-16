@@ -9,12 +9,13 @@
  */
 import type { CollectionEntry } from '@/lib/cards/types';
 import { siteFail, type SiteApiCall, type SiteIdentity, type SiteResult, type SiteTabStatus } from '@/lib/sites/types';
-import { runMoxRequest } from './api';
+import { runMoxRequest, type WriteInit } from './api';
 import { identityFromAuthorization, tokenFromStartup, type TokenInfo } from './identity';
 import { isCollectionSearchUrl, normalizeEntry, withPaging, type CollectionPage } from './normalize';
 
 export type Headers = Record<string, string>;
-export type PageFetch = (url: string, headers: Headers) => Promise<Response>;
+/** The page's own fetch with the session headers; `init` for writes (method and body). */
+export type PageFetch = (url: string, headers: Headers, init?: WriteInit) => Promise<Response>;
 
 export interface SessionInfo {
   hasAuth: boolean;
@@ -202,7 +203,7 @@ export class MoxPageSession {
       if (as.userId !== expect) return siteFail(0, 'wrong_account', `Moxfield is logged in as ${as.userName} in this tab.`, as);
     }
     const headers = { ...snap.headers };
-    const res = await runMoxRequest(req, (url) => doFetch(url, headers));
+    const res = await runMoxRequest(req, (url, init) => doFetch(url, headers, init));
     // The token was refused: don't offer this session again until the page gets a new one.
     if (!res.ok && res.code === 'no_auth') this.drop(headers.authorization);
     return { ...res, as };

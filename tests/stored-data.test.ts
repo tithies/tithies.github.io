@@ -6,6 +6,7 @@ import { db, getMeta, putMeta } from '@/lib/db';
 import { getSettings, overlayCollapsedItem, saveSettings } from '@/lib/settings';
 import { comparisonConfigKey } from '@/features/collection-comparison/config';
 import { clearStoredData, listStoredPreferences, measureStoredData, resetAllSettings } from '@/features/settings/stored-data';
+import { listOps, startOp, writeLogger } from '@/lib/changes/log';
 import { newAccount, resetDb } from './helpers';
 
 // Rows only need their keys for these tests.
@@ -33,6 +34,8 @@ async function fill() {
   await db.f2fCache.add(row({ key: 'k1', fetchedAt: Date.now() }));
   await putMeta('bulkRates', { fetchedAt: 1 });
   await putMeta('f2fSets', { fetchedAt: 1, sets: ['Alpha'] });
+  const opId = await startOp({ site: 'moxfield', accountKey: A.key, userName: 'alice', kind: 'export', title: 'Export', source: 'test', details: {} });
+  await writeLogger(opId).begin({ method: 'POST', url: 'u', body: 'b' });
 }
 
 const counts = async (data: AccountData) => ({
@@ -78,7 +81,11 @@ describe('Settings → Stored data', () => {
 
   it('clears everything of an account', async () => {
     await clearStoredData(['f2fCache', 'decks', 'collection', 'runs'], A.key);
-    expect(await measureStoredData(A.key)).toEqual({ f2fCache: 0, decks: 0, collection: 0, runs: 0 });
+    expect(await measureStoredData(A.key)).toMatchObject({ f2fCache: 0, decks: 0, collection: 0, runs: 0 });
+    // The change log is its own (global) group.
+    expect(await listOps()).toHaveLength(1);
+    await clearStoredData(['changeLog'], null);
+    expect(await measureStoredData(A.key)).toEqual({ f2fCache: 0, changeLog: 0, decks: 0, collection: 0, runs: 0 });
     expect(await counts(A.data)).toEqual({ runs: 0, items: 0, decks: 0, deckCards: 0, decksMeta: false, collection: 0, collectionMeta: false });
     expect(await counts(B.data)).toEqual(full);
     // Only the current-account pointer is left in the global meta table.

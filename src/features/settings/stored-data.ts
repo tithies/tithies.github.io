@@ -13,15 +13,16 @@ import { db } from '@/lib/db';
 import { sendMessage } from '@/lib/messaging';
 import { clearCaches } from '@/features/f2f-buylist/runner';
 import { ACCOUNT_STORAGE_PREFIXES } from '@/lib/accounts/storage-keys';
+import { clearChangeLog, measureChangeLog } from '@/lib/changes/log';
 
 const COMPARISON_PREFIX = ACCOUNT_STORAGE_PREFIXES.collectionComparison.slice('local:'.length);
 
-/** The groups of IndexedDB data the user can clear: the shared F2F cache, or one account's data. */
-export type DataGroup = 'f2fCache' | AccountDataGroup;
+/** The groups of IndexedDB data the user can clear: the shared F2F cache, the change log (every account's), or one account's data. */
+export type DataGroup = 'f2fCache' | 'changeLog' | AccountDataGroup;
 export const ACCOUNT_GROUPS: AccountDataGroup[] = ['decks', 'collection', 'runs'];
-export const DATA_GROUPS: DataGroup[] = ['f2fCache', ...ACCOUNT_GROUPS];
+export const DATA_GROUPS: DataGroup[] = ['f2fCache', 'changeLog', ...ACCOUNT_GROUPS];
 
-const isAccountGroup = (g: DataGroup): g is AccountDataGroup => g !== 'f2fCache';
+const isAccountGroup = (g: DataGroup): g is AccountDataGroup => g !== 'f2fCache' && g !== 'changeLog';
 
 /**
  * Empties the chosen groups (account groups: of `accountKey`'s data only). Active Selling runs
@@ -34,6 +35,7 @@ export async function clearStoredData(groups: Iterable<DataGroup>, accountKey: A
     for (const runId of await data.runs.activeIds()) await sendMessage('controlRun', { runId, action: 'cancel' }).catch(() => undefined);
   }
   if (g.has('f2fCache')) await clearCaches();
+  if (g.has('changeLog')) await clearChangeLog();
   const own = [...g].filter(isAccountGroup);
   if (data && own.length) await data.clear(own);
 }
@@ -54,12 +56,13 @@ async function tableSize(table: Table): Promise<number> {
  * rows until the browser compacts them, later. Reads every row, so call it on demand.
  */
 export async function measureStoredData(accountKey: AccountKey | null): Promise<Record<DataGroup, number>> {
-  const [lookups, f2fMeta, own] = await Promise.all([
+  const [lookups, f2fMeta, changes, own] = await Promise.all([
     tableSize(db.f2fCache),
     db.meta.bulkGet(['bulkRates', 'f2fSets']).then((rows) => rows.reduce((sum, r) => sum + (r ? jsonSize(r) : 0), 0)),
+    measureChangeLog().then((m) => m.bytes),
     accountKey ? accountData(accountKey).measure() : Promise.resolve({ decks: 0, collection: 0, runs: 0 }),
   ]);
-  return { f2fCache: lookups + f2fMeta, ...own };
+  return { f2fCache: lookups + f2fMeta, changeLog: changes, ...own };
 }
 
 /** What each known preference key holds, for the "Reset all settings" list. */

@@ -3,6 +3,7 @@ import type { AccountRow } from '@/lib/accounts/types';
 import type { CollectionEntry } from '@/lib/cards/types';
 import type { CacheEntry, Item, Run } from '@/features/f2f-buylist/types';
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
+import type { ChangeCall, ChangeOp } from '@/lib/changes/types';
 
 export interface MetaRow {
   key: string;
@@ -23,7 +24,9 @@ export interface AccountMetaRow {
 /**
  * Extension-wide IndexedDB (shared by the background worker and extension pages).
  *
- * Global tables: `f2fCache`, `meta` (F2F caches and the current account), `accounts`.
+ * Global tables: `f2fCache`, `meta` (F2F caches and the current account), `accounts`, and the
+ * change log (`changeOps`, `changeCalls`: every write made to a site, each tagged with its account;
+ * only src/lib/changes/log.ts touches them).
  * Every other table holds one account's data, keyed by `accountKey`: only the access layer in
  * src/lib/accounts/data.ts (and the Selling runner, for runs and items) may touch them. A test
  * (tests/account-scope.test.ts) enforces it.
@@ -42,6 +45,10 @@ export class TithiesDB extends Dexie {
   collectionEntries!: Table<Scoped<CollectionEntry>, [string, string]>;
   /** Per-account state: 'decks' (DecksMeta), 'collection' (CollectionMeta), 'sync' (SyncState). */
   accountMeta!: Table<AccountMetaRow, [string, string]>;
+  /** Change log: one row per user action that changed a site. */
+  changeOps!: EntityTable<ChangeOp, 'id'>;
+  /** Change log: every write request, by action. */
+  changeCalls!: Table<ChangeCall, [number, number]>;
 
   constructor(name = 'tithies') {
     super(name);
@@ -77,6 +84,11 @@ export class TithiesDB extends Dexie {
         await tx.table('runs').clear();
         await tx.table('meta').bulkDelete(['decks', 'moxCollection', 'moxSync']);
       });
+    // v4: the change log.
+    this.version(4).stores({
+      changeOps: '++id, startedAt, accountKey, status',
+      changeCalls: '[opId+seq], opId',
+    });
   }
 }
 

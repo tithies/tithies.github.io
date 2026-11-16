@@ -1,6 +1,6 @@
 import type { BoardInfo } from '@/lib/decks/types';
 import type { SitePacing } from './client';
-import type { SiteType } from './types';
+import type { DescribedRequest, SiteMutation, SiteType } from './types';
 
 /**
  * Everything the rest of Tithies needs to know about one collection site. Adding a site means
@@ -23,7 +23,13 @@ export interface SiteProvider {
     collection: boolean;
     /** The site's own collection page can start a Selling run from what it shows (the panel). */
     collectionCapture: boolean;
+    /** Cards can be exported to the site: into binders, and into the collection. */
+    exportTo: { binders: boolean; collection: boolean };
   };
+  /** The request a write makes, for the change log; null when the site doesn't make that write. */
+  describeMutation(op: SiteMutation): DescribedRequest | null;
+  /** A binder's page on the site. */
+  binderUrl(publicId: string): string;
   /** The site's deck boards, in display order. */
   boards: BoardInfo[];
   boardLabel(key: string): string;

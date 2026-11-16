@@ -1,7 +1,18 @@
 import PQueue from 'p-queue';
 import type { CollectionEntry } from '@/lib/cards/types';
 import type { DeckCard, DeckSummary } from '@/lib/decks/types';
-import { siteFail, type SiteErrorCode, type SiteIdentity, type SiteRequest, type SiteResult, type SiteSuccess } from './types';
+import {
+  siteFail,
+  type DescribedRequest,
+  type SiteBinder,
+  type SiteErrorCode,
+  type SiteFailure,
+  type SiteIdentity,
+  type SiteMutation,
+  type SiteRequest,
+  type SiteResult,
+  type SiteSuccess,
+} from './types';
 
 /** Sends one request to a site (in practice: through a logged-in tab of that site). */
 export type SiteTransport = (req: SiteRequest) => Promise<SiteResult>;
@@ -32,6 +43,11 @@ export class SiteWrongAccountError extends SiteError {
     super(message, 0, 'wrong_account');
   }
 }
+/**
+ * A write may or may not have been made (timeout, lost tab, network error, server error): it is
+ * never sent again automatically. The site must be checked (Tithies' verification does it).
+ */
+export class SiteUnknownOutcomeError extends SiteError {}
 export class CancelledError extends Error {
   constructor() {
     super('Cancelled');
@@ -53,9 +69,34 @@ export interface SitePacing {
   maxIntervalMs: number;
 }
 
+/** What the change log learns about one write. */
+export interface WriteOutcome {
+  /** ok: made; failed: refused (nothing changed); unknown: maybe made. */
+  outcome: 'ok' | 'failed' | 'unknown';
+  status: number;
+  durationMs: number;
+  response?: string;
+  error?: string;
+  as?: SiteIdentity | null;
+}
+
+/** Records every write: `begin` right before it is sent, `end` once its outcome is known. */
+export interface WriteLogger {
+  begin(req: DescribedRequest): Promise<number>;
+  end(handle: number, outcome: WriteOutcome): Promise<void>;
+}
+
+/** Failures that mean the site didn't make the change: refused before sending, or by the server (4xx). */
+export function writeNotMade(res: SiteFailure): boolean {
+  if (res.code === 'wrong_account' || res.code === 'no_tab' || res.code === 'bad_request' || res.code === 'no_auth') return true;
+  return res.code === 'http' && res.status >= 400 && res.status < 500;
+}
+
 export interface SiteClientOptions extends SitePacing {
   /** The site's name in messages ("Moxfield is rate limiting Tithies…"). */
   label: string;
+  /** The request a write makes, for the change log (the site provider's describeMutation). */
+  describeMutation?: (op: SiteMutation) => DescribedRequest | null;
   /**
    * The account every answer must have been made as (a userId; read before each answer, so it
    * can be bound late). Any answer made as someone else fails with SiteWrongAccountError before
@@ -166,6 +207,79 @@ export class SiteClient {
       }
       throw new SiteError(res.message, res.status, res.code);
     }
+  }
+
+  /**
+   * One write, logged before it is sent and once its outcome is known (every write must be: there
+   * is no other way to make one). It is sent again only when the site refused it (HTTP 429: after
+   * the rate-limit waits); an unknown outcome throws SiteUnknownOutcomeError and is never retried.
+   */
+  mutate(op: SiteMutation, log: WriteLogger): Promise<Extract<SiteSuccess, { kind: 'mutate' }>> {
+    if (!log) throw new Error('Every change must be logged');
+    const described = this.opts.describeMutation?.(op);
+    if (!described) throw new SiteError(`${this.opts.label} can't make this change`, 0, 'bad_request');
+    return this.queue.add(() => this.sendWrite(op, described, log)) as Promise<Extract<SiteSuccess, { kind: 'mutate' }>>;
+  }
+
+  private async sendWrite(op: SiteMutation, described: DescribedRequest, log: WriteLogger): Promise<Extract<SiteSuccess, { kind: 'mutate' }>> {
+    const { label } = this.opts;
+    let rateLimited = 0;
+    for (;;) {
+      this.checkCancelled();
+      const wait = this.lastAt + this.interval + (this.opts.random ?? Math.random)() * this.opts.jitterMs - this.now();
+      if (this.lastAt && wait > 0) await this.sleep(wait);
+      this.checkCancelled();
+      this.requests++;
+      const handle = await log.begin(described);
+      const t0 = this.now();
+      let res: SiteResult;
+      try {
+        res = await this.transport({ kind: 'mutate', op });
+      } catch (e) {
+        if (e instanceof CancelledError) {
+          await log.end(handle, { outcome: 'unknown', status: 0, durationMs: this.now() - t0, error: 'Cancelled while the change was being sent' });
+          throw e;
+        }
+        res = siteFail(0, 'network', e instanceof Error ? e.message : String(e));
+      } finally {
+        this.lastAt = this.now();
+      }
+      const w = res.ok ? (res.kind === 'mutate' ? res : null) : res;
+      const base = { status: w?.status ?? 0, durationMs: this.now() - t0, response: w?.response, as: res.as };
+      const expected = this.opts.expectedUserId?.();
+      if (res.ok) {
+        if (res.kind !== 'mutate') {
+          await log.end(handle, { ...base, outcome: 'unknown', error: `Unexpected answer (${res.kind})` });
+          throw new SiteUnknownOutcomeError(`${label} answered something unexpected: check whether the change was made.`, 0, 'parse');
+        }
+        if (expected !== undefined && res.as?.userId !== expected) {
+          const who = res.as ? res.as.userName : 'an unknown account';
+          await log.end(handle, { ...base, outcome: 'ok', error: `Made as ${who}` });
+          throw new SiteWrongAccountError(`${label} made the change as ${who}.`, res.as ?? null);
+        }
+        await log.end(handle, { ...base, outcome: 'ok' });
+        return res;
+      }
+      const made = !writeNotMade(res) ? 'unknown' : 'failed';
+      await log.end(handle, { ...base, outcome: made, error: res.message });
+      if (res.code === 'wrong_account') throw new SiteWrongAccountError(res.message, res.as ?? null);
+      if (res.status === 429) {
+        const waitMs = this.opts.rateLimitWaitsMs[rateLimited];
+        if (waitMs == null) throw new SiteRateLimitError(`${label} is rate limiting Tithies. Wait a few minutes, then try again.`, 429, 'rate_limited');
+        rateLimited++;
+        this.interval = Math.min(this.opts.maxIntervalMs, Math.round(this.interval * 1.5));
+        this.opts.onWait?.(`${label} is rate limiting: retrying in ${Math.round(waitMs / 1000)} s (${rateLimited}/${this.opts.rateLimitWaitsMs.length})`, waitMs);
+        await this.sleep(waitMs);
+        continue;
+      }
+      if (res.code === 'no_auth') throw new SiteAuthError(res.message, res.status, res.code);
+      if (made === 'unknown') throw new SiteUnknownOutcomeError(`${res.message}. Tithies doesn't know whether ${label} made the change, so it stopped.`, res.status, res.code);
+      throw new SiteError(res.message, res.status, res.code);
+    }
+  }
+
+  async binders(): Promise<SiteBinder[]> {
+    return (await this.request({ kind: 'binders' })).binders;
   }
 
   private request<K extends SiteSuccess['kind']>(req: SiteRequest & { kind: K }): Promise<Extract<SiteSuccess, { kind: K }>> {
