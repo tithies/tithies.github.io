@@ -3,7 +3,7 @@
  * Pure: safe to import from the background worker.
  */
 export const ACCOUNT_STORAGE_PREFIXES = {
-  /** Collection comparisons: the inputs and the saved presets. */
+  /** Comparison: the inputs and the saved presets. */
   collectionComparison: 'local:collectionComparison:',
   /** Before presets (moved by migrateStorage); still removed by Forget in case one is left. */
   legacyDeckMismatchConfig: 'local:deckMismatchConfig:',

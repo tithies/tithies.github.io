@@ -41,7 +41,9 @@ export function MenuArt() {
     let frameId = 0;
     let lastTime = 0;
     const frame = (now: number) => {
-      scene.update(Math.min(3, (now - lastTime) / 16.667));
+      // The first frame's timestamp can be a little earlier than the performance.now() taken
+      // when it was requested: never step back in time (particles would get a negative age).
+      scene.update(Math.max(0, Math.min(3, (now - lastTime) / 16.667)));
       lastTime = now;
       scene.render();
       frameId = requestAnimationFrame(frame);

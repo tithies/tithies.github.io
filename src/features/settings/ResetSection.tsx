@@ -103,8 +103,8 @@ export function ResetSection() {
       <Modal opened={confirming} onClose={() => setConfirming(false)} title="Reset all settings to their defaults?" centered>
         <Stack>
           <Text size="sm">
-            Every tool's settings, the Collection comparisons inputs, hidden columns, page sizes, the theme and the Moxfield panel go back to their defaults. Runs,
-            synced decks, caches and saved Collection comparisons presets are kept.
+            Every tool's settings, the Comparison inputs, hidden columns, page sizes, the theme and the Moxfield panel go back to their defaults. Runs,
+            synced decks, caches and saved Comparison presets are kept.
           </Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setConfirming(false)}>

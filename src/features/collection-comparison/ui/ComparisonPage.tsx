@@ -276,7 +276,7 @@ export function ComparisonPage() {
 
   const header = (
     <Stack gap={4}>
-      <Title order={2}>Collection comparisons</Title>
+      <Title order={2}>Comparison</Title>
       <Text size="sm" c="dimmed">
         Your decks compared with your collection: deck cards the collection doesn't have, and collection cards no deck uses. Compared by exact print
         (set, collector number and finish); copies used by several decks add up.
@@ -419,7 +419,7 @@ export function ComparisonPage() {
         site={site}
         items={exportList.items}
         sourceAccountKey={key}
-        source={`Collection comparisons of ${account ? accountLabel(account) : 'an account'}`}
+        source={`Comparison of ${account ? accountLabel(account) : 'an account'}`}
         onClearExport={() => exportList.clear()}
       />
       <LeaveGuard prints={exportList.prints} summary={exportSummary(exportList)} />

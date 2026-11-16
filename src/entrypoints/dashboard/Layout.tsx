@@ -1,4 +1,4 @@
-import { ActionIcon, AppShell, Burger, Group, NavLink, Text, Title, Tooltip, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
+import { ActionIcon, AppShell, Burger, Divider, Group, NavLink, Text, Title, Tooltip, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconArrowsDiff, IconCards, IconCash, IconHistory, IconListDetails, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
 import { Link, Outlet, useLocation } from 'react-router';
@@ -19,7 +19,7 @@ const NAV = [
   {
     label: 'Decks',
     icon: IconCards,
-    links: [{ to: '/decks/comparisons', label: 'Collection comparisons', icon: IconArrowsDiff }],
+    links: [{ to: '/decks/comparison', label: 'Comparison', icon: IconArrowsDiff }],
   },
 ];
 
@@ -58,19 +58,27 @@ export function Layout() {
       <AppShell.Navbar p="xs">
         <MenuArt />
         <AppShell.Section grow>
-          {NAV.map((section) => (
-            <NavLink key={section.label} label={section.label} leftSection={<section.icon size={18} />} defaultOpened childrenOffset={12}>
+          {/* A section is a heading (small, bold, uppercase, with its icon) over its links; a line separates sections. */}
+          {NAV.map((section, i) => (
+            <div key={section.label}>
+              {i > 0 && <Divider my="sm" />}
+              <Group gap={6} px="sm" pt={i ? 0 : 6} pb={6} wrap="nowrap" c="dimmed">
+                <section.icon size={14} stroke={2.2} />
+                <Text size="xs" fw={700} tt="uppercase" style={{ letterSpacing: '0.07em' }}>
+                  {section.label}
+                </Text>
+              </Group>
               {section.links.map((l) => (
                 <NavLink
                   key={l.to}
                   component={Link}
                   to={l.to}
                   label={l.label}
-                  leftSection={<l.icon size={16} />}
+                  leftSection={<l.icon size={18} />}
                   active={pathname === l.to || (l.to === '/f2f/runs' && pathname.startsWith('/f2f/runs/'))}
                 />
               ))}
-            </NavLink>
+            </div>
           ))}
         </AppShell.Section>
         <AppShell.Section>

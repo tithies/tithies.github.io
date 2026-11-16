@@ -318,7 +318,7 @@ export function createFireScene(back: HTMLCanvasElement, front: HTMLCanvasElemen
   };
 
   const drawSprite = (context: CanvasRenderingContext2D, x: number, y: number, particle: Flame | Orbit) => {
-    const progress = particle.age / particle.life;
+    const progress = Math.min(1, Math.max(0, particle.age / particle.life || 0));
     const sprite = sprites[Math.min(sprites.length - 1, Math.floor(progress * sprites.length))];
     const size = particle.size * (1 - 0.65 * progress);
     context.globalAlpha = particle.alpha * (1 - progress);

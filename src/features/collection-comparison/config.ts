@@ -33,7 +33,7 @@ export interface ComparisonPreset {
 }
 
 /**
- * One account's Collection comparisons state: the inputs as they are now (saved on every change,
+ * One account's Comparison state: the inputs as they are now (saved on every change,
  * so a reload keeps them), the saved presets, and the preset the inputs were last loaded from or
  * saved to (null: none).
  */
@@ -144,7 +144,7 @@ export function deletePreset(s: ComparisonState, id: string): ComparisonState {
   return { ...s, presets: s.presets.filter((p) => p.id !== id), loadedPresetId: s.loadedPresetId === id ? null : s.loadedPresetId };
 }
 
-/** Extension-storage key of one account's Collection comparisons state. */
+/** Extension-storage key of one account's Comparison state. */
 export const comparisonConfigKey = (accountKey: string) => `${ACCOUNT_STORAGE_PREFIXES.collectionComparison}${accountKey}` as const;
 
 /**

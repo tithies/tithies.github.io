@@ -8,7 +8,7 @@ A toolbox for Magic: The Gathering collectors: a Chrome extension (MV3) that add
 
 ## Accounts
 
-Tithies keeps each Moxfield account apart: its Selling runs, synced decks, collection and Collection comparisons options and presets belong to it, and every page shows one account, picked at the top right of the dashboard (with the site's icon, and a green dot when it is logged in on Moxfield right now). Settings are shared by every account.
+Tithies keeps each Moxfield account apart: its Selling runs, synced decks, collection and Comparison options and presets belong to it, and every page shows one account, picked at the top right of the dashboard (with the site's icon, and a green dot when it is logged in on Moxfield right now). Settings are shared by every account.
 
 - **Accounts are added by an action**, never just because a Moxfield tab is open: "Check selling prices" in the Moxfield panel, a first "Sync decks", or "Switch Tithies to …". An action started from Moxfield runs as the account logged in there and switches the dashboard to it.
 - **One login per site at a time.** The browser holds one Moxfield login, so other accounts stay viewable from what Tithies already read, but only the logged-in account can be synced. Syncing an account while Moxfield is logged in as another one stops before anything is read, with a button to switch Tithies to the logged-in account instead. If the login changes in the middle of a sync, the sync stops at the first answer from the other account: what was read before is kept, and nothing is written into (or deleted from) the wrong account.
@@ -47,9 +47,9 @@ Runs are stored in IndexedDB and survive browser restarts. A run interrupted by 
 
 The F2F delays, the batch size, the cache TTL, the credit bonus and the fallback search can be changed under **Settings → Selling**, and the Moxfield pace under **Settings → Moxfield** (saved as you type). **Settings → Stored data** shows everything Tithies keeps in the browser (the shared F2F lookups and the change log, then each account's synced decks, collection and runs) and clears any part of it, or all of it; **Reset settings** puts every setting and preference back to its default (saved comparison presets are kept).
 
-## Feature 2 — Collection comparisons
+## Feature 2 — Comparison
 
-Normally every card in your decks is also in your collection, and every collection card sits in a deck. **Decks → Collection comparisons** in the dashboard lists every exact print (set, collector number and finish) where the two disagree, with quantities:
+Normally every card in your decks is also in your collection, and every collection card sits in a deck. **Decks → Comparison** in the dashboard lists every exact print (set, collector number and finish) where the two disagree, with quantities:
 
 - **Missing from collection**: copies your decks use that the collection doesn't have;
 - **Not in any deck**: collection copies no included deck uses.
