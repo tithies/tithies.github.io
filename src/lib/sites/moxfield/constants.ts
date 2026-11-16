@@ -9,7 +9,10 @@ export const MOX_SITE_URL = 'https://moxfield.com';
 export const MOX_TAB_PATTERNS = ['https://moxfield.com/*', 'https://www.moxfield.com/*'];
 /** Page Tithies opens when it needs a Moxfield tab (any logged-in page works). */
 export const MOX_SYNC_TAB_URL = 'https://moxfield.com/decks/personal';
-/** Largest collection page Moxfield accepts (verified 2026-11-09). */
+/**
+ * Collection page size Tithies asks for. Moxfield accepted 5000 (2026-11-09) but answers 100 rows
+ * per page since (2026-11-16); readers page with whatever size the answer says it used.
+ */
 export const MAX_COLLECTION_PAGE_SIZE = 5000;
 
 /**

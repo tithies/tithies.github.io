@@ -21,6 +21,7 @@ import {
   type SiteTransport,
 } from '@/lib/sites/client';
 import type { SiteProvider } from '@/lib/sites/provider';
+import type { SiteLock } from '@/lib/sites/lock';
 import type { SiteFailure, SiteIdentity } from '@/lib/sites/types';
 import { refreshCollection } from './collection';
 import { syncDecks } from './sync';
@@ -40,6 +41,8 @@ export interface SyncJobDeps {
   onActiveChange?(active: boolean): void;
   /** Overrides the provider's pacing (tests, settings). Read at each job start. */
   clientOptions?: Partial<SiteClientOptions> | (() => Promise<Partial<SiteClientOptions>>);
+  /** The site's lock, shared with the export job: one of them at a time. */
+  lock?: SiteLock;
 }
 
 export type StartSyncResult =
@@ -47,8 +50,8 @@ export type StartSyncResult =
   | {
       ok: false;
       error: string;
-      /** busy: another account's sync runs (`busyWith`); wrong_account / no_tab: no usable session (first sync). */
-      code: 'busy' | 'no_account' | 'wrong_account' | 'no_tab' | 'cancelled';
+      /** busy: another account's sync runs (`busyWith`); exporting: an export to the site runs; wrong_account / no_tab: no usable session (first sync). */
+      code: 'busy' | 'exporting' | 'no_account' | 'wrong_account' | 'no_tab' | 'cancelled';
       busyWith?: AccountKey;
       actual?: SiteIdentity | null;
     };
@@ -101,6 +104,9 @@ export class AccountSyncJob {
         if (collection && !running.state.withCollection) await this.patch(running, { withCollection: true });
         return { ok: true, jobId: running.state.jobId, accountKey: key, alreadyRunning: true };
       }
+      if (this.deps.lock && !this.deps.lock.tryAcquire('sync')) {
+        return { ok: false, code: 'exporting', error: `Tithies is exporting cards to ${this.site.label}: wait for it to finish (see the Change log), then sync.` };
+      }
       const abort = new AbortController();
       const promise = this.begin(accountKey, collection, abort);
       this.starting = { promise, abort };
@@ -108,6 +114,8 @@ export class AccountSyncJob {
         return await promise;
       } finally {
         if (this.starting?.promise === promise) this.starting = null;
+        // No job came out of it (or it is over already): free the site.
+        if (!this.active) this.deps.lock?.release('sync');
       }
     }
   }
@@ -246,6 +254,7 @@ export class AccountSyncJob {
     const running = job;
     running.done = this.run(running, transport).finally(() => {
       if (this.active === running) this.active = null;
+      if (!this.active) this.deps.lock?.release('sync');
       this.deps.onActiveChange?.(false);
     });
     return { ok: true, jobId: running.state.jobId, accountKey: running.data.key, alreadyRunning: false };

@@ -1,6 +1,8 @@
-import { ActionIcon, Anchor, Badge, Button, Group, HoverCard, Menu, MultiSelect, Paper, Stack, Switch, Table, Text, TextInput, Tooltip } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Group, HoverCard, Menu, MultiSelect, NumberInput, Paper, Stack, Switch, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { useDebouncedCallback, useLocalStorage } from '@mantine/hooks';
-import { IconDownload, IconExternalLink, IconSearch } from '@tabler/icons-react';
+import { IconDownload, IconExternalLink, IconSearch, IconShoppingCart, IconShoppingCartPlus, IconTrash, IconX } from '@tabler/icons-react';
+import { MAX_CART_QTY, type ExportCart } from '@/lib/export/cart';
+import { rowToItem } from '../export';
 import { DataTable, type DataTableColumn, type DataTableSortStatus } from 'mantine-datatable';
 import { useStickyTableHeader } from '@/lib/ui/useStickyTableHeader';
 import { useEffect, useMemo, useState } from 'react';
@@ -84,8 +86,53 @@ function DeckUses({ row, decks, boardLabel }: { row: ComparisonRow; decks: Reado
   );
 }
 
-function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: string) => string): DataTableColumn<ComparisonRow>[] {
+/** Add to the cart, or (in it) its quantity and remove. */
+function CartCell({ row, cart }: { row: ComparisonRow; cart: ExportCart }) {
+  const item = cart.get(row.key);
+  if (!item) {
+    return (
+      <Tooltip label={`Add to the export cart (×${Math.abs(row.diff)})`}>
+        <ActionIcon variant="subtle" onClick={() => cart.add([rowToItem(row)])} aria-label={`Add ${row.name} to the export cart`}>
+          <IconShoppingCartPlus size={16} />
+        </ActionIcon>
+      </Tooltip>
+    );
+  }
+  return (
+    <Group gap={2} wrap="nowrap">
+      <NumberInput
+        size="xs"
+        w={64}
+        min={1}
+        max={MAX_CART_QTY}
+        allowDecimal={false}
+        value={item.qty}
+        onChange={(v) => typeof v === 'number' && cart.setQty(row.key, v)}
+        aria-label={`Copies of ${row.name} to export`}
+      />
+      <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => cart.remove([row.key])} aria-label={`Remove ${row.name} from the export cart`}>
+        <IconX size={14} />
+      </ActionIcon>
+    </Group>
+  );
+}
+
+function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: string) => string, cart?: ExportCart): DataTableColumn<ComparisonRow>[] {
   return [
+    ...(cart
+      ? [
+          {
+            accessor: 'cart',
+            title: (
+              <Tooltip label="Export cart: what to export to a binder or a collection">
+                <IconShoppingCart size={16} />
+              </Tooltip>
+            ),
+            ...tight,
+            render: (r: ComparisonRow) => <CartCell row={r} cart={cart} />,
+          } satisfies DataTableColumn<ComparisonRow>,
+        ]
+      : []),
     {
       accessor: 'kind',
       title: '',
@@ -191,6 +238,10 @@ function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: s
 
 interface Props {
   rows: ComparisonRow[];
+  /** Every row of the comparison, shown or not (for the cart shortcuts). */
+  allRows?: ComparisonRow[];
+  /** The page's export cart (adds a cart column and shortcuts). */
+  cart?: ExportCart;
   decks: ReadonlyMap<string, DeckRow>;
   /** The decks' site board names ("Sideboard"…). */
   boardLabel: (board: string) => string;
@@ -198,7 +249,7 @@ interface Props {
   emptyText: string;
 }
 
-export function ComparisonTable({ rows, decks, boardLabel, loading, emptyText }: Props) {
+export function ComparisonTable({ rows, allRows = rows, cart, decks, boardLabel, loading, emptyText }: Props) {
   const tableRef = useStickyTableHeader();
   const [params, setParams] = useSearchParams();
   const [pageSize, setPageSize] = useLocalStorage({ key: 'tithies:decks:pageSize', defaultValue: 50 });
@@ -216,7 +267,10 @@ export function ComparisonTable({ rows, decks, boardLabel, loading, emptyText }:
   const lastPage = Math.max(1, Math.ceil(view.length / pageSize));
   const safePage = Math.min(page, lastPage);
   const records = view.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const columns = useMemo(() => buildColumns(decks, boardLabel), [decks, boardLabel]);
+  const columns = useMemo(() => buildColumns(decks, boardLabel, cart), [decks, boardLabel, cart]);
+  const missingRows = useMemo(() => allRows.filter((r) => r.kind === 'missing'), [allRows]);
+  const unassignedRows = useMemo(() => allRows.filter((r) => r.kind === 'unassigned'), [allRows]);
+  const shownInCart = cart ? view.filter((r) => cart.has(r.key)).length : 0;
   const sortStatus: DataTableSortStatus<ComparisonRow> = { columnAccessor: sort.key, direction: sort.dir };
 
   const setOptions = useMemo(() => {
@@ -270,9 +324,37 @@ export function ComparisonTable({ rows, decks, boardLabel, loading, emptyText }:
             Clear filters
           </Button>
         )}
+        {cart && (
+          <Menu position="bottom-end" withinPortal>
+            <Menu.Target>
+              <Button variant="light" leftSection={<IconShoppingCart size={14} />} ml="auto" disabled={!allRows.length && !cart.prints}>
+                Cart{cart.prints ? ` (${cart.prints})` : ''}
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Label>Add to the export cart (copies = the difference)</Menu.Label>
+              <Menu.Item leftSection={<IconShoppingCartPlus size={14} />} disabled={!view.length} onClick={() => cart.add(view.map(rowToItem))}>
+                Rows shown, every page ({view.length})
+              </Menu.Item>
+              <Menu.Item leftSection={<IconShoppingCartPlus size={14} />} disabled={!missingRows.length} onClick={() => cart.add(missingRows.map(rowToItem))}>
+                Every “Missing from collection” row ({missingRows.length})
+              </Menu.Item>
+              <Menu.Item leftSection={<IconShoppingCartPlus size={14} />} disabled={!unassignedRows.length} onClick={() => cart.add(unassignedRows.map(rowToItem))}>
+                Every “Not in any deck” row ({unassignedRows.length})
+              </Menu.Item>
+              <Menu.Divider />
+              <Menu.Item leftSection={<IconX size={14} />} disabled={!shownInCart} onClick={() => cart.remove(view.map((r) => r.key))}>
+                Remove the rows shown ({shownInCart})
+              </Menu.Item>
+              <Menu.Item color="red" leftSection={<IconTrash size={14} />} disabled={!cart.prints} onClick={() => cart.clear()}>
+                Clear the cart ({cart.prints})
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        )}
         <Menu position="bottom-end" withinPortal>
           <Menu.Target>
-            <Button variant="default" leftSection={<IconDownload size={14} />} disabled={!rows.length} ml="auto">
+            <Button variant="default" leftSection={<IconDownload size={14} />} disabled={!rows.length} ml={cart ? undefined : 'auto'}>
               CSV
             </Button>
           </Menu.Target>
@@ -293,6 +375,7 @@ export function ComparisonTable({ rows, decks, boardLabel, loading, emptyText }:
           noRecordsText={rows.length ? 'No row matches these filters' : emptyText}
           striped
           highlightOnHover
+          rowBackgroundColor={cart ? (r) => (cart.has(r.key) ? { dark: 'rgba(34, 139, 230, 0.12)', light: 'rgba(34, 139, 230, 0.08)' } : undefined) : undefined}
           verticalSpacing={4}
           horizontalSpacing="xs"
           sortStatus={sortStatus}

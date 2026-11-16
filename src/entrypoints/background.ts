@@ -6,6 +6,8 @@ import { parseAccountKey, type AccountKey } from '@/lib/accounts/types';
 import { migrateStorage } from '@/lib/accounts/migrate';
 import { markStaleOps } from '@/lib/changes/log';
 import { AccountSyncJob } from '@/lib/decks/job';
+import { ExportJob } from '@/lib/export/job';
+import { SiteLock } from '@/lib/sites/lock';
 import { holdAwake } from '@/lib/keepalive';
 import { onMessage, sendMessage } from '@/lib/messaging';
 import { isSiteType, SITE_TYPES, siteOf } from '@/lib/sites/registry';
@@ -38,23 +40,42 @@ export default defineBackground(() => {
     onActiveChange: (active) => holdAwake('f2f-runner', active),
   });
 
+  // One job per site at a time (sync or export): they share the site's tab, pace and the account's data.
+  const locks = Object.fromEntries(SITE_TYPES.map((type) => [type, new SiteLock()])) as Record<SiteType, SiteLock>;
+  // The pace set in Settings (read at each job start).
+  const paceOf = (type: SiteType) => async () => {
+    if (type !== 'moxfield') return {};
+    const s = await getSettings();
+    return { intervalMs: s.moxfieldIntervalMs, jitterMs: s.moxfieldJitterMs, maxIntervalMs: Math.max(siteOf(type).pacing.maxIntervalMs, s.moxfieldIntervalMs) };
+  };
+
   // Decks + collection of each site, read through a logged-in tab of that site (shared by deck features).
   const syncJobs = Object.fromEntries(
     SITE_TYPES.map((type) => {
       const site = siteOf(type);
       const job = new AccountSyncJob(site, {
         createTransport: ({ expect, ...ctl }) => new TabTransport(site, { ...ctl, expect }),
-        // The pace set in Settings (read at each sync start).
-        clientOptions: async () => {
-          if (type !== 'moxfield') return {};
-          const s = await getSettings();
-          return { intervalMs: s.moxfieldIntervalMs, jitterMs: s.moxfieldJitterMs, maxIntervalMs: Math.max(site.pacing.maxIntervalMs, s.moxfieldIntervalMs) };
-        },
+        clientOptions: paceOf(type),
         onActiveChange: (active) => holdAwake(`${type}-sync`, active),
+        lock: locks[type],
       });
       return [type, job];
     }),
   ) as Record<SiteType, AccountSyncJob>;
+
+  // Exports of cards to an account of each site (binder or collection), every write in the change log.
+  const exportJobs = Object.fromEntries(
+    SITE_TYPES.map((type) => {
+      const site = siteOf(type);
+      const job = new ExportJob(site, {
+        createTransport: ({ expect, ...ctl }) => new TabTransport(site, { ...ctl, expect }),
+        clientOptions: paceOf(type),
+        onActiveChange: (active) => holdAwake(`${type}-export`, active),
+        lock: locks[type],
+      });
+      return [type, job];
+    }),
+  ) as Record<SiteType, ExportJob>;
   for (const job of Object.values(syncJobs)) void job.markStale();
 
   onMessage('forgetAccount', async ({ data }) => {
@@ -67,7 +88,7 @@ export default defineBackground(() => {
         const end = Date.now() + 30_000;
         while (runner.activeRunId != null && runIds.includes(runner.activeRunId) && Date.now() < end) await new Promise((r) => setTimeout(r, 100));
       },
-      syncJobs: Object.values(syncJobs),
+      syncJobs: [...Object.values(syncJobs), ...Object.values(exportJobs)],
       removeStorage: async (keys) => {
         for (const k of keys) await storage.removeItem(k as `local:${string}`);
       },
@@ -99,6 +120,17 @@ export default defineBackground(() => {
     return syncJobs[data.type].start({ accountKey: data.accountKey ?? null, collection: data.collection === true });
   });
   onMessage('cancelAccountSync', ({ data }) => ({ ok: syncJobs[data.type].cancel() }));
+
+  onMessage('readExportTarget', ({ data }) => {
+    if (!isSiteType(data?.type) || !parseAccountKey(data.accountKey)) return { ok: false, code: 'no_account', error: 'Unknown account.' } as const;
+    return exportJobs[data.type].readTarget(data.accountKey);
+  });
+  onMessage('startExport', ({ data }) => {
+    if (!isSiteType(data?.type)) return { ok: false, code: 'unsupported', error: 'Unknown site.' } as const;
+    const { type, ...req } = data;
+    return exportJobs[type].start(req);
+  });
+  onMessage('cancelExport', ({ data }) => ({ ok: isSiteType(data?.type) && exportJobs[data.type].cancel() }));
 
   onMessage('getProgress', ({ data, sender }) => progressFor(data, sender.tab?.id));
 

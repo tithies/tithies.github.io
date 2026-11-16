@@ -6,18 +6,12 @@ import { useMemo, useState } from 'react';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { accountLabel, type AccountKey } from '@/lib/accounts/types';
 import { listOps, opCalls } from '@/lib/changes/log';
-import type { ChangeCall, ChangeOp, ChangeOpStatus } from '@/lib/changes/types';
+import type { ChangeCall, ChangeOp } from '@/lib/changes/types';
+import { StatusBadge } from '@/lib/changes/ui/StatusBadge';
+import { ExportOpDetails } from '@/lib/export/ui/ExportOpDetails';
 import { dateTime, duration, timeAgo } from '@/lib/format';
 import { downloadText } from '@/lib/ui/download';
 import { SiteIcon } from '@/lib/ui/SiteIcon';
-
-const STATUS: Record<ChangeOpStatus, { label: string; color: string }> = {
-  running: { label: 'Running', color: 'blue' },
-  done: { label: 'Done', color: 'teal' },
-  failed: { label: 'Failed', color: 'red' },
-  cancelled: { label: 'Cancelled', color: 'gray' },
-  interrupted: { label: 'Interrupted', color: 'orange' },
-};
 
 const OUTCOME: Record<ChangeCall['outcome'], { label: string; color: string; tip: string }> = {
   sent: { label: 'Sending', color: 'blue', tip: 'Sent, no answer yet' },
@@ -25,24 +19,6 @@ const OUTCOME: Record<ChangeCall['outcome'], { label: string; color: string; tip
   failed: { label: 'Refused', color: 'gray', tip: 'The site refused it, or it was never sent: nothing changed' },
   unknown: { label: 'Unknown', color: 'orange', tip: "Tithies doesn't know whether the site made it (timeout, lost tab, server error): check on the site" },
 };
-
-export function StatusBadge({ op }: { op: ChangeOp }) {
-  const s = STATUS[op.status];
-  return (
-    <Group gap={4} wrap="nowrap">
-      <Badge color={s.color} variant="light">
-        {s.label}
-      </Badge>
-      {op.unknownCalls > 0 && (
-        <Tooltip label="Some changes may or may not have been made: see the requests below" multiline w={240}>
-          <Badge color="orange" variant="outline" leftSection={<IconAlertTriangle size={12} />}>
-            {op.unknownCalls} unknown
-          </Badge>
-        </Tooltip>
-      )}
-    </Group>
-  );
-}
 
 function Block({ label, text }: { label: string; text: string }) {
   const [open, setOpen] = useState(false);
@@ -116,7 +92,7 @@ function OpDetails({ op }: { op: ChangeOp }) {
           {op.error}
         </Alert>
       )}
-      <Block label="Details" text={JSON.stringify(op.details, null, 2)} />
+      {op.kind === 'export' ? <ExportOpDetails op={op} /> : <Block label="Details" text={JSON.stringify(op.details, null, 2)} />}
       <Group justify="space-between">
         <Text size="sm" fw={600}>
           Requests sent ({calls?.length ?? '…'})

@@ -39,6 +39,8 @@ export interface ComparisonRow {
   rarity: string;
   typeLine: string;
   scryfallId: string;
+  /** The site's card id (Moxfield's), for exports. */
+  cardId: string;
   deckQty: number;
   collectionQty: number;
   /** collection − decks (< 0: missing, > 0: unassigned). */
@@ -187,6 +189,7 @@ export function compareDecksToCollection(
       rarity: a.card.rarity,
       typeLine: a.card.typeLine,
       scryfallId: a.card.scryfallId,
+      cardId: a.card.id,
       deckQty: a.deckQty,
       collectionQty: a.collectionQty,
       diff,

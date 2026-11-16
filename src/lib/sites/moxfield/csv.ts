@@ -43,6 +43,40 @@ export interface MoxCsvRow {
 
 const FOIL: Record<Finish, string> = { nonFoil: '', foil: 'foil', etched: 'etched' };
 
+/** Moxfield's condition keys (API) → its CSV names. */
+export const MOX_CONDITION_NAMES: Record<string, string> = {
+  mint: 'Mint',
+  nearMint: 'Near Mint',
+  excellent: 'Excellent',
+  good: 'Good (Lightly Played)',
+  lightlyPlayed: 'Good (Lightly Played)',
+  played: 'Played',
+  heavilyPlayed: 'Heavily Played',
+  poor: 'Poor',
+  damaged: 'Damaged',
+};
+
+/** Language codes (Scryfall's, as Moxfield reports them) → Moxfield's CSV names. */
+export const MOX_LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  fr: 'French',
+  de: 'German',
+  it: 'Italian',
+  es: 'Spanish',
+  pt: 'Portuguese',
+  ja: 'Japanese',
+  ko: 'Korean',
+  ru: 'Russian',
+  zhs: 'Chinese Simplified',
+  zht: 'Chinese Traditional',
+  he: 'Hebrew',
+  la: 'Latin',
+  grc: 'Ancient Greek',
+  ar: 'Arabic',
+  sa: 'Sanskrit',
+  ph: 'Phyrexian',
+};
+
 export function toMoxCsv(rows: readonly MoxCsvRow[]): string {
   const lines = [MOX_CSV_HEADER];
   for (const r of rows) {

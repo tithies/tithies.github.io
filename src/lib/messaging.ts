@@ -2,6 +2,7 @@ import { defineExtensionMessaging } from '@webext-core/messaging';
 import type { CollectionEntry } from '@/lib/cards/types';
 import type { AccountKey } from '@/lib/accounts/types';
 import type { StartSyncResult } from '@/lib/decks/job';
+import type { ReadTargetResult, StartExportRequest, StartExportResult } from '@/lib/export/job';
 import type { SiteApiCall, SiteIdentity, SiteResult, SiteTabStatus, SiteType } from '@/lib/sites/types';
 import type { RunProgress, RunSource } from '@/features/f2f-buylist/types';
 
@@ -39,6 +40,13 @@ interface ProtocolMap {
   pruneSessions(): void;
   /** dashboard → background: stop everything working for the account, then delete all of its data. */
   forgetAccount(data: { accountKey: AccountKey }): void;
+
+  /** dashboard → background: reads an account's binders and whole collection for an export preview (changes nothing). */
+  readExportTarget(data: { type: SiteType; accountKey: AccountKey }): ReadTargetResult;
+  /** dashboard → background: starts an export; progress and result are in its change-log row (`opId`). */
+  startExport(data: { type: SiteType } & StartExportRequest): StartExportResult;
+  /** dashboard → background: stops the export (or preview read) of a site. */
+  cancelExport(data: { type: SiteType }): { ok: boolean };
 }
 
 export const { sendMessage, onMessage } = defineExtensionMessaging<ProtocolMap>();

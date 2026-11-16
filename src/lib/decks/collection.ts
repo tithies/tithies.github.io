@@ -11,12 +11,10 @@ import type { CollectionMeta } from './types';
 
 const MAX_PAGES = 200;
 
-export async function refreshCollection(
-  site: Pick<SiteProvider, 'maxCollectionPageSize'>,
-  data: AccountData,
-  client: CollectionSource,
-  ctl: { signal?: AbortSignal; onProgress?: (p: { done: number; total: number; entries: number }) => void | Promise<void> } = {},
-): Promise<CollectionMeta> {
+type ReadControl = { signal?: AbortSignal; onProgress?: (p: { done: number; total: number; entries: number }) => void | Promise<void> };
+
+/** Reads every row of the collection (each row once), writing nothing. */
+export async function readWholeCollection(site: Pick<SiteProvider, 'maxCollectionPageSize'>, client: CollectionSource, ctl: ReadControl = {}): Promise<CollectionEntry[]> {
   const first = await client.collectionPage(1, site.maxCollectionPageSize);
   const pageSize = first.pageSize || site.maxCollectionPageSize;
   const totalPages = Math.min(MAX_PAGES, Math.max(1, first.totalPages));
@@ -34,7 +32,16 @@ export async function refreshCollection(
     const id = e.id || `row-${i}`;
     if (!byId.has(id)) byId.set(id, { ...e, id });
   });
-  const entries = [...byId.values()];
+  return [...byId.values()];
+}
+
+export async function refreshCollection(
+  site: Pick<SiteProvider, 'maxCollectionPageSize'>,
+  data: AccountData,
+  client: CollectionSource,
+  ctl: ReadControl = {},
+): Promise<CollectionMeta> {
+  const entries = await readWholeCollection(site, client, ctl);
   const meta: CollectionMeta = { fetchedAt: Date.now(), entries: entries.length, copies: entries.reduce((s, e) => s + e.qty, 0) };
   await data.write((w) => w.collection.replace(entries, meta));
   return meta;
