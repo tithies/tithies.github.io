@@ -1,5 +1,5 @@
-import { ActionIcon, Badge, Button, Group, Menu, Modal, Paper, SegmentedControl, Select, Stack, Text, TextInput } from '@mantine/core';
-import { IconDeviceFloppy, IconDots, IconPencil, IconTrash } from '@tabler/icons-react';
+import { ActionIcon, Badge, Button, Group, Menu, Modal, Paper, Select, Stack, Text, TextInput, Tooltip } from '@mantine/core';
+import { IconCopy, IconDeviceFloppy, IconDots, IconPencil, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { hasUnsavedOptions, isModified, loadedPreset, PRESET_NAME_MAX, presetNameError, type ComparisonState, type SaveTarget } from '../config';
 
@@ -23,19 +23,23 @@ function attempt(fn: () => void, setError: (e: string | null) => void): boolean 
   }
 }
 
-function SaveModal({ state, opened, onClose, save }: { state: ComparisonState; opened: boolean; onClose: () => void; save: Props['save'] }) {
-  const [mode, setMode] = useState<'new' | 'overwrite'>('new');
+/** "Save as…": a new preset under a name; the name of an existing preset overwrites it (said on the button). */
+function SaveAsModal({ state, onClose, save, onSaved }: { state: ComparisonState; onClose: () => void; save: Props['save']; onSaved?: () => void }) {
   const [name, setName] = useState('');
-  const [overwriteId, setOverwriteId] = useState<string | null>(state.loadedPresetId);
   const [error, setError] = useState<string | null>(null);
-  const nameError = mode === 'new' && name.trim() ? presetNameError(state, name) : null;
-  const canSave = mode === 'new' ? !!name.trim() && !nameError : !!overwriteId;
+  const trimmed = name.trim();
+  const existing = state.presets.find((p) => p.name.trim().toLowerCase() === trimmed.toLowerCase()) ?? null;
+  const nameError = trimmed && !existing ? presetNameError(state, name) : null;
+  const canSave = !!trimmed && !nameError;
   const submit = () => {
     if (!canSave) return;
-    if (attempt(() => save(mode === 'new' ? { name } : { overwriteId: overwriteId! }), setError)) onClose();
+    if (attempt(() => save(existing ? { overwriteId: existing.id } : { name }), setError)) {
+      onClose();
+      onSaved?.();
+    }
   };
   return (
-    <Modal opened={opened} onClose={onClose} title="Save the current options" centered>
+    <Modal opened onClose={onClose} title="Save the options as a preset" centered>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -46,35 +50,16 @@ function SaveModal({ state, opened, onClose, save }: { state: ComparisonState; o
           <Text size="sm" c="dimmed">
             A preset keeps the decks and folders left out, the boards counted, the proxy option and which rows are shown.
           </Text>
-          {state.presets.length > 0 && (
-            <SegmentedControl
-              value={mode}
-              onChange={(v) => setMode(v as 'new' | 'overwrite')}
-              data={[
-                { value: 'new', label: 'New preset' },
-                { value: 'overwrite', label: 'Overwrite a preset' },
-              ]}
-            />
-          )}
-          {mode === 'new' ? (
-            <TextInput
-              label="Name"
-              placeholder="e.g. Commander decks only"
-              value={name}
-              onChange={(e) => setName(e.currentTarget.value)}
-              maxLength={PRESET_NAME_MAX}
-              error={nameError}
-              data-autofocus
-            />
-          ) : (
-            <Select
-              label="Preset to overwrite"
-              data={state.presets.map((p) => ({ value: p.id, label: p.name }))}
-              value={overwriteId}
-              onChange={setOverwriteId}
-              allowDeselect={false}
-            />
-          )}
+          <TextInput
+            label="Name"
+            placeholder="e.g. Commander decks only"
+            value={name}
+            onChange={(e) => setName(e.currentTarget.value)}
+            maxLength={PRESET_NAME_MAX}
+            error={nameError}
+            description={existing ? `“${existing.name}” already exists: its options will be replaced by these.` : undefined}
+            data-autofocus
+          />
           {error && (
             <Text size="sm" c="red">
               {error}
@@ -84,8 +69,8 @@ function SaveModal({ state, opened, onClose, save }: { state: ComparisonState; o
             <Button variant="default" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!canSave} leftSection={<IconDeviceFloppy size={16} />}>
-              {mode === 'new' ? 'Save' : 'Overwrite'}
+            <Button type="submit" disabled={!canSave} color={existing ? 'yellow' : undefined} leftSection={<IconDeviceFloppy size={16} />}>
+              {existing ? `Overwrite “${existing.name}”` : 'Save as new preset'}
             </Button>
           </Group>
         </Stack>
@@ -125,10 +110,12 @@ function RenameModal({ state, id, onClose, rename }: { state: ComparisonState; i
 
 /**
  * Named presets of the page's options. Picking one changes the inputs; the inputs are saved as
- * they change, but a preset only changes when it is saved over.
+ * they change, but a preset only changes on Save (into the loaded preset) or Save as (a new one,
+ * or over the preset of that name).
  */
 export function PresetBar({ state, load, save, rename, remove }: Props) {
-  const [saving, setSaving] = useState(false);
+  /** Save as is open; `then` runs once it saved (a switch waiting for it). */
+  const [savingAs, setSavingAs] = useState<{ then?: () => void } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [switchTo, setSwitchTo] = useState<string | null>(null);
@@ -163,8 +150,20 @@ export function PresetBar({ state, load, save, rename, remove }: Props) {
             Modified
           </Badge>
         )}
-        <Button variant="light" leftSection={<IconDeviceFloppy size={16} />} onClick={() => setSaving(true)}>
-          Save
+        <Tooltip
+          label={current ? (modified ? `Save the changes into “${current.name}”` : `No changes since “${current.name}” was loaded`) : 'Save the options as a new preset'}
+        >
+          <Button
+            variant="light"
+            leftSection={<IconDeviceFloppy size={16} />}
+            disabled={!!current && !modified}
+            onClick={() => (current ? save({ overwriteId: current.id }) : setSavingAs({}))}
+          >
+            Save
+          </Button>
+        </Tooltip>
+        <Button variant="default" leftSection={<IconCopy size={16} />} onClick={() => setSavingAs({})}>
+          Save as…
         </Button>
         {current && (
           <Menu position="bottom-end" withinPortal>
@@ -186,13 +185,13 @@ export function PresetBar({ state, load, save, rename, remove }: Props) {
         <Text size="xs" c="dimmed" style={{ flex: 1, minWidth: 200 }}>
           {current
             ? modified
-              ? `Your changes are kept here, but “${current.name}” only changes when you save over it.`
+              ? `Your changes are kept here, but “${current.name}” only changes when you click Save.`
               : `The options below are those of “${current.name}”.`
             : 'Save the options below under a name to switch back to them later.'}
         </Text>
       </Group>
 
-      {saving && <SaveModal state={state} opened onClose={() => setSaving(false)} save={save} />}
+      {savingAs && <SaveAsModal state={state} onClose={() => setSavingAs(null)} save={save} onSaved={savingAs.then} />}
       {renaming && <RenameModal state={state} id={renaming} onClose={() => setRenaming(null)} rename={rename} />}
 
       <Modal opened={!!deletingPreset} onClose={() => setDeleting(null)} title="Delete the preset?" centered>
@@ -230,11 +229,17 @@ export function PresetBar({ state, load, save, rename, remove }: Props) {
             <Button
               variant="default"
               onClick={() => {
+                const target = switchTo;
                 setSwitchTo(null);
-                setSaving(true);
+                if (!target) return;
+                // Into the loaded preset, then switch; without one, Save as first.
+                if (current) {
+                  save({ overwriteId: current.id });
+                  load(target);
+                } else setSavingAs({ then: () => load(target) });
               }}
             >
-              Save first
+              {current ? `Save into “${current.name}” and switch` : 'Save as… first'}
             </Button>
             <Button
               color="yellow"
