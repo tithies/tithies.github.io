@@ -256,3 +256,17 @@ describe('Comparator presets', () => {
     expect(hasUnsavedOptions({ ...s, current: s.presets[0].config })).toBe(false);
   });
 });
+
+describe('Comparator rows as export items', () => {
+  it('exports the difference, or for a match its copies', async () => {
+    const { exportQty, rowToItem } = await import('@/features/collection-comparison/export');
+    const { rows } = compareDecksToCollection(DECKS, CARDS, COLLECTION, OPTS);
+    const missing = byKey(rows, 'c21|263|nonFoil')!;
+    const unassigned = byKey(rows, 'otj|9|nonFoil')!;
+    const match = byKey(rows, 'dsk|279|nonFoil')!;
+    expect([exportQty(missing), exportQty(unassigned)]).toEqual([1, 3]);
+    expect(exportQty(match)).toBe(match.deckQty);
+    expect(match.deckQty).toBeGreaterThan(0);
+    expect(rowToItem(match)).toMatchObject({ key: 'dsk|279|nonFoil', qty: match.collectionQty, note: 'Matching' });
+  });
+});

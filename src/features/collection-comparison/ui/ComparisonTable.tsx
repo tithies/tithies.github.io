@@ -2,7 +2,7 @@ import { ActionIcon, Anchor, Badge, Button, Group, HoverCard, Menu, MultiSelect,
 import { useDebouncedCallback, useLocalStorage } from '@mantine/hooks';
 import { IconDownload, IconExternalLink, IconFileExport, IconPlus, IconSearch, IconTrash, IconX } from '@tabler/icons-react';
 import { MAX_EXPORT_QTY, type ExportList } from '@/lib/export/list';
-import { rowToItem } from '../export';
+import { exportQty, rowToItem } from '../export';
 import { DataTable, type DataTableColumn, type DataTableSortStatus } from 'mantine-datatable';
 import { useStickyTableHeader } from '@/lib/ui/useStickyTableHeader';
 import { Fragment, useEffect, useMemo, useState } from 'react';
@@ -107,13 +107,12 @@ function HintDecks({ uses, decks, boardLabel }: { uses: DeckUse[]; decks: Readon
   );
 }
 
-/** Add the row to the export, or (once in it) its quantity and remove. A match has nothing to export. */
+/** Add the row to the export, or (once in it) its quantity and remove. */
 function ExportCell({ row, exportList }: { row: ComparisonRow; exportList: ExportList }) {
-  if (row.diff === 0) return null;
   const item = exportList.get(row.key);
   if (!item) {
     return (
-      <Tooltip label={`Add to the export (×${Math.abs(row.diff)})`}>
+      <Tooltip label={`Add to the export (×${exportQty(row)})`}>
         <ActionIcon variant="subtle" onClick={() => exportList.add([rowToItem(row)])} aria-label={`Add ${row.name} to the export`}>
           <IconFileExport size={16} />
         </ActionIcon>
@@ -301,8 +300,7 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
   const records = view.slice((safePage - 1) * pageSize, safePage * pageSize);
   const columns = useMemo(() => buildColumns(decks, boardLabel, exportList), [decks, boardLabel, exportList]);
   const missingRows = useMemo(() => allRows.filter((r) => r.kind === 'missing'), [allRows]);
-  /** Matches have no difference to export. */
-  const exportableShown = useMemo(() => view.filter((r) => r.diff !== 0), [view]);
+  const matchedRows = useMemo(() => allRows.filter((r) => r.kind === 'match'), [allRows]);
   const unassignedRows = useMemo(() => allRows.filter((r) => r.kind === 'unassigned'), [allRows]);
   const shownInExport = exportList ? view.filter((r) => exportList.has(r.key)).length : 0;
   const sortStatus: DataTableSortStatus<ComparisonRow> = { columnAccessor: sort.key, direction: sort.dir };
@@ -366,15 +364,18 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
               </Button>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Label>Add to the export (copies = the difference)</Menu.Label>
-              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!exportableShown.length} onClick={() => exportList.add(exportableShown.map(rowToItem))}>
-                Rows shown, every page ({exportableShown.length})
+              <Menu.Label>Add to the export (copies = the difference; for a match, its copies)</Menu.Label>
+              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!view.length} onClick={() => exportList.add(view.map(rowToItem))}>
+                Rows shown, every page ({view.length})
               </Menu.Item>
               <Menu.Item leftSection={<IconPlus size={14} />} disabled={!missingRows.length} onClick={() => exportList.add(missingRows.map(rowToItem))}>
                 Every “Missing from collection” row ({missingRows.length})
               </Menu.Item>
               <Menu.Item leftSection={<IconPlus size={14} />} disabled={!unassignedRows.length} onClick={() => exportList.add(unassignedRows.map(rowToItem))}>
                 Every “Not in any deck” row ({unassignedRows.length})
+              </Menu.Item>
+              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!matchedRows.length} onClick={() => exportList.add(matchedRows.map(rowToItem))}>
+                Every “Matching” row ({matchedRows.length})
               </Menu.Item>
               <Menu.Divider />
               <Menu.Item leftSection={<IconX size={14} />} disabled={!shownInExport} onClick={() => exportList.remove(view.map((r) => r.key))}>
