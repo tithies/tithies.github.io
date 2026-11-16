@@ -286,6 +286,7 @@
               <li>Choose which boards count (maybeboard, sideboard…), and ignore proxies</li>
               <li>Flags the likely wrong print or finish when the same card differs the other way</li>
               <li>Decks are kept in the extension: later syncs only read the decks you changed</li>
+              <li>Export the result to a Moxfield binder or collection, of this account or another one: a cart, a live preview of every change, confirmations, and a check of every copy afterwards</li>
             </ul>
           </div>
           <a class="shot" href="img/mismatches.webp" target="_blank" rel="noopener">
@@ -401,7 +402,7 @@
         <details>
           <summary>What does Tithies access, and where does my data go?</summary>
           <ul>
-            <li><b>Moxfield</b>: Tithies reads your collection and decks through your open Moxfield tab, using your own session. Your login never leaves that page. If no Moxfield tab is open, Tithies opens one for a few seconds and closes it afterwards.</li>
+            <li><b>Moxfield</b>: Tithies reads your collection and decks through your open Moxfield tab, using your own session. Your login never leaves that page. If no Moxfield tab is open, Tithies opens one for a few seconds and closes it afterwards. It <b>changes</b> Moxfield only when you confirm an export (create a binder, delete what a replace deletes, import the cards), and the Change log in the dashboard lists every such request, exactly as sent.</li>
             <li><b>Face to Face Games</b>: the public search behind F2F's "sell your cards" page, one request at a time.</li>
             <li><b>This page</b>: every 6 hours, or when you ask, the dashboard reads <code>version.json</code> here to tell you about updates.</li>
           </ul>

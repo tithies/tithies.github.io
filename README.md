@@ -12,7 +12,7 @@ Tithies keeps each Moxfield account apart: its Selling runs, synced decks, colle
 
 - **Accounts are added by an action**, never just because a Moxfield tab is open: "Check selling prices" in the Moxfield panel, a first "Sync decks", or "Switch Tithies to …". An action started from Moxfield runs as the account logged in there and switches the dashboard to it.
 - **One login per site at a time.** The browser holds one Moxfield login, so other accounts stay viewable from what Tithies already read, but only the logged-in account can be synced. Syncing an account while Moxfield is logged in as another one stops before anything is read, with a button to switch Tithies to the logged-in account instead. If the login changes in the middle of a sync, the sync stops at the first answer from the other account: what was read before is kept, and nothing is written into (or deleted from) the wrong account.
-- **Settings → Accounts** gives each account a nickname, and **Forget** deletes everything Tithies keeps for it (its running checks and syncs are stopped first). Nothing on Moxfield is touched.
+- **Settings → Accounts** gives each account a nickname, and **Forget** deletes everything Tithies keeps for it, the log of the changes it made to that account included (its running checks, syncs and exports are stopped first). Nothing on Moxfield is touched.
 - **Updating from a version before accounts** resets the Selling runs and the synced decks and collection (they had no owner); the F2F caches and settings are kept. After installing or updating Tithies, reload your open Moxfield tabs so Tithies sees which account is logged in there.
 - Tithies learns the account from Moxfield's session token itself (its user id and username claims), in the page. The token never leaves the page; only the user id and username are kept, in this browser.
 
@@ -35,16 +35,17 @@ Runs are stored in IndexedDB and survive browser restarts. A run interrupted by 
 ### How it talks to the sites
 
 - **Moxfield.** A small script in the Moxfield page remembers the collection-search request the page itself makes (`api2.moxfield.com/v1/collections/search?...`). That request already carries your filters and session, and Tithies replays it page by page. Your session token never leaves the page.
-- **Moxfield decks (feature 2).** The background worker asks a logged-in Moxfield tab to make each request. Your own tab is used if one is open; otherwise Tithies opens one, shows it for a few seconds while Moxfield starts (Moxfield doesn't start in a never-shown tab), then switches back and closes it at the end. The page makes the request with its own session and sends back only trimmed card lists, never the token. Requests: `GET /v3/decks` (the whole deck list), `GET /v3/decks/all/{publicId}` per new or changed deck, and the unfiltered collection search (5000 rows per page).
+- **Moxfield decks (feature 2).** The background worker asks a logged-in Moxfield tab to make each request. Your own tab is used if one is open; otherwise Tithies opens one, shows it for a few seconds while Moxfield starts (Moxfield doesn't start in a never-shown tab), then switches back and closes it at the end. The page makes the request with its own session and sends back only trimmed card lists, never the token. Requests: `GET /v3/decks` (the whole deck list), `GET /v3/decks/all/{publicId}` per new or changed deck, and the unfiltered collection search (Tithies asks for 5000 rows per page; since November 2026 Moxfield answers 100, so a 4,000-entry collection takes about 40 requests).
   - **Pace:** one request at a time, 1–1.5 s apart (**Settings → Moxfield**).
   - **Rate limits:** Moxfield sends no `Retry-After`, and its own UI says to wait about 30 s. On HTTP 429 Tithies waits 30 s, 60 s, then 120 s, and stops after that.
   - **Interruptions:** each deck is saved as soon as it's read, so an interrupted sync continues where it stopped.
   - **Accounts:** every request carries the account it must be made as; the page refuses to send it as anyone else, and every answer says who it was made as (see Accounts above).
   - **Permission:** Moxfield's API is private. Its FAQ says they sometimes allow personal, non-commercial use on request (support@moxfield.com).
 - **F2F.** Tithies uses the same public search endpoint as F2F's "sell your cards" mode (`/apps/prod-indexer/buy/search/...`). Each product variant includes both `price` (what F2F sells it for) and `sellPrice` (what F2F pays you). Up to 40 prints are looked up per request (name × collector number × English). Requests go one at a time, at least 1.5 s apart plus random jitter. Tithies honours `Retry-After` on HTTP 429 and pauses after 3 failures in a row. Results are cached for 1 h (setting); "not found" results are always looked up again.
+- **Moxfield writes (exports only).** Tithies changes Moxfield only when you confirm an export, and only through these requests (each one in the change log, exactly as sent): `POST /v1/trade-binders` (create a binder), `POST /v1/collections/bulk/remove` (delete entries, up to 1000 per request), `DELETE /v1/collections` (a collection replace), and `POST /v1/collections/import-file` (Moxfield's own CSV import, 500 rows per request, into a binder with `tradeBinderId`). They are made by the page like the reads, and only as the account you picked: the page refuses to send them as anyone else. **A write is never sent twice**: when its outcome is unknown (timeout, lost tab, network or server error) the export stops, and the collection is read again to show what was made. Only refusals (HTTP 429, a wrong account before sending) are retried.
 - **Shop/sell mode.** F2F keeps a cart attribute `site=shop|sell`. Sell links use F2F's own `?site=sell`. Buy links use `?tithies=shop`, which a tiny content script turns back into shop mode.
 
-The F2F delays, the batch size, the cache TTL, the credit bonus and the fallback search can be changed under **Settings → Selling**, and the Moxfield pace under **Settings → Moxfield** (saved as you type). **Settings → Stored data** shows everything Tithies keeps in the browser (the shared F2F lookups, then each account's synced decks, collection and runs) and clears any part of it, or all of it; **Reset settings** puts every setting and preference back to its default.
+The F2F delays, the batch size, the cache TTL, the credit bonus and the fallback search can be changed under **Settings → Selling**, and the Moxfield pace under **Settings → Moxfield** (saved as you type). **Settings → Stored data** shows everything Tithies keeps in the browser (the shared F2F lookups and the change log, then each account's synced decks, collection and runs) and clears any part of it, or all of it; **Reset settings** puts every setting and preference back to its default (saved comparison presets are kept).
 
 ## Feature 2 — Collection comparisons
 
@@ -63,6 +64,24 @@ Each list is shown or hidden by clicking its panel above the table, since not ev
 **Presets.** **Save** keeps the current options (decks and folders left out, boards, proxies, which rows are shown) as a named preset, or over an existing one. Picking a preset in the list puts its options back; a *Modified* badge shows when you changed them since, and switching away from unsaved options asks first. The options you're using are always kept as they are, presets only change when you save. Presets belong to the account, and **Reset settings** keeps them.
 
 Rows show which decks use the print. A yellow hint flags the likely fix when the same card differs the other way in another print or finish (e.g. the deck says foil, the collection has non-foil). Filters, sort and CSV export work like the F2F results table.
+
+### Exporting to Moxfield
+
+The rows of a comparison can be exported to a Moxfield account, as a binder or into its collection (e.g. the cards your decks miss into a "To buy" binder of another account).
+
+1. **Fill the export cart.** Each row has a cart button (copies = the difference; change the quantity in the row or in the cart). The **Cart** menu adds every row shown (all pages), every "Missing from collection" row, or every "Not in any deck" row, removes the rows shown, or clears the cart. The cart only lives on the page: leaving it asks first.
+2. **Export to Moxfield…** (the bar at the bottom) opens four steps:
+   - **Target**: the Moxfield account (another one than the compared account by default), then a **new binder** (name, visibility), an **existing binder** or the **collection**, each with **Add** (keep what's there) or **Replace** (delete what's there first). Tithies reads the account's binders and whole collection (reads only); it must be the account logged in on Moxfield in this browser.
+   - **Preview**: everything that will change, read live: what is created, deleted (every entry) and added, the copies before → after, the requests and how long they take, and warnings. Binder cards are collection cards on Moxfield: replacing a binder deletes its cards from the collection; replacing the collection deletes every card, binders included.
+   - **Confirm**: a checkbox; for a replace, type the binder name (or the username, for the collection); for the compared account itself, a second explanation (the exported cards become part of the collection you compare: missing cards stop being missing, cards in no deck are then there twice).
+   - **Progress**: Tithies reads the target again and stops if it changed since the preview, makes the changes, then reads the collection again and **checks every copy** per print: "all 57 copies are there, and nothing else changed", or the prints short, extra (a card imported as another print shows up as one short and one extra) or otherwise changed.
+3. Cards are added Near Mint, English, with their exact set, collector number and finish. The cart stays after an export (to try again); empty it from the last step.
+
+The export is reusable by other pages: `src/lib/export/` (cart, dialog, plan, check, background job) with each site's writes in `src/lib/sites/<type>/export.ts`. One Moxfield job runs at a time: a sync waits for an export and the other way round.
+
+## Change log
+
+**Change log** (above Settings) lists everything Tithies changed on your sites, newest first, for every account: each action (an export…), its status, and every request it sent, exactly as sent (method, URL, body or CSV, status, the start of the answer, duration; sessions and tokens are never logged). An action stopped by a browser restart shows as *interrupted* and is never resumed; a request without an answer shows as *unknown*. For an export it also shows the check, and keeps the entries it deleted with a **CSV to import them back** on Moxfield (Moxfield has no undo). Download any action as JSON. Every write goes through one logged path (`SiteClient.mutate`), so future features' changes are logged the same way. Clear the log in **Settings → Stored data**.
 
 The deck sync lives in `src/lib/decks/` (sync, cache, folder tree, deck picker) so other features can reuse it.
 
@@ -96,10 +115,13 @@ Every push to `master` runs `.github/workflows/pages.yml`: typecheck, tests, `np
 src/entrypoints/          background worker, content scripts (Moxfield hook + panel, F2F mode helper), dashboard page
 src/features/f2f-buylist/ runner (batches, cache, resume), matcher, bulk rates, dashboard UI
 src/features/collection-comparison/ deck ↔ collection comparison, options and presets, comparison page
+src/features/change-log/  Change log page: every change made to a site, request by request
 src/features/settings/    Settings page: accounts, Moxfield pace, stored data, reset
 src/lib/accounts/         accounts, the current account, and the access layer: the only code that touches per-account data
 src/lib/cards/            site-neutral card types (collection entries, prints)
 src/lib/decks/            reusable deck sync + cache, collection snapshot, background job, folder tree, deck picker
+src/lib/export/           reusable export to a site: page cart, dialog, plan + check, background job
+src/lib/changes/          the change log (every write, by action)
 src/lib/sites/            site providers (account types) + registry, polite client, tab transport, live sessions
 src/lib/sites/moxfield/   Moxfield: API requests, normalisation, session/account in the page, provider
 src/lib/                  F2F API client, Dexie DB, settings, messaging, update check, shared UI/format/sort helpers
