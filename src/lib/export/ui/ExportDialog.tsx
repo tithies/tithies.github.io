@@ -33,6 +33,8 @@ import type { BinderVisibility } from '@/lib/sites/types';
 import { useSiteSessions } from '@/lib/sites/useSiteSessions';
 import { SiteIcon } from '@/lib/ui/SiteIcon';
 import { Stat } from '@/lib/ui/Stat';
+import { FULL_READ_EVERY_MS } from '@/lib/decks/collection';
+import { useCollectionMeta } from '@/lib/decks/hooks';
 import { cancelExport, readExportTarget, startExport, useChangeOp, useReadProgress } from '../client';
 import { exporterOf } from '../exporters';
 import type { ReadTargetResult } from '../job';
@@ -279,6 +281,8 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
   const op = useChangeOp(opId);
   const over = !!op && op.status !== 'running';
   const progress = useReadProgress(reading ? accountKey : null);
+  const savedMeta = useCollectionMeta(accountKey);
+  const savedCollection = !!savedMeta?.fullReadAt && Date.now() - savedMeta.fullReadAt < FULL_READ_EVERY_MS;
 
   // Opening: start over at the target step (choices kept); another account than the compared one first.
   useEffect(() => {
@@ -324,8 +328,11 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
           : null
         : { accountKey, kind, mode };
   const plan = useMemo(
-    () => (target && state && exporter && stateCovers(state, previewRead(target)) ? planExport(target, items, state, { sourceAccountKey, targetName: name, limits: exporter.limits }) : null),
-    [JSON.stringify(target), state, items, sourceAccountKey, name, exporter], // eslint-disable-line react-hooks/exhaustive-deps
+    () =>
+      target && state && exporter && stateCovers(state, previewRead(target))
+        ? planExport(target, items, state, { sourceAccountKey, targetName: name, limits: exporter.limits, savedCollection })
+        : null,
+    [JSON.stringify(target), state, items, sourceAccountKey, name, exporter, savedCollection], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   /** "Preview the changes": reads what this target needs (if not read yet), then shows the preview. */

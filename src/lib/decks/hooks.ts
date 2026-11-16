@@ -14,7 +14,8 @@ import type { CollectionMeta, DeckCardsRow, DeckRow, DecksMeta, SyncState } from
  * collection afterwards. With no account (`null`), syncs whoever is logged in on the site and
  * adds that account. Answers once a tab of the account is found.
  */
-export const startSync = (type: SiteType, accountKey: AccountKey | null, collection: boolean) => sendMessage('startAccountSync', { type, accountKey, collection });
+export const startSync = (type: SiteType, accountKey: AccountKey | null, collection: boolean, fullCollection = false) =>
+  sendMessage('startAccountSync', { type, accountKey, collection, fullCollection });
 export const cancelSync = (type: SiteType) => sendMessage('cancelAccountSync', { type });
 
 /** Resolves with the final state once job `jobId` of the account has stopped running. */

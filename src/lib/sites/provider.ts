@@ -36,8 +36,8 @@ export interface SiteProvider {
   boardOrder(key: string): number;
   /** Bump when the deck normaliser changes, so cached decks are fetched again. */
   deckCardsVersion: number;
-  /** Largest collection page the site accepts. */
-  maxCollectionPageSize: number;
+  /** Rows per collection page the site answers. */
+  collectionPageSize: number;
   /** Default request pace. */
   pacing: SitePacing;
 }

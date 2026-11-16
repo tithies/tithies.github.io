@@ -295,9 +295,14 @@ export class SiteClient {
     return { lastUpdatedAt, cards };
   }
 
-  /** One page of the whole collection. */
-  async collectionPage(pageNumber: number, pageSize: number): Promise<CollectionPageResult> {
-    const { entries, totalResults, totalPages, pageSize: size, totalCopies } = await this.request({ kind: 'collection', pageNumber, pageSize });
+  /** One page of the whole collection, by card name (or most recently changed first). */
+  async collectionPage(pageNumber: number, pageSize: number, opts: { newestFirst?: boolean } = {}): Promise<CollectionPageResult> {
+    const { entries, totalResults, totalPages, pageSize: size, totalCopies } = await this.request({
+      kind: 'collection',
+      pageNumber,
+      pageSize,
+      ...(opts.newestFirst ? { newestFirst: true } : {}),
+    });
     return { entries, totalResults, totalPages, pageSize: size, ...(totalCopies !== undefined ? { totalCopies } : {}) };
   }
 

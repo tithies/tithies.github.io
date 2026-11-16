@@ -37,6 +37,7 @@ const entry = (name: string, set: string, cn: string, qty: number, finish: Finis
   isProxy: false,
   isAlter: false,
   game: 'paper',
+  updatedAt: '2026-01-01T00:00:00.000Z',
   ...(binderId ? { binderId } : {}),
   card: card(name, set, cn),
 });
@@ -120,8 +121,10 @@ describe('Export plan', () => {
     const totals: TargetState = { ...binderOnly, read: { kind: 'totals' }, totals: { entries: 4010, copies: 5431 } };
     const p = planExport(add, exportList, totals, ctx({ limits: { importRows: 500, removeEntries: 1000, pageSize: 100 } }));
     expect(p).toMatchObject({ before: 5431, after: 5438 });
-    // 1 binder list + 41 pages before + 41 pages after.
-    expect(p.reads).toBe(1 + 41 + 41);
+    // 1 binder list + every page before (no saved snapshot) + the check reads only the new entries.
+    expect(p.reads).toBe(1 + 41 + 1);
+    // With a recent snapshot, before is only its changes too.
+    expect(planExport(add, exportList, totals, ctx({ savedCollection: true, limits: { importRows: 500, removeEntries: 1000, pageSize: 100 } })).reads).toBe(3);
     const nbPlan = planExport(nb, exportList, binderOnly, ctx({ limits: { importRows: 500, removeEntries: 1000, pageSize: 100 } }));
     expect(nbPlan.reads).toBe(2);
   });
@@ -202,9 +205,14 @@ class FakeMox {
     if (req.kind === 'collection' || req.kind === 'binderPage') {
       const binder = req.kind === 'binderPage' ? this.binders.find((b) => b.publicId === req.publicId) : null;
       if (req.kind === 'binderPage' && (!binder || this.binderSearchFails)) return { ok: false, status: 404, code: 'http', message: 'Moxfield answered HTTP 404' };
-      this.reads.push(binder ? `binder:${binder.id}` : 'collection');
+      const newestFirst = (req as { newestFirst?: boolean }).newestFirst === true;
+      this.reads.push(binder ? `binder:${binder.id}` : newestFirst ? 'collection:changes' : 'collection');
       // Like Moxfield: a binder search lists entries without their binder; the answer names it once.
-      const rows = binder ? this.entries.filter((e) => e.binderId === binder.id).map(({ binderId: _b, ...e }) => ({ ...e, binderId: binder.id })) : this.entries;
+      const rows = binder
+        ? this.entries.filter((e) => e.binderId === binder.id).map(({ binderId: _b, ...e }) => ({ ...e, binderId: binder.id }))
+        : newestFirst
+          ? [...this.entries].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+          : this.entries;
       return {
         ok: true,
         kind: req.kind,
@@ -238,7 +246,7 @@ class FakeMox {
           let { Edition: set, 'Collector Number': cn } = r;
           if (this.misprint && r.Name === this.misprint.from) ({ set, cn } = this.misprint.to);
           const finish = (r.Foil || 'nonFoil') as Finish;
-          this.entries.push(entry(r.Name, set, cn, Number(r.Count), finish, op.binderId));
+          this.entries.push({ ...entry(r.Name, set, cn, Number(r.Count), finish, op.binderId), updatedAt: new Date(Date.UTC(2026, 10, 16) + ++this.n * 1000).toISOString() });
         }
         const count = rows.reduce((s, r) => s + Number(r.Count), 0);
         return { ok: true, kind: 'mutate', status: 200, response: `{"isSuccessful":true,"totalImportedCount":${count},"errors":[]}`, imported: { ok: true, count, errors: [] } };
@@ -335,6 +343,29 @@ describe('Export job', () => {
     expect(mox.writes[1]).not.toHaveProperty('binderId');
     expect(op.status).toBe('done');
     expect(details).toMatchObject({ wholeCollection: true, before: 10, after: 3, verify: { ok: true } });
+  });
+
+  it('adds to the collection and checks it by reading only the new entries', async () => {
+    const { acc, mox, job } = await setup();
+    mox.entries = [entry('Island', 'dsk', '279', 10), entry('Opt', 'xln', '65', 2)];
+    const { op, details } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'collection', mode: 'add' }, TO_EXPORT);
+    expect(op.status).toBe('done');
+    expect(details.verify).toMatchObject({ ok: true, scope: 'collection', expectedCopies: 3, foundCopies: 3 });
+    // Preview: its size (1 page); before: every page (no snapshot saved yet); check: newest first, only the changes.
+    expect(mox.reads).toEqual(['collection', 'collection', 'collection:changes']);
+  });
+
+  it('a deletion by someone else during the export makes the check read every page, and shows it', async () => {
+    const { acc, mox, job } = await setup();
+    const opt = entry('Opt', 'xln', '65', 2);
+    mox.entries = [entry('Island', 'dsk', '279', 10), opt];
+    mox.failOn = (op) => {
+      if (op.op === 'importCsv') mox.entries = mox.entries.filter((e) => e !== opt);
+      return null;
+    };
+    const { details } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'collection', mode: 'add' }, TO_EXPORT);
+    expect(mox.reads.slice(-2)).toEqual(['collection:changes', 'collection']);
+    expect(details.verify).toMatchObject({ ok: false, otherChanged: [{ name: 'Opt', expected: 2, found: 0 }] });
   });
 
   it('reports a card Moxfield imported as another print', async () => {

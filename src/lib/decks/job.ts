@@ -89,7 +89,7 @@ export class AccountSyncJob {
     return this.active?.done ?? Promise.resolve();
   }
 
-  async start({ accountKey, collection }: { accountKey: AccountKey | null; collection: boolean }): Promise<StartSyncResult> {
+  async start({ accountKey, collection, fullCollection = false }: { accountKey: AccountKey | null; collection: boolean; fullCollection?: boolean }): Promise<StartSyncResult> {
     for (;;) {
       if (this.starting) {
         await this.starting.promise.catch(() => undefined);
@@ -101,14 +101,16 @@ export class AccountSyncJob {
         if (accountKey !== null && accountKey !== key) {
           return { ok: false, code: 'busy', busyWith: key, error: `Tithies is already syncing another ${this.site.label} account. Wait for it to finish, or cancel it.` };
         }
-        if (collection && !running.state.withCollection) await this.patch(running, { withCollection: true });
+        if (collection && (!running.state.withCollection || (fullCollection && !running.state.fullCollection))) {
+          await this.patch(running, { withCollection: true, fullCollection: fullCollection || running.state.fullCollection });
+        }
         return { ok: true, jobId: running.state.jobId, accountKey: key, alreadyRunning: true };
       }
       if (this.deps.lock && !this.deps.lock.tryAcquire('sync')) {
         return { ok: false, code: 'exporting', error: `Tithies is exporting cards to ${this.site.label}: wait for it to finish (see the Change log), then sync.` };
       }
       const abort = new AbortController();
-      const promise = this.begin(accountKey, collection, abort);
+      const promise = this.begin(accountKey, collection, abort, fullCollection);
       this.starting = { promise, abort };
       try {
         return await promise;
@@ -157,7 +159,7 @@ export class AccountSyncJob {
     return typeof o === 'function' ? o() : (o ?? {});
   }
 
-  private async begin(accountKey: AccountKey | null, collection: boolean, abort: AbortController): Promise<StartSyncResult> {
+  private async begin(accountKey: AccountKey | null, collection: boolean, abort: AbortController, fullCollection = false): Promise<StartSyncResult> {
     const { label } = this.site;
     let data: AccountData | null = null;
     let expect: SiteIdentity | 'first' = 'first';
@@ -176,6 +178,7 @@ export class AccountSyncJob {
       status: 'running',
       phase: 'connecting',
       withCollection: collection,
+      ...(fullCollection ? { fullCollection: true } : {}),
       done: 0,
       total: 0,
       startedAt: now,
@@ -287,6 +290,7 @@ export class AccountSyncJob {
       if (job.state.withCollection) {
         await this.patch(job, { phase: 'collection', done: 0, total: 1, message: undefined });
         await refreshCollection(this.site, job.data, client, {
+          full: job.state.fullCollection === true,
           signal,
           onProgress: (p) => this.patch(job, { done: p.done, total: p.total, message: undefined, requests: client.requests }),
         });

@@ -6,9 +6,10 @@ import { bridge, type CaptureInfo } from '@/lib/sites/moxfield/bridge';
 import { parseIdentity } from '@/lib/sites/validate';
 import type { SiteIdentity } from '@/lib/sites/types';
 import { groupPrints, isEligible } from '@/lib/cards/prints';
+import { MOX_COLLECTION_PAGE_SIZE } from '@/lib/sites/moxfield/constants';
 import { describeQuery } from '@/lib/sites/moxfield/normalize';
 import { onMessage, sendMessage } from '@/lib/messaging';
-import { getSettings, overlayCollapsedItem as collapsedItem } from '@/lib/settings';
+import { overlayCollapsedItem as collapsedItem } from '@/lib/settings';
 import type { RunProgress } from '@/features/f2f-buylist/types';
 
 type Phase =
@@ -91,9 +92,8 @@ export function Overlay() {
 
   async function start() {
     try {
-      const settings = await getSettings();
       setPhase({ kind: 'reading', page: 0, totalPages: 0, fetched: 0 });
-      const res = await bridge.sendMessage('fetchCollection', { pageSize: settings.moxfieldPageSize, delayMs: 350 });
+      const res = await bridge.sendMessage('fetchCollection', { pageSize: MOX_COLLECTION_PAGE_SIZE, delayMs: 350 });
       const readAs = parseIdentity(res.account);
       if (!readAs) {
         setPhase({ kind: 'error', message: "Couldn't tell which Moxfield account this collection belongs to. Reload the page, then try again." });

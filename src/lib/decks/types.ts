@@ -76,6 +76,10 @@ export interface CollectionMeta {
   fetchedAt: number;
   entries: number;
   copies: number;
+  /** Last time every page was read (a read of only the changes builds on it). Unset: never, or before this was kept. */
+  fullReadAt?: number;
+  /** How the last read went: every page, or only the entries changed since the snapshot. */
+  lastRead?: { mode: 'full' | 'changes'; pages: number; changed: number; why?: string };
 }
 
 export type SyncStatus = 'running' | 'done' | 'error' | 'cancelled' | 'interrupted';
@@ -98,8 +102,10 @@ export interface SyncState {
   accountKey: string;
   status: SyncStatus;
   phase: SyncPhase;
-  /** Also read the whole collection after the decks. */
+  /** Also read the collection after the decks. */
   withCollection: boolean;
+  /** Read every page of it (else only what changed since the snapshot, when that can be trusted). */
+  fullCollection?: boolean;
   done: number;
   total: number;
   /** Deck being fetched. */

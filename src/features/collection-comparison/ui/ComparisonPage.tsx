@@ -1,4 +1,4 @@
-import { Alert, Anchor, Button, Checkbox, Divider, Group, Modal, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Alert, Anchor, Button, Checkbox, Divider, Group, Modal, Paper, SimpleGrid, Stack, Text, Title, Tooltip } from '@mantine/core';
 import { IconAlertTriangle, IconArrowsDiff, IconPlayerStop, IconRefresh } from '@tabler/icons-react';
 import { useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router';
@@ -15,7 +15,7 @@ import { accountData, addAccountFromAction } from '@/lib/accounts/data';
 import { AccountHint } from '@/lib/ui/AccountHint';
 import type { AccountKey } from '@/lib/accounts/types';
 import type { SiteProvider } from '@/lib/sites/provider';
-import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
+import type { CollectionMeta, DeckCardsRow, DeckRow } from '@/lib/decks/types';
 import { timeAgo } from '@/lib/format';
 import { siteOf } from '@/lib/sites/registry';
 import { Stat } from '@/lib/ui/Stat';
@@ -43,11 +43,11 @@ function useStartSync() {
   const { key, site } = usePageAccount();
   const [error, setError] = useState<{ message: string; busy: boolean } | null>(null);
   const [starting, setStarting] = useState(false);
-  const start = async (collection: boolean) => {
+  const start = async (collection: boolean, fullCollection = false) => {
     setError(null);
     setStarting(true);
     try {
-      const res = await startSync(site.type, key, collection);
+      const res = await startSync(site.type, key, collection, fullCollection);
       if (!res.ok && res.code !== 'cancelled') setError({ message: res.error, busy: res.code === 'busy' });
     } catch (e) {
       setError({ message: `Couldn't start the sync: ${e instanceof Error ? e.message : String(e)}`, busy: false });
@@ -126,13 +126,13 @@ function OptionsCard({
   update,
   boards,
   decksSyncedAt,
-  collectionAt,
+  collection,
 }: {
   config: ComparisonConfig;
   update: (p: Partial<ComparisonConfig>) => void;
   boards: Map<string, number>;
   decksSyncedAt?: number;
-  collectionAt?: number;
+  collection?: CollectionMeta | null;
 }) {
   const { key, site } = usePageAccount();
   const sync = useSyncState(key);
@@ -177,7 +177,34 @@ function OptionsCard({
         />
         <Divider />
         <Text size="xs" c="dimmed">
-          Decks synced {decksSyncedAt ? timeAgo(decksSyncedAt) : 'never'} · Collection read {collectionAt ? timeAgo(collectionAt) : 'never'}
+          Decks synced {decksSyncedAt ? timeAgo(decksSyncedAt) : 'never'} · Collection read {collection ? timeAgo(collection.fetchedAt) : 'never'}
+          {collection?.lastRead?.mode === 'changes' && (
+            <>
+              {' '}
+              (only what changed: {collection.lastRead.changed.toLocaleString('en-CA')} {collection.lastRead.changed === 1 ? 'entry' : 'entries'} in{' '}
+              {collection.lastRead.pages === 1 ? '1 request' : `${collection.lastRead.pages} requests`}; every page read {collection.fullReadAt ? timeAgo(collection.fullReadAt) : 'never'})
+            </>
+          )}
+          {collection?.lastRead?.mode === 'full' && (
+            <>
+              {' '}
+              (every page{collection.lastRead.why ? `: ${collection.lastRead.why}` : ''})
+            </>
+          )}
+          {collection && (
+            <>
+              {' · '}
+              <Tooltip
+                label="Compare usually reads only what changed in your collection since the last read (Moxfield lists entries by last change), and every page when its totals don't match. This reads every page now."
+                multiline
+                w={300}
+              >
+                <Anchor component="button" type="button" size="xs" disabled={running} onClick={() => void start(true, true)}>
+                  Read every page
+                </Anchor>
+              </Tooltip>
+            </>
+          )}
         </Text>
         <SyncProgress state={sync} site={site} onSwitch={switchTo(site)} />
         {error && <StartError error={error} site={site} onCancelled={clearError} />}
@@ -196,7 +223,8 @@ function OptionsCard({
           )}
         </Group>
         <Text size="xs" c="dimmed">
-          Compare first syncs decks (only new or changed ones are read), then reads your whole collection. Options, presets and deck choices apply instantly.
+          Compare first syncs decks (only new or changed ones are read), then reads what changed in your collection (every page once a week, or when
+          something was deleted). Options, presets and deck choices apply instantly.
         </Text>
       </Stack>
     </Paper>
@@ -338,7 +366,7 @@ export function ComparisonPage() {
             />
           </Stack>
         </Paper>
-        <OptionsCard config={config} update={update} boards={boards} decksSyncedAt={decksMeta.lastSuccessAt} collectionAt={collectionMeta?.fetchedAt} />
+        <OptionsCard config={config} update={update} boards={boards} decksSyncedAt={decksMeta.lastSuccessAt} collection={collectionMeta} />
       </SimpleGrid>
 
       {!collectionMeta ? (

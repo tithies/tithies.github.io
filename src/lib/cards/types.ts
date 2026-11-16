@@ -42,6 +42,8 @@ export interface CollectionEntry {
   langId?: string;
   /** The binder the entry is in (the site's binder id), if any. */
   binderId?: string;
+  /** When the site last changed the entry (ISO), when it says. */
+  updatedAt?: string;
   card: CardPrint;
 }
 

@@ -18,7 +18,8 @@ export interface SiteIdentity {
 export type SiteRequest =
   | { kind: 'deckList' }
   | { kind: 'deck'; publicId: string }
-  | { kind: 'collection'; pageNumber: number; pageSize: number }
+  /** `newestFirst`: most recently changed entries first (else by card name). */
+  | { kind: 'collection'; pageNumber: number; pageSize: number; newestFirst?: boolean }
   /** One page of one binder's cards (the site's own binder search; `publicId` as in the binder's URL). */
   | { kind: 'binderPage'; publicId: string; pageNumber: number; pageSize: number }
   | { kind: 'binders' }

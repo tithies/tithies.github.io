@@ -1,9 +1,9 @@
 import { DEFAULT_SETTINGS } from '@/lib/settings';
 
 describe('settings defaults', () => {
-  it('keeps F2F results for 1 h and reads Moxfield 1000 rows per request', () => {
+  it('keeps F2F results for 1 h, and has no Moxfield page size any more (always 100)', () => {
     expect(DEFAULT_SETTINGS.cacheTtlHours).toBe(1);
-    expect(DEFAULT_SETTINGS.moxfieldPageSize).toBe(1000);
+    expect(DEFAULT_SETTINGS).not.toHaveProperty('moxfieldPageSize');
   });
 });
 

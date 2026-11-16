@@ -19,6 +19,8 @@ export interface PlanContext {
   /** "alice" */
   targetName: string;
   limits: PlanLimits;
+  /** Tithies has a recent snapshot of the target's collection: reading it again is usually one page (its changes). */
+  savedCollection?: boolean;
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-CA')} ${n === 1 ? one : many}`;
@@ -175,7 +177,8 @@ export function planExport(target: ExportTarget, rawItems: readonly ExportItem[]
       ? pages(items.length)
       : target.kind === 'binder'
         ? pages(targetEntries) + pages((target.mode === 'replace' ? 0 : targetEntries) + items.length)
-        : pages(collectionEntries) + pages((wholeCollection ? 0 : collectionEntries) + items.length));
+        : // Before: every page, or only the changes since the saved snapshot. Check: only the changes since "before".
+          (ctx.savedCollection ? 1 : pages(collectionEntries)) + pages(items.length));
 
   // What the run must find unchanged: the binders, and every entry it deletes.
   const digest = hash(

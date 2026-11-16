@@ -10,10 +10,10 @@ export const MOX_TAB_PATTERNS = ['https://moxfield.com/*', 'https://www.moxfield
 /** Page Tithies opens when it needs a Moxfield tab (any logged-in page works). */
 export const MOX_SYNC_TAB_URL = 'https://moxfield.com/decks/personal';
 /**
- * Collection page size Tithies asks for. Moxfield accepted 5000 (2026-11-09) but answers 100 rows
- * per page since (2026-11-16); readers page with whatever size the answer says it used.
+ * Rows per collection (or binder) page. Moxfield accepted up to 5000 until 2026-11-16, and answers
+ * 100 rows whatever is asked since; readers still page with the size the answer says it used.
  */
-export const MAX_COLLECTION_PAGE_SIZE = 5000;
+export const MOX_COLLECTION_PAGE_SIZE = 100;
 
 /**
  * Polite pace for Moxfield: one request at a time, a minimum gap plus random jitter.

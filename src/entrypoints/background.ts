@@ -117,7 +117,7 @@ export default defineBackground(() => {
 
   onMessage('startAccountSync', ({ data }) => {
     if (!isSiteType(data.type)) return { ok: false, code: 'no_account', error: 'Unknown site.' } as const;
-    return syncJobs[data.type].start({ accountKey: data.accountKey ?? null, collection: data.collection === true });
+    return syncJobs[data.type].start({ accountKey: data.accountKey ?? null, collection: data.collection === true, fullCollection: data.fullCollection === true });
   });
   onMessage('cancelAccountSync', ({ data }) => ({ ok: syncJobs[data.type].cancel() }));
 

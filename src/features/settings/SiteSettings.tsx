@@ -1,7 +1,7 @@
 import { Button, Group, NumberInput, Paper, SimpleGrid, Text, Title } from '@mantine/core';
 import { IconCheck, IconRestore } from '@tabler/icons-react';
 import { DEFAULT_SETTINGS, MOXFIELD_SETTING_KEYS, type Settings } from '@/lib/settings';
-import { MAX_COLLECTION_PAGE_SIZE, MOX_PACING } from '@/lib/sites/moxfield/constants';
+import { MOX_PACING } from '@/lib/sites/moxfield/constants';
 import { SiteIcon } from '@/lib/ui/SiteIcon';
 import { SettingsSection } from '@/lib/ui/SettingsSection';
 import { useSettingsForm } from '@/lib/ui/useSettingsForm';
@@ -9,7 +9,6 @@ import { useSettingsForm } from '@/lib/ui/useSettingsForm';
 const FIELD_LABELS: Partial<Record<keyof Settings, string>> = {
   moxfieldIntervalMs: 'Min. gap between requests',
   moxfieldJitterMs: 'Random extra delay',
-  moxfieldPageSize: 'Collection rows per request (panel)',
 };
 
 const MoxfieldIcon = ({ size = 20 }: { size?: number }) => <SiteIcon type="moxfield" size={size} />;
@@ -48,7 +47,7 @@ export function SiteSettings() {
         <Title order={4} mb="sm">
           Politeness (Moxfield rate limits)
         </Title>
-        <SimpleGrid cols={{ base: 1, sm: 3 }}>
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
           <NumberInput
             label={FIELD_LABELS.moxfieldIntervalMs}
             description={`Deck and collection syncs · default ${MOX_PACING.intervalMs} ms`}
@@ -68,15 +67,6 @@ export function SiteSettings() {
             step={250}
             value={s.moxfieldJitterMs}
             onChange={(v) => set('moxfieldJitterMs', n(v, DEFAULT_SETTINGS.moxfieldJitterMs))}
-          />
-          <NumberInput
-            label={FIELD_LABELS.moxfieldPageSize}
-            description={`"Check selling prices" in the panel · max ${MAX_COLLECTION_PAGE_SIZE} = one request`}
-            min={25}
-            max={MAX_COLLECTION_PAGE_SIZE}
-            step={100}
-            value={s.moxfieldPageSize}
-            onChange={(v) => set('moxfieldPageSize', n(v, DEFAULT_SETTINGS.moxfieldPageSize))}
           />
         </SimpleGrid>
         <Text size="xs" c="dimmed" mt="xs">

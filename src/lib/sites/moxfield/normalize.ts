@@ -42,6 +42,7 @@ export function normalizeEntry(raw: any): CollectionEntry | null {
     game: raw.game == null || raw.game === '' ? undefined : str(raw.game).toLowerCase(),
     ...(raw.language?.id ? { langId: str(raw.language.id) } : {}),
     ...(raw.tradeBinder?.id ? { binderId: str(raw.tradeBinder.id) } : {}),
+    ...(typeof raw.lastUpdatedAtUtc === 'string' ? { updatedAt: raw.lastUpdatedAtUtc } : {}),
     card: {
       id: str(c.id),
       scryfallId: str(c.scryfall_id),

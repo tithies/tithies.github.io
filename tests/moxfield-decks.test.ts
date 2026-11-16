@@ -1,5 +1,5 @@
 import { requestUrl, runMoxRequest, wholeCollectionUrl } from '@/lib/sites/moxfield/api';
-import { MAX_COLLECTION_PAGE_SIZE } from '@/lib/sites/moxfield/constants';
+import { MOX_COLLECTION_PAGE_SIZE } from '@/lib/sites/moxfield/constants';
 import { boardLabel, normalizeDeckCards, normalizeDeckList } from '@/lib/sites/moxfield/decks';
 import { printKey } from '@/lib/cards/prints';
 import { normalizeEntry } from '@/lib/sites/moxfield/normalize';
@@ -76,7 +76,7 @@ describe('Moxfield requests', () => {
     expect(requestUrl({ kind: 'nope' })).toBeNull();
     expect(requestUrl({ kind: 'collection', pageNumber: 0, pageSize: 10 })).toBeNull();
     const url = new URL(requestUrl({ kind: 'collection', pageNumber: 2, pageSize: 99_999 })!);
-    expect(url.searchParams.get('pageSize')).toBe(String(MAX_COLLECTION_PAGE_SIZE));
+    expect(url.searchParams.get('pageSize')).toBe(String(MOX_COLLECTION_PAGE_SIZE));
     expect(url.searchParams.get('pageNumber')).toBe('2');
   });
 

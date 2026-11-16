@@ -25,7 +25,7 @@ interface ProtocolMap {
    * collection when `collection` is true. `accountKey: null` syncs (and adds) whoever is logged in.
    * Answers once a tab is found; progress is in the account's meta 'sync'.
    */
-  startAccountSync(data: { type: SiteType; accountKey: AccountKey | null; collection: boolean }): StartSyncResult;
+  startAccountSync(data: { type: SiteType; accountKey: AccountKey | null; collection: boolean; fullCollection?: boolean }): StartSyncResult;
   cancelAccountSync(data: { type: SiteType }): { ok: boolean };
   /** background → site tab: can this tab make requests to its site? */
   siteStatus(): SiteTabStatus;

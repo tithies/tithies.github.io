@@ -1,5 +1,5 @@
 import type { SiteProvider } from '@/lib/sites/provider';
-import { MAX_COLLECTION_PAGE_SIZE, MOX_PACING, MOX_SITE_URL, MOX_SYNC_TAB_URL, MOX_TAB_PATTERNS } from './constants';
+import { MOX_COLLECTION_PAGE_SIZE, MOX_PACING, MOX_SITE_URL, MOX_SYNC_TAB_URL, MOX_TAB_PATTERNS } from './constants';
 import { BOARDS, boardLabel, boardOrder, DECK_CARDS_VERSION } from './decks';
 import { describeMoxMutation } from './mutations';
 
@@ -17,6 +17,6 @@ export const moxfieldSite: SiteProvider = {
   boardLabel,
   boardOrder,
   deckCardsVersion: DECK_CARDS_VERSION,
-  maxCollectionPageSize: MAX_COLLECTION_PAGE_SIZE,
+  collectionPageSize: MOX_COLLECTION_PAGE_SIZE,
   pacing: MOX_PACING,
 };
