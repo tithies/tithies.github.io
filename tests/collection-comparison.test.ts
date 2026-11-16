@@ -103,10 +103,10 @@ describe('compareDecksToCollection', () => {
     // Sol Ring in 3 decks, 2 copies owned (French + LP still count).
     expect(byKey(rows, 'c21|263|nonFoil')).toMatchObject({ kind: 'missing', deckQty: 3, collectionQty: 2, diff: -1 });
     expect(byKey(rows, 'c21|263|nonFoil')!.decks.map((d) => d.deckId).sort()).toEqual(['a', 'b', 'c']);
-    // Commanders count; matching prints produce no row.
-    expect(byKey(rows, '2x2|211|nonFoil')).toBeUndefined();
-    expect(byKey(rows, 'dsk|279|nonFoil')).toBeUndefined();
-    expect(byKey(rows, 'neo|5|nonFoil')).toBeUndefined();
+    // Commanders count; matching prints are match rows (shown only when asked).
+    expect(byKey(rows, '2x2|211|nonFoil')).toMatchObject({ kind: 'match', diff: 0 });
+    expect(byKey(rows, 'dsk|279|nonFoil')).toMatchObject({ kind: 'match', diff: 0 });
+    expect(byKey(rows, 'neo|5|nonFoil')).toMatchObject({ kind: 'match', diff: 0 });
     // Collection-only cards.
     expect(byKey(rows, 'otj|9|nonFoil')).toMatchObject({ kind: 'unassigned', deckQty: 0, collectionQty: 3, diff: 3 });
     // Ignored: maybeboard, proxies (both sides), MTGO/Arena rows.
@@ -114,7 +114,12 @@ describe('compareDecksToCollection', () => {
     expect(byKey(rows, 'lea|1|nonFoil')).toBeUndefined();
     expect(byKey(rows, 'otj|10|nonFoil')).toBeUndefined();
     expect(summary).toMatchObject({ decksIncluded: 3, decksWithoutCards: 0, proxiesSkipped: { decks: 1, collection: 1 }, nonPaperSkipped: 1 });
-    expect(rows.every((r) => r.diff !== 0)).toBe(true);
+    expect(rows.every((r) => (r.kind === 'match') === (r.diff === 0))).toBe(true);
+    const matches = rows.filter((r) => r.kind === 'match');
+    expect(summary.matchedPrints).toBe(matches.length);
+    expect(summary.matchedPrintCopies).toBe(matches.reduce((s, r) => s + r.deckQty, 0));
+    // Matches neither get nor give likely-wrong-print hints.
+    expect(matches.every((r) => r.otherPrints.length === 0)).toBe(true);
   });
 
   it('flags the other finish of the same print as the likely fix', () => {
@@ -125,12 +130,15 @@ describe('compareDecksToCollection', () => {
     expect(nonFoil).toMatchObject({ kind: 'unassigned', diff: 1 });
     expect(foil.otherPrints).toEqual([expect.objectContaining({ key: 'dmu|107|nonFoil', sameCn: true, diff: 1 })]);
     expect(nonFoil.otherPrints[0]).toMatchObject({ key: 'dmu|107|foil', diff: -1 });
+    // The hint names the decks using the other print (where to fix it).
+    expect(nonFoil.otherPrints[0].decks.map((d) => d.deckId)).toEqual(foil.decks.map((d) => d.deckId));
+    expect(nonFoil.otherPrints[0].decks.length).toBeGreaterThan(0);
     expect(summary.hinted).toBe(2);
   });
 
   it('applies deck, board and proxy options', () => {
     const noC = compareDecksToCollection(DECKS, CARDS, COLLECTION, { ...OPTS, excludedDeckIds: ['c'] });
-    expect(byKey(noC.rows, 'c21|263|nonFoil')).toBeUndefined(); // 2 decks, 2 copies
+    expect(byKey(noC.rows, 'c21|263|nonFoil')).toMatchObject({ kind: 'match' }); // 2 decks, 2 copies
     expect(noC.summary.decksIncluded).toBe(2);
 
     const withMaybe = compareDecksToCollection(DECKS, CARDS, COLLECTION, { ...OPTS, ignoredBoards: [] });
@@ -140,7 +148,7 @@ describe('compareDecksToCollection', () => {
     expect(byKey(noSide.rows, 'neo|5|nonFoil')).toMatchObject({ kind: 'unassigned', diff: 2 });
 
     const proxies = compareDecksToCollection(DECKS, CARDS, COLLECTION, { ...OPTS, ignoreProxies: false });
-    expect(byKey(proxies.rows, 'lea|1|nonFoil')).toBeUndefined(); // 1 proxy in a deck, 1 proxy owned
+    expect(byKey(proxies.rows, 'lea|1|nonFoil')).toMatchObject({ kind: 'match' }); // 1 proxy in a deck, 1 proxy owned
     expect(proxies.summary.proxiesSkipped).toEqual({ decks: 0, collection: 0 });
   });
 
@@ -154,7 +162,7 @@ describe('compareDecksToCollection', () => {
 
 describe('Comparator config and filters', () => {
   it('defaults and repairs stored config field by field', () => {
-    expect(DEFAULT_COMPARISON_CONFIG).toEqual({ showMissing: true, showUnassigned: false, ignoreProxies: true, ignoredBoards: ['maybeboard'], excludedDeckIds: [] });
+    expect(DEFAULT_COMPARISON_CONFIG).toEqual({ showMissing: true, showUnassigned: false, showMatched: false, ignoreProxies: true, ignoredBoards: ['maybeboard'], excludedDeckIds: [] });
     expect(parseComparisonConfig({ showMissing: false, ignoredBoards: 'oops', excludedDeckIds: ['a'] })).toEqual({
       ...DEFAULT_COMPARISON_CONFIG,
       showMissing: false,
@@ -164,7 +172,7 @@ describe('Comparator config and filters', () => {
   });
 
   it('filters, sorts and round-trips through the URL', () => {
-    const { rows } = compareDecksToCollection(DECKS, CARDS, COLLECTION, OPTS);
+    const rows = compareDecksToCollection(DECKS, CARDS, COLLECTION, OPTS).rows.filter((r) => r.kind !== 'match');
     const f = { q: 'deck b', sets: [], finishes: [], hinted: false };
     expect(applyComparisonFilters(rows, f, (id) => `Deck ${id}`).map((r) => r.name)).toEqual(['Sol Ring']);
     expect(applyComparisonFilters(rows, { ...f, q: '', hinted: true }, String).map((r) => r.key).sort()).toEqual(['dmu|107|foil', 'dmu|107|nonFoil']);

@@ -6,8 +6,11 @@ import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
 import { printKey } from '@/lib/cards/prints';
 import type { CardPrint, CollectionEntry, Finish } from '@/lib/cards/types';
 
-/** missing = in decks, not (enough) in the collection; unassigned = in the collection, not (enough) in decks. */
-export type ComparisonKind = 'missing' | 'unassigned';
+/**
+ * missing = in decks, not (enough) in the collection; unassigned = in the collection, not (enough)
+ * in decks; match = as many copies in decks as in the collection.
+ */
+export type ComparisonKind = 'missing' | 'unassigned' | 'match';
 
 export interface DeckUse {
   deckId: string;
@@ -26,6 +29,8 @@ export interface OtherPrint {
   diff: number;
   /** Same set and number: only the finish differs. */
   sameCn: boolean;
+  /** The decks that use that print (where to fix it when decks use the wrong one). */
+  decks: DeckUse[];
 }
 
 export interface ComparisonRow {
@@ -43,7 +48,7 @@ export interface ComparisonRow {
   cardId: string;
   deckQty: number;
   collectionQty: number;
-  /** collection − decks (< 0: missing, > 0: unassigned). */
+  /** collection − decks (< 0: missing, > 0: unassigned, 0: match). */
   diff: number;
   decks: DeckUse[];
   otherPrints: OtherPrint[];
@@ -63,6 +68,9 @@ export interface CompareSummary {
   collectionCopies: number;
   /** Copies present on both sides. */
   matchedCopies: number;
+  /** Prints with as many copies on both sides (match rows), and their copies. */
+  matchedPrints: number;
+  matchedPrintCopies: number;
   missingPrints: number;
   missingCopies: number;
   unassignedPrints: number;
@@ -101,6 +109,8 @@ export function compareDecksToCollection(
     deckCopies: 0,
     collectionCopies: 0,
     matchedCopies: 0,
+    matchedPrints: 0,
+    matchedPrintCopies: 0,
     missingPrints: 0,
     missingCopies: 0,
     unassignedPrints: 0,
@@ -169,14 +179,16 @@ export function compareDecksToCollection(
   for (const a of acc.values()) {
     summary.matchedCopies += Math.min(a.deckQty, a.collectionQty);
     const diff = a.collectionQty - a.deckQty;
-    if (diff === 0) continue;
-    const kind: ComparisonKind = diff < 0 ? 'missing' : 'unassigned';
+    const kind: ComparisonKind = diff < 0 ? 'missing' : diff > 0 ? 'unassigned' : 'match';
     if (kind === 'missing') {
       summary.missingPrints++;
       summary.missingCopies -= diff;
-    } else {
+    } else if (kind === 'unassigned') {
       summary.unassignedPrints++;
       summary.unassignedCopies += diff;
+    } else {
+      summary.matchedPrints++;
+      summary.matchedPrintCopies += a.deckQty;
     }
     rows.push({
       key: a.key,
@@ -198,18 +210,20 @@ export function compareDecksToCollection(
     });
   }
 
-  // Same card, opposite mismatch elsewhere: "deck uses DMU 435 foil, collection has DMU 435 non-foil".
+  // Same card, opposite difference elsewhere: "deck uses DMU 435 foil, collection has DMU 435 non-foil".
+  // Matches neither get nor give hints.
+  const differing = rows.filter((r) => r.diff !== 0);
   const byName = new Map<string, ComparisonRow[]>();
-  for (const r of rows) {
+  for (const r of differing) {
     const k = nameKey(r.name);
     const list = byName.get(k);
     if (list) list.push(r);
     else byName.set(k, [r]);
   }
-  for (const r of rows) {
-    const others = byName.get(nameKey(r.name))!.filter((o) => o !== r && Math.sign(o.diff) !== Math.sign(r.diff));
+  for (const r of differing) {
+    const others = byName.get(nameKey(r.name))!.filter((o) => o !== r && Math.sign(o.diff) === -Math.sign(r.diff));
     r.otherPrints = others
-      .map((o) => ({ key: o.key, set: o.set, setName: o.setName, cn: o.cn, finish: o.finish, diff: o.diff, sameCn: o.set === r.set && o.cn === r.cn }))
+      .map((o) => ({ key: o.key, set: o.set, setName: o.setName, cn: o.cn, finish: o.finish, diff: o.diff, sameCn: o.set === r.set && o.cn === r.cn, decks: o.decks }))
       .sort((x, y) => Number(y.sameCn) - Number(x.sameCn) || Math.abs(y.diff) - Math.abs(x.diff));
     if (r.otherPrints.length) summary.hinted++;
   }

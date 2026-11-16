@@ -4,7 +4,7 @@ import type { ComparisonRow } from './compare';
 export function comparisonToCsv(rows: ComparisonRow[], deckName: (id: string) => string, boardLabel: (board: string) => string): string {
   return Papa.unparse(
     rows.map((r) => ({
-      kind: r.kind === 'missing' ? 'missing_from_collection' : 'not_in_any_deck',
+      kind: r.kind === 'missing' ? 'missing_from_collection' : r.kind === 'unassigned' ? 'not_in_any_deck' : 'match',
       name: r.name,
       set: r.set.toUpperCase(),
       set_name: r.setName,

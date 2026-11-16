@@ -298,7 +298,10 @@ export function ComparisonPage() {
   if (fresh) previous.current = fresh;
   const result = fresh ?? previous.current;
   const shown = useMemo(
-    () => (result && config ? result.rows.filter((r) => (r.kind === 'missing' ? config.showMissing : config.showUnassigned)) : []),
+    () =>
+      result && config
+        ? result.rows.filter((r) => (r.kind === 'missing' ? config.showMissing : r.kind === 'unassigned' ? config.showUnassigned : config.showMatched))
+        : [],
     [result, config],
   );
 
@@ -376,7 +379,7 @@ export function ComparisonPage() {
       ) : (
         <>
           {s && (
-            <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }}>
+            <SimpleGrid cols={{ base: 1, xs: 2, md: 3, xl: 5 }}>
               <Stat
                 label="Missing from collection"
                 value={`${s.missingCopies} copies`}
@@ -398,6 +401,20 @@ export function ComparisonPage() {
                 action={config.showUnassigned ? 'Hide these rows' : 'Show these rows'}
               />
               <Stat
+                label="Matching"
+                value={`${s.matchedPrintCopies} copies`}
+                color={config.showMatched ? 'teal' : 'dimmed'}
+                lines={[
+                  'Prints with as many copies in decks as in the collection (exact print)',
+                  `${s.matchedPrints} prints`,
+                  !config.showMatched && 'Hidden from the table',
+                ].filter(Boolean) as string[]}
+                onClick={() => update({ showMatched: !config.showMatched })}
+                active={config.showMatched}
+                activeSuffix=" · shown"
+                action={config.showMatched ? 'Hide these rows' : 'Show these rows'}
+              />
+              <Stat
                 label="Likely wrong print"
                 value={String(s.hinted)}
                 color="yellow"
@@ -411,7 +428,7 @@ export function ComparisonPage() {
                 value={`${s.decksIncluded} decks`}
                 lines={[
                   `${s.deckCopies} deck copies · ${s.collectionCopies} collection copies`,
-                  `${s.matchedCopies} copies match`,
+                  `${s.matchedCopies} copies on both sides`,
                   s.proxiesSkipped.decks + s.proxiesSkipped.collection > 0 &&
                     `Proxies ignored: ${s.proxiesSkipped.decks} in decks, ${s.proxiesSkipped.collection} in collection`,
                   s.nonPaperSkipped > 0 && `${s.nonPaperSkipped} MTGO/Arena copies ignored`,
@@ -433,9 +450,11 @@ export function ComparisonPage() {
             boardLabel={site.boardLabel}
             loading={!loaded}
             emptyText={
-              config.showMissing || config.showUnassigned
-                ? 'No differences: decks and collection agree'
-                : 'Both kinds of rows are hidden: click “Missing from collection” or “Not in any deck” above to show them'
+              config.showMissing || config.showUnassigned || config.showMatched
+                ? config.showMatched
+                  ? 'Nothing to show'
+                  : 'No differences: decks and collection agree'
+                : 'Every kind of row is hidden: click “Missing from collection”, “Not in any deck” or “Matching” above to show them'
             }
           />
         </>

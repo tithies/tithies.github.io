@@ -66,7 +66,7 @@ export function applyComparisonFilters(rows: ComparisonRow[], f: ComparisonFilte
   });
 }
 
-const KIND_ORDER = { missing: 0, unassigned: 1 };
+const KIND_ORDER = { missing: 0, unassigned: 1, match: 2 };
 
 /**
  * `decks` sorts by the first deck shown in the row (the one using most copies). Empty values count as

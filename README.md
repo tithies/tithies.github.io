@@ -55,7 +55,7 @@ Normally every card in your decks is also in your collection, and every collecti
 - **Missing from collection**: copies your decks use that the collection doesn't have;
 - **Not in any deck**: collection copies no included deck uses.
 
-Each list is shown or hidden by clicking its panel above the table, since not everyone mirrors both ways. Copies of a print used by several decks add up (each physical copy is expected to live in one deck). Every language and condition of a collection print counts. MTGO/Arena collection rows are ignored.
+Each list is shown or hidden by clicking its panel above the table, since not everyone mirrors both ways. A third panel, **Matching**, shows the prints with as many copies in decks as in the collection (hidden by default; they have nothing to export). Copies of a print used by several decks add up (each physical copy is expected to live in one deck). Every language and condition of a collection print counts. MTGO/Arena collection rows are ignored.
 
 1. The first time, click **Sync decks**. Tithies reads your deck list, then every deck (about 6 minutes for ~270 decks), and keeps them in the extension.
 2. Pick the decks to compare in the folder tree (Moxfield folders, with tri-state folder checkboxes and search). Choices are saved, per account. They're stored as exclusions, so **new decks are included automatically** and marked *New*.
@@ -64,7 +64,7 @@ Each list is shown or hidden by clicking its panel above the table, since not ev
 
 **Presets.** A preset keeps the options (decks and folders left out, boards, proxies, which rows are shown) under a name. **Save as…** saves them as a new preset (typing the name of an existing one overwrites it, as its button says); **Save** saves your changes into the preset you loaded (without one, it asks for a name). Picking a preset in the list puts its options back; a *Modified* badge shows when you changed them since, and switching away from unsaved options asks first (and can save them into the loaded preset on the way). The options you're using are always kept as they are, presets only change when you save. Presets belong to the account, and **Reset settings** keeps them.
 
-Rows show which decks use the print. A yellow hint flags the likely fix when the same card differs the other way in another print or finish (e.g. the deck says foil, the collection has non-foil). Filters, sort and CSV export work like the F2F results table.
+Rows show which decks use the print. A yellow hint flags the likely fix when the same card differs the other way in another print or finish (e.g. the deck says foil, the collection has non-foil); when decks use that other print, the hint links them, since that is where to fix it. Filters, sort and CSV export work like the F2F results table.
 
 ### Exporting to Moxfield
 

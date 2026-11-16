@@ -5,13 +5,13 @@ import { MAX_EXPORT_QTY, type ExportList } from '@/lib/export/list';
 import { rowToItem } from '../export';
 import { DataTable, type DataTableColumn, type DataTableSortStatus } from 'mantine-datatable';
 import { useStickyTableHeader } from '@/lib/ui/useStickyTableHeader';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import type { DeckRow } from '@/lib/decks/types';
 import { scryfallCardLink, scryfallImage } from '@/lib/f2f/links';
 import { FINISH_LABEL, finishLabel } from '@/lib/format';
 import { CardThumb } from '@/lib/ui/CardThumb';
-import type { ComparisonRow, OtherPrint } from '../compare';
+import type { ComparisonRow, DeckUse, OtherPrint } from '../compare';
 import { downloadComparisonCsv } from '../csv';
 import {
   applyComparisonFilters,
@@ -86,8 +86,30 @@ function DeckUses({ row, decks, boardLabel }: { row: ComparisonRow; decks: Reado
   );
 }
 
-/** Add the row to the export, or (once in it) its quantity and remove. */
+/** "in Deck A, Deck B · Sideboard +2 more": the decks of a likely-wrong-print hint, linked. */
+function HintDecks({ uses, decks, boardLabel }: { uses: DeckUse[]; decks: ReadonlyMap<string, DeckRow>; boardLabel: (board: string) => string }) {
+  const shown = uses.slice(0, 2);
+  return (
+    <Text size="xs" c="dimmed" lineClamp={1}>
+      in{' '}
+      {shown.map((u, i) => (
+        <Fragment key={`${u.deckId}|${u.board}`}>
+          {i > 0 && ', '}
+          <Anchor href={decks.get(u.deckId)?.publicUrl} target="_blank" size="xs" inherit>
+            {decks.get(u.deckId)?.name ?? 'Unknown deck'}
+            {u.board === 'mainboard' ? '' : ` · ${boardLabel(u.board)}`}
+          </Anchor>
+          {u.qty > 1 ? ` ×${u.qty}` : ''}
+        </Fragment>
+      ))}
+      {uses.length > 2 && ` +${uses.length - 2} more`}
+    </Text>
+  );
+}
+
+/** Add the row to the export, or (once in it) its quantity and remove. A match has nothing to export. */
 function ExportCell({ row, exportList }: { row: ComparisonRow; exportList: ExportList }) {
+  if (row.diff === 0) return null;
   const item = exportList.get(row.key);
   if (!item) {
     return (
@@ -145,10 +167,16 @@ function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: s
               Missing
             </Badge>
           </Tooltip>
-        ) : (
+        ) : r.kind === 'unassigned' ? (
           <Tooltip label="In the collection, but no included deck uses these copies">
             <Badge color="orange" variant="light">
               Not in a deck
+            </Badge>
+          </Tooltip>
+        ) : (
+          <Tooltip label="As many copies of this exact print in the included decks as in the collection">
+            <Badge color="teal" variant="light">
+              Match
             </Badge>
           </Tooltip>
         ),
@@ -169,9 +197,13 @@ function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: s
             {r.name}
           </Text>
           {r.otherPrints.slice(0, 2).map((o) => (
-            <Text key={o.key} size="xs" c="yellow" lineClamp={1} title={hintText(o)}>
-              {hintText(o)}
-            </Text>
+            <Stack key={o.key} gap={0}>
+              <Text size="xs" c="yellow" lineClamp={1} title={hintText(o)}>
+                {hintText(o)}
+              </Text>
+              {/* Decks use the other print: those decks are where to fix it. */}
+              {o.diff < 0 && o.decks.length > 0 && <HintDecks uses={o.decks} decks={decks} boardLabel={boardLabel} />}
+            </Stack>
           ))}
           {r.otherPrints.length > 2 && (
             <Text size="xs" c="dimmed">
@@ -211,14 +243,14 @@ function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: s
     {
       accessor: 'diff',
       title: (
-        <Tooltip label="Collection − decks: negative = copies missing from the collection, positive = copies in no deck" multiline w={240}>
+        <Tooltip label="Collection − decks: negative = copies missing from the collection, positive = copies in no deck, 0 = a match" multiline w={240}>
           <span>Diff</span>
         </Tooltip>
       ),
       ...tight,
       sortable: true,
       textAlign: 'right',
-      render: (r) => num(r.diff > 0 ? `+${r.diff}` : r.diff, r.diff < 0 ? 'red' : 'orange'),
+      render: (r) => num(r.diff > 0 ? `+${r.diff}` : r.diff, r.diff < 0 ? 'red' : r.diff > 0 ? 'orange' : 'teal'),
     },
     { accessor: 'decks', title: 'Decks', sortable: true, render: (r) => <DeckUses row={r} decks={decks} boardLabel={boardLabel} /> },
     {
@@ -269,6 +301,8 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
   const records = view.slice((safePage - 1) * pageSize, safePage * pageSize);
   const columns = useMemo(() => buildColumns(decks, boardLabel, exportList), [decks, boardLabel, exportList]);
   const missingRows = useMemo(() => allRows.filter((r) => r.kind === 'missing'), [allRows]);
+  /** Matches have no difference to export. */
+  const exportableShown = useMemo(() => view.filter((r) => r.diff !== 0), [view]);
   const unassignedRows = useMemo(() => allRows.filter((r) => r.kind === 'unassigned'), [allRows]);
   const shownInExport = exportList ? view.filter((r) => exportList.has(r.key)).length : 0;
   const sortStatus: DataTableSortStatus<ComparisonRow> = { columnAccessor: sort.key, direction: sort.dir };
@@ -333,8 +367,8 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
             </Menu.Target>
             <Menu.Dropdown>
               <Menu.Label>Add to the export (copies = the difference)</Menu.Label>
-              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!view.length} onClick={() => exportList.add(view.map(rowToItem))}>
-                Rows shown, every page ({view.length})
+              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!exportableShown.length} onClick={() => exportList.add(exportableShown.map(rowToItem))}>
+                Rows shown, every page ({exportableShown.length})
               </Menu.Item>
               <Menu.Item leftSection={<IconPlus size={14} />} disabled={!missingRows.length} onClick={() => exportList.add(missingRows.map(rowToItem))}>
                 Every “Missing from collection” row ({missingRows.length})

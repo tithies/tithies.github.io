@@ -9,6 +9,8 @@ export const comparisonConfigSchema = z.object({
   showMissing: z.boolean().default(true).catch(true),
   /** Mode B: collection copies no (included) deck uses. */
   showUnassigned: z.boolean().default(false).catch(false),
+  /** Prints with as many copies in decks as in the collection. */
+  showMatched: z.boolean().default(false).catch(false),
   /** Leave proxy copies out on both sides. */
   ignoreProxies: z.boolean().default(true).catch(true),
   /** Deck boards left out (a board type never seen before counts by default). */
@@ -78,6 +80,7 @@ export function sameConfig(a: ComparisonConfig, b: ComparisonConfig): boolean {
   return (
     a.showMissing === b.showMissing &&
     a.showUnassigned === b.showUnassigned &&
+    a.showMatched === b.showMatched &&
     a.ignoreProxies === b.ignoreProxies &&
     sortedEq(a.ignoredBoards, b.ignoredBoards) &&
     sortedEq(a.excludedDeckIds, b.excludedDeckIds)
