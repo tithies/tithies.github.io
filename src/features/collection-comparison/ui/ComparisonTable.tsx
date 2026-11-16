@@ -1,4 +1,4 @@
-import { ActionIcon, Anchor, Badge, Button, Group, HoverCard, Menu, MultiSelect, NumberInput, Paper, Stack, Switch, Table, Text, TextInput, Tooltip } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Group, HoverCard, Menu, MultiSelect, NumberInput, Paper, Stack, Switch, Table, Text, TextInput, Tooltip, type ComboboxParsedItem } from '@mantine/core';
 import { useDebouncedCallback, useLocalStorage } from '@mantine/hooks';
 import { IconDownload, IconExternalLink, IconFileExport, IconPlus, IconSearch, IconTrash, IconX } from '@tabler/icons-react';
 import { MAX_EXPORT_QTY, type ExportList } from '@/lib/export/list';
@@ -9,7 +9,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import type { DeckRow } from '@/lib/decks/types';
 import { scryfallCardLink, scryfallImage } from '@/lib/f2f/links';
-import { FINISH_LABEL, finishLabel } from '@/lib/format';
+import { finishLabel, FINISH_LABEL, fold } from '@/lib/format';
 import { CardThumb } from '@/lib/ui/CardThumb';
 import type { ComparisonRow, DeckUse, OtherPrint } from '../compare';
 import { downloadComparisonCsv } from '../csv';
@@ -26,6 +26,8 @@ import {
 } from '../filtering';
 
 const PAGE_SIZES = [25, 50, 100, 250, 500];
+/** The typing area of a multi-select starts small and grows, so a picked value and it share one line. */
+const ONE_LINE_PILLS = { inputField: { minWidth: 40, flex: '1 1 40px', width: 0 } };
 const tight = { noWrap: true, width: '1%' } as const;
 
 const num = (children: React.ReactNode, c?: string) => (
@@ -309,11 +311,24 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
   const shownInExport = exportList ? view.filter((r) => exportList.has(r.key)).length : 0;
   const sortStatus: DataTableSortStatus<ComparisonRow> = { columnAccessor: sort.key, direction: sort.dir };
 
-  const setOptions = useMemo(() => {
+  // Picked sets show as their code ("M20") so the field stays one line; the list shows (and searches) names too.
+  const setNames = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of rows) m.set(r.set, r.setName);
-    return [...m].sort((a, b) => a[1].localeCompare(b[1])).map(([value, name]) => ({ value, label: `${name} (${value.toUpperCase()})` }));
+    return m;
   }, [rows]);
+  const setOptions = useMemo(
+    () => [...setNames].sort((a, b) => a[1].localeCompare(b[1])).map(([value]) => ({ value, label: value.toUpperCase() })),
+    [setNames],
+  );
+  const filterSets = ({ options, search }: { options: ComboboxParsedItem[]; search: string }) => {
+    const words = fold(search).split(/\s+/).filter(Boolean);
+    return options.filter((o) => {
+      if (!('value' in o)) return true;
+      const hay = fold(`${setNames.get(String(o.value)) ?? ''} ${o.value}`);
+      return words.every((w) => hay.includes(w));
+    });
+  };
   const filtered = filters.q.trim() !== '' || filters.sets.length > 0 || filters.finishes.length > 0 || filters.hinted;
 
   return (
@@ -336,8 +351,18 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
           data={setOptions}
           value={filters.sets}
           onChange={(v) => update({ ...filters, sets: v }, sort, 1)}
+          filter={filterSets}
+          renderOption={({ option }) => (
+            <Text size="sm">
+              {setNames.get(option.value) ?? option.value}{' '}
+              <Text span size="xs" c="dimmed">
+                {option.label}
+              </Text>
+            </Text>
+          )}
           searchable
           clearable
+          styles={ONE_LINE_PILLS}
           w={260}
         />
         <MultiSelect
@@ -347,6 +372,7 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
           value={filters.finishes}
           onChange={(v) => update({ ...filters, finishes: v }, sort, 1)}
           clearable
+          styles={ONE_LINE_PILLS}
           w={200}
         />
         <Switch

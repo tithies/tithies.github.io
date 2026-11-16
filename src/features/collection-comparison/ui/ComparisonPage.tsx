@@ -417,9 +417,13 @@ export function ComparisonPage() {
               <Stat
                 label="Likely wrong print"
                 value={String(s.hinted)}
-                color="yellow"
-                lines={['Same card is mismatched the other way in another print or finish']}
-                onClick={toggleHinted}
+                color={s.hinted ? 'yellow' : 'dimmed'}
+                lines={[
+                  'Same card is mismatched the other way in another print or finish',
+                  !s.hinted && 'None with these decks and options: it takes a card both missing and in no deck, in two prints',
+                ].filter(Boolean) as string[]}
+                // Nothing to show: not a filter then (unless it is on, to turn it off).
+                onClick={s.hinted || hintedOnly ? toggleHinted : undefined}
                 active={hintedOnly}
                 action={hintedOnly ? 'Show every row' : 'Show only these rows'}
               />
