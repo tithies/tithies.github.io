@@ -7,8 +7,10 @@
   --ti-navbar-shadow: 1px 0 10px rgba(16, 24, 40, 0.04);
   --ti-card-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 14px rgba(16, 24, 40, 0.05);
   --ti-art-opacity: 0.1;
-  /* Opacity of every surface in the page content, dialogs and popovers (see "Glass" below). */
+  /* Opacity of every surface in the page content (see "Glass" below)… */
   --ti-glass: 70%;
+  /* …and of what floats over it: dialogs, drawers, popovers, menus, dropdowns, tooltips. */
+  --ti-glass-float: 85%;
   --ti-glass-blur: 12px;
   /* Table rows: tints over their panel, so a see-through row stays see-through. */
   --ti-row-stripe: rgba(16, 24, 40, 0.025);
@@ -127,6 +129,14 @@ body {
    [data-mantine-color-scheme='dark'], so no selector here may start with that attribute. */
 :is(.mantine-AppShell-main, [data-portal]) .mantine-Paper-root {
   background-color: color-mix(in srgb, var(--mantine-color-body) var(--ti-glass), transparent);
+}
+
+/* What floats over the page is portaled to the body (dialogs, drawers, popovers, menus,
+   dropdowns, tooltips, the export bar): it is less see-through, everything inside it too. The
+   floating surfaces themselves also get it when they are not portaled. */
+[data-portal],
+:is(.mantine-Modal-content, .mantine-Drawer-content, .mantine-Popover-dropdown, .mantine-Menu-dropdown, .mantine-HoverCard-dropdown, .mantine-Combobox-dropdown, .mantine-Tooltip-tooltip) {
+  --ti-glass: var(--ti-glass-float);
 }
 
 /* Buttons, action icons, badges, theme icons, alerts. */
