@@ -308,3 +308,14 @@ describe('Change log', () => {
     expect(await db.changeCalls.count()).toBe(1);
   });
 });
+
+describe('Moxfield import answer (verified 2026-11-16)', () => {
+  it('reads what the import says it did', async () => {
+    const res = await runMoxRequest({ kind: 'mutate', op: IMPORT }, async () => new Response('{"isSuccessful":true,"totalImportedCount":57,"errors":[]}', { status: 200 }));
+    expect(res).toMatchObject({ ok: true, imported: { ok: true, count: 57, errors: [] } });
+    const bad = await runMoxRequest({ kind: 'mutate', op: IMPORT }, async () => new Response('{"isSuccessful":false,"totalImportedCount":1,"errors":["Line 3: card not found", {"line":4}]}', { status: 200 }));
+    expect(bad).toMatchObject({ ok: true, imported: { ok: false, count: 1, errors: ['Line 3: card not found', '{"line":4}'] } });
+    const odd = await runMoxRequest({ kind: 'mutate', op: IMPORT }, async () => new Response('done', { status: 200 }));
+    expect(odd).toEqual({ ok: true, kind: 'mutate', status: 200, response: 'done' });
+  });
+});

@@ -23,6 +23,14 @@ export type SiteRequest =
   /** A write. Every write goes through this one kind, so the change log sees all of them (see SiteClient.mutate). */
   | { kind: 'mutate'; op: SiteMutation };
 
+/** What a CSV import says it did (Moxfield: `{ isSuccessful, totalImportedCount, errors }`). */
+export interface ImportAnswer {
+  ok: boolean;
+  count: number;
+  /** The site's row errors, as text. */
+  errors: string[];
+}
+
 /** A binder of a collection site (Moxfield: a "trade binder", a label on collection entries). */
 export interface SiteBinder {
   id: string;
@@ -75,8 +83,8 @@ export type SiteSuccess = (
   | { ok: true; kind: 'deck'; lastUpdatedAt: string; cards: DeckCard[] }
   | { ok: true; kind: 'collection'; entries: CollectionEntry[]; totalResults: number; totalPages: number; pageSize: number }
   | { ok: true; kind: 'binders'; binders: SiteBinder[] }
-  /** `response`: the start of the answer (change log); `binder`: what a createBinder made. */
-  | { ok: true; kind: 'mutate'; status: number; response: string; binder?: SiteBinder }
+  /** `response`: the start of the answer (change log); `binder`: what a createBinder made; `imported`: what an import says it did. */
+  | { ok: true; kind: 'mutate'; status: number; response: string; binder?: SiteBinder; imported?: ImportAnswer }
 ) & {
   /** The session the request was made as (see SiteFailure.as). */
   as?: SiteIdentity | null;

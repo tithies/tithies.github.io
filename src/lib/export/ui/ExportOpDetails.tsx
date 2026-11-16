@@ -114,6 +114,26 @@ export function ExportOpDetails({ op }: { op: ChangeOp }) {
         />
       </SimpleGrid>
 
+      {d.imported && (d.imported.errors.length > 0 || d.imported.failed > 0) && (
+        <Alert color="orange" variant="light" icon={<IconAlertTriangle size={18} />} p="xs" title={`${site.label} reported problems with the import`}>
+          <Stack gap={2}>
+            <Text size="sm">
+              {site.label} says it imported {plural(d.imported.count, 'copy', 'copies')}
+              {d.imported.failed ? `; ${plural(d.imported.failed, 'import')} failed` : ''}.
+            </Text>
+            {d.imported.errors.slice(0, 20).map((e, i) => (
+              <Text key={i} size="xs" ff="monospace">
+                {e}
+              </Text>
+            ))}
+            {d.imported.errors.length > 20 && (
+              <Text size="xs" c="dimmed">
+                …and {d.imported.errors.length - 20} more (in the JSON download)
+              </Text>
+            )}
+          </Stack>
+        </Alert>
+      )}
       {v ? (
         v.ok ? (
           <Alert color="teal" variant="light" icon={<IconCircleCheck size={18} />} p="xs">

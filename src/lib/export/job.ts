@@ -304,10 +304,16 @@ export class ExportJob {
         else for (const op of exporter.removeEntries(plan.remove.entries.map((e) => e.entryId))) await write(op, `Deleting the cards in ${plan.targetLabel}`);
       }
       const imports = exporter.importItems(plan.items, binderId);
-      for (const [i, op] of imports.entries()) await write(op, imports.length > 1 ? `Adding the cards (${i + 1}/${imports.length})` : 'Adding the cards');
+      for (const [i, op] of imports.entries()) {
+        const res = await write(op, imports.length > 1 ? `Adding the cards (${i + 1}/${imports.length})` : 'Adding the cards');
+        if (res.imported) {
+          const prev = details.imported ?? { count: 0, errors: [], failed: 0 };
+          details.imported = { count: prev.count + res.imported.count, errors: [...prev.errors, ...res.imported.errors].slice(0, 200), failed: prev.failed + (res.imported.ok ? 0 : 1) };
+        }
+      }
 
-      await save({ phase: 'Checking every copy', progress: { done, total } });
-      const after = await readWholeCollection(this.site, client, { signal });
+      await save({ phase: 'Checking every copy', progress: { done: 0, total: 1 } });
+      const after = await readWholeCollection(this.site, client, { signal, onProgress: (p) => void patchOp(opId, { progress: { done: p.done, total: p.total } }).catch(() => {}) });
       details.verify = verifyExport(plan, before.entries, after, binderId);
       await save({ status: 'done', phase: details.verify.ok ? 'Done: every copy is there' : 'Done, with differences (see below)', finishedAt: Date.now() });
     } catch (e) {

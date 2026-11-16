@@ -70,7 +70,7 @@ function CallRow({ call }: { call: ChangeCall }) {
         <Text size="xs" c="dimmed" className="ti-num">
           {dateTime(call.at)}
           {call.status ? ` · HTTP ${call.status}` : ''}
-          {call.durationMs != null ? ` · ${duration(call.durationMs)}` : ''}
+          {call.durationMs != null ? ` · ${call.durationMs < 1000 ? `${call.durationMs} ms` : duration(call.durationMs)}` : ''}
           {call.as ? ` · as ${call.as.userName}` : ''}
           {call.error ? ` · ${call.error}` : ''}
         </Text>

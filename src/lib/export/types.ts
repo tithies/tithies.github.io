@@ -122,5 +122,7 @@ export interface ExportDetails {
   after: number;
   /** The binder created or used. */
   binder?: SiteBinder;
+  /** What the site said each import did (copies it says it imported, its row errors). */
+  imported?: { count: number; errors: string[]; failed: number };
   verify?: ExportVerification;
 }

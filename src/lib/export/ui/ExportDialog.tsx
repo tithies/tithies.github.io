@@ -387,6 +387,8 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [opId, setOpId] = useState<number | null>(null);
+  const op = useChangeOp(opId);
+  const over = !!op && op.status !== 'running';
 
   // Opening: start over at the target step (choices kept); another account than the compared one first.
   useEffect(() => {
@@ -578,7 +580,7 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
           <Stack mt="md">
             {opId != null && <ProgressStep opId={opId} site={site} onCancel={() => void cancelExport(site.type)} />}
             <Group justify="flex-end">
-              {onEmptyCart && items.length > 0 && (
+              {onEmptyCart && over && items.length > 0 && (
                 <Button
                   variant="subtle"
                   color="red"

@@ -6,7 +6,7 @@ import type { CollectionEntry } from '@/lib/cards/types';
 import { siteFail, type SiteRequest, type SiteResult } from '@/lib/sites/types';
 import { MAX_COLLECTION_PAGE_SIZE, MOX_API_ORIGIN } from './constants';
 import { normalizeDeckCards, normalizeDeckList } from './decks';
-import { binderFromAnswer, buildMoxMutation, normalizeBinderList, type BuiltMutation } from './mutations';
+import { binderFromAnswer, buildMoxMutation, importAnswer, normalizeBinderList, type BuiltMutation } from './mutations';
 import { COLLECTION_SEARCH_PATH, normalizeEntry, type CollectionPage } from './normalize';
 
 export const DECK_LIST_URL = `${MOX_API_ORIGIN}/v3/decks`;
@@ -117,6 +117,15 @@ async function runMoxWrite(op: unknown, doFetch: (url: string, init?: WriteInit)
     }
     if (!binder) return { ...siteFail(res.status, 'parse', "Moxfield created the binder but its answer didn't say which one"), response };
     return { ok: true, kind: 'mutate', status: res.status, response, binder };
+  }
+  if (kind === 'importCsv') {
+    let imported = null;
+    try {
+      imported = importAnswer(JSON.parse(text));
+    } catch {
+      /* an unexpected answer: the check after the export tells what was made */
+    }
+    return { ok: true, kind: 'mutate', status: res.status, response, ...(imported ? { imported } : {}) };
   }
   return { ok: true, kind: 'mutate', status: res.status, response };
 }

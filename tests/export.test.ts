@@ -195,7 +195,8 @@ class FakeMox {
           const finish = (r.Foil || 'nonFoil') as Finish;
           this.entries.push(entry(r.Name, set, cn, Number(r.Count), finish, op.binderId));
         }
-        return { ok: true, kind: 'mutate', status: 200, response: `{"imported":${rows.length}}` };
+        const count = rows.reduce((s, r) => s + Number(r.Count), 0);
+        return { ok: true, kind: 'mutate', status: 200, response: `{"isSuccessful":true,"totalImportedCount":${count},"errors":[]}`, imported: { ok: true, count, errors: [] } };
       }
     }
   };
@@ -249,6 +250,7 @@ describe('Export job', () => {
     ]);
     expect(calls[1].body).toContain('"2","2","Sol Ring","c21","Near Mint","English","","","","263","False","False",""');
     expect(details.verify).toMatchObject({ ok: true, expectedCopies: 3, foundCopies: 3 });
+    expect(details.imported).toEqual({ count: 3, errors: [], failed: 0 });
     expect(details.binder).toMatchObject({ id: 'nb1', name: 'To buy' });
   });
 

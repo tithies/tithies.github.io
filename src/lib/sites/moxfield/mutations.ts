@@ -5,7 +5,7 @@
  *
  * Endpoints were read from Moxfield's own web app (2026-11-16): see the tithies-f2f-api memory.
  */
-import type { BinderVisibility, DescribedRequest, SiteBinder, SiteMutation } from '@/lib/sites/types';
+import type { BinderVisibility, DescribedRequest, ImportAnswer, SiteBinder, SiteMutation } from '@/lib/sites/types';
 import { MOX_API_ORIGIN } from './constants';
 import { MOX_CSV_HEADER } from './csv';
 
@@ -86,6 +86,15 @@ export function binderFromAnswer(raw: unknown): SiteBinder | null {
     name: typeof b.name === 'string' ? b.name : '',
     visibility: typeof b.visibility === 'string' ? b.visibility : '',
   };
+}
+
+/** import-file's answer: `{"isSuccessful":true,"totalImportedCount":57,"errors":[]}` (verified 2026-11-16). */
+export function importAnswer(raw: unknown): ImportAnswer | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.isSuccessful !== 'boolean') return null;
+  const errors = Array.isArray(r.errors) ? r.errors.slice(0, 200).map((e) => (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 300)) : [];
+  return { ok: r.isSuccessful, count: typeof r.totalImportedCount === 'number' ? r.totalImportedCount : 0, errors };
 }
 
 /** GET /v1/trade-binders → binders (an array, or `{ data: [...] }`). */
