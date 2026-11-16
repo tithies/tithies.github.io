@@ -251,7 +251,8 @@ body .mantine-Tooltip-tooltip {
   -webkit-backdrop-filter: blur(var(--ti-glass-blur));
   backdrop-filter: blur(var(--ti-glass-blur));
 }
-body .mantine-Modal-content {
+/* Dialogs, drawers and floating bars (an Affix: the export bar) blur what is under them too. */
+body :is(.mantine-Modal-content, .mantine-Drawer-content, .mantine-Affix-root > .mantine-Paper-root) {
   -webkit-backdrop-filter: blur(var(--ti-glass-blur));
   backdrop-filter: blur(var(--ti-glass-blur));
 }
