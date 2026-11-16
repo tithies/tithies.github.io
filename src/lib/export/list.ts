@@ -1,29 +1,29 @@
 /**
- * The export cart: what a page will export, print by print with a quantity. It lives in the
+ * The export list: what a page will export, print by print with a quantity. It lives in the
  * page's state only (each page has its own; leaving the page empties it).
  */
 import { useCallback, useMemo, useReducer } from 'react';
 import type { ExportItem } from './types';
 
-export type CartState = ReadonlyMap<string, ExportItem>;
+export type ExportListState = ReadonlyMap<string, ExportItem>;
 
-export type CartAction =
-  /** Adds the items not in the cart yet (those already in it keep their quantity). */
+export type ExportListAction =
+  /** Adds the items not in the list yet (those already in it keep their quantity). */
   | { type: 'add'; items: readonly ExportItem[] }
   | { type: 'remove'; keys: readonly string[] }
   /** Below 1: removed. */
   | { type: 'setQty'; key: string; qty: number }
   | { type: 'clear' };
 
-export const MAX_CART_QTY = 9999;
+export const MAX_EXPORT_QTY = 9999;
 
-export function cartReducer(state: CartState, a: CartAction): CartState {
+export function exportListReducer(state: ExportListState, a: ExportListAction): ExportListState {
   switch (a.type) {
     case 'add': {
       const fresh = a.items.filter((i) => i.qty > 0 && !state.has(i.key));
       if (!fresh.length) return state;
       const next = new Map(state);
-      for (const i of fresh) next.set(i.key, { ...i, qty: Math.min(MAX_CART_QTY, Math.round(i.qty)) });
+      for (const i of fresh) next.set(i.key, { ...i, qty: Math.min(MAX_EXPORT_QTY, Math.round(i.qty)) });
       return next;
     }
     case 'remove': {
@@ -36,7 +36,7 @@ export function cartReducer(state: CartState, a: CartAction): CartState {
       const item = state.get(a.key);
       if (!item) return state;
       const next = new Map(state);
-      const qty = Math.min(MAX_CART_QTY, Math.floor(a.qty));
+      const qty = Math.min(MAX_EXPORT_QTY, Math.floor(a.qty));
       if (!(qty >= 1)) next.delete(a.key);
       else next.set(a.key, { ...item, qty });
       return next;
@@ -46,13 +46,13 @@ export function cartReducer(state: CartState, a: CartAction): CartState {
   }
 }
 
-export function cartTotals(state: CartState): { prints: number; copies: number } {
+export function exportListTotals(state: ExportListState): { prints: number; copies: number } {
   let copies = 0;
   for (const i of state.values()) copies += i.qty;
   return { prints: state.size, copies };
 }
 
-export interface ExportCart {
+export interface ExportList {
   items: ExportItem[];
   prints: number;
   copies: number;
@@ -64,14 +64,14 @@ export interface ExportCart {
   clear(): void;
 }
 
-export function useExportCart(): ExportCart {
-  const [state, dispatch] = useReducer(cartReducer, new Map() as CartState);
+export function useExportList(): ExportList {
+  const [state, dispatch] = useReducer(exportListReducer, new Map() as ExportListState);
   const add = useCallback((items: readonly ExportItem[]) => dispatch({ type: 'add', items }), []);
   const remove = useCallback((keys: readonly string[]) => dispatch({ type: 'remove', keys }), []);
   const setQty = useCallback((key: string, qty: number) => dispatch({ type: 'setQty', key, qty }), []);
   const clear = useCallback(() => dispatch({ type: 'clear' }), []);
   return useMemo(() => {
-    const t = cartTotals(state);
+    const t = exportListTotals(state);
     return {
       items: [...state.values()],
       ...t,

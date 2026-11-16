@@ -295,10 +295,26 @@ export class SiteClient {
     return { lastUpdatedAt, cards };
   }
 
-  async collectionPage(pageNumber: number, pageSize: number): Promise<{ entries: CollectionEntry[]; totalResults: number; totalPages: number; pageSize: number }> {
-    const { entries, totalResults, totalPages, pageSize: size } = await this.request({ kind: 'collection', pageNumber, pageSize });
-    return { entries, totalResults, totalPages, pageSize: size };
+  /** One page of the whole collection. */
+  async collectionPage(pageNumber: number, pageSize: number): Promise<CollectionPageResult> {
+    const { entries, totalResults, totalPages, pageSize: size, totalCopies } = await this.request({ kind: 'collection', pageNumber, pageSize });
+    return { entries, totalResults, totalPages, pageSize: size, ...(totalCopies !== undefined ? { totalCopies } : {}) };
   }
+
+  /** One page of one binder's cards (`publicId` as in the binder's URL). */
+  async binderPage(publicId: string, pageNumber: number, pageSize: number): Promise<CollectionPageResult> {
+    const { entries, totalResults, totalPages, pageSize: size, totalCopies } = await this.request({ kind: 'binderPage', publicId, pageNumber, pageSize });
+    return { entries, totalResults, totalPages, pageSize: size, ...(totalCopies !== undefined ? { totalCopies } : {}) };
+  }
+}
+
+export interface CollectionPageResult {
+  entries: CollectionEntry[];
+  totalResults: number;
+  totalPages: number;
+  pageSize: number;
+  /** Copies over every page, when the site says. */
+  totalCopies?: number;
 }
 
 /** What the deck sync needs from a client (lets tests use a fake). */

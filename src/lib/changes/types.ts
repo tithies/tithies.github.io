@@ -24,7 +24,8 @@ export interface ChangeOp {
   status: ChangeOpStatus;
   /** The step running now, or the last one. */
   phase?: string;
-  progress?: { done: number; total: number };
+  /** The step's progress: pages read, or changes sent. */
+  progress?: { done: number; total: number; unit?: 'page' | 'change' };
   error?: string;
   startedAt: number;
   heartbeatAt: number;

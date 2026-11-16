@@ -1,6 +1,6 @@
 /**
  * Exporting cards to an account of a site, as a binder or into its collection. Site-neutral:
- * pages build ExportItems (a cart), the dialog previews an ExportPlan from a live read of the
+ * pages build ExportItems (the export list), the dialog previews an ExportPlan from a live read of the
  * target, and the background ExportJob makes the changes and checks them.
  */
 import type { AccountKey } from '@/lib/accounts/types';
@@ -31,11 +31,27 @@ export type ExportTarget =
   | { accountKey: AccountKey; kind: 'binder'; binderId: string; mode: ExportMode }
   | { accountKey: AccountKey; kind: 'collection'; mode: ExportMode };
 
+/**
+ * What is read from the target account: its binder list only, plus one binder's cards, or the
+ * collection's totals (one page), or the whole collection. Each step reads only what it needs.
+ */
+export type TargetRead = { kind: 'binders' } | { kind: 'binder'; binderId: string } | { kind: 'totals' } | { kind: 'collection' };
+
 /** What the target account has: read live for the preview, again before changing anything, and after. */
 export interface TargetState {
   binders: SiteBinder[];
+  read: TargetRead;
+  /** The entries read: the binder's, or the whole collection's (none for 'binders' and 'totals'). */
   entries: CollectionEntry[];
+  /** The whole collection's size ('totals' and 'collection' reads). */
+  totals: { entries: number; copies: number } | null;
   readAt: number;
+}
+
+/** A read in progress: pages of the collection (or binder) read so far. */
+export interface ReadProgress {
+  done: number;
+  total: number;
 }
 
 /** A collection entry the export deletes, kept whole in the log (to put it back by hand). */
@@ -98,9 +114,11 @@ export interface VerifyDiff {
 
 export interface ExportVerification {
   ok: boolean;
+  /** What was compared: the binder's cards only, or the whole collection. */
+  scope: 'binder' | 'collection';
   expectedCopies: number;
   foundCopies: number;
-  /** Prints of the cart with fewer copies than expected. */
+  /** Prints of the export with fewer copies than expected. */
   short: VerifyDiff[];
   /** Prints with more copies than expected (a card imported as another print shows up as short + extra). */
   extra: VerifyDiff[];

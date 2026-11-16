@@ -69,15 +69,26 @@ Rows show which decks use the print. A yellow hint flags the likely fix when the
 
 The rows of a comparison can be exported to a Moxfield account, as a binder or into its collection (e.g. the cards your decks miss into a "To buy" binder of another account).
 
-1. **Fill the export cart.** Each row has a cart button (copies = the difference; change the quantity in the row or in the cart). The **Cart** menu adds every row shown (all pages), every "Missing from collection" row, or every "Not in any deck" row, removes the rows shown, or clears the cart. The cart only lives on the page: leaving it asks first.
+1. **Choose what to export.** Each row has an export button (copies = the difference; change the quantity in the row or in the review drawer). The **Export** menu adds every row shown (all pages), every "Missing from collection" row, or every "Not in any deck" row, removes the rows shown, or clears the export. The list only lives on the page: leaving it asks first.
 2. **Export to Moxfield…** (the bar at the bottom) opens four steps:
-   - **Target**: the Moxfield account (another one than the compared account by default), then a **new binder** (name, visibility), an **existing binder** or the **collection**, each with **Add** (keep what's there) or **Replace** (delete what's there first). Tithies reads the account's binders and whole collection (reads only); it must be the account logged in on Moxfield in this browser.
-   - **Preview**: everything that will change, read live: what is created, deleted (every entry) and added, the copies before → after, the requests and how long they take, and warnings. Binder cards are collection cards on Moxfield: replacing a binder deletes its cards from the collection; replacing the collection deletes every card, binders included.
+   - **Target**: the Moxfield account (another one than the compared account by default), then a **new binder** (name, visibility), an **existing binder** or the **collection**, each with **Add** (keep what's there) or **Replace** (delete what's there first). It must be the account logged in on Moxfield in this browser.
+   - **Preview** (nothing is changed yet): everything that would change, read live: what would be created, deleted (every entry) and added, the copies before → after, the requests and how long they would take, and warnings. Binder cards are collection cards on Moxfield: replacing a binder deletes its cards from the collection; replacing the collection deletes every card, binders included.
    - **Confirm**: a checkbox; for a replace, type the binder name (or the username, for the collection); for the compared account itself, a second explanation (the exported cards become part of the collection you compare: missing cards stop being missing, cards in no deck are then there twice).
    - **Progress**: Tithies reads the target again and stops if it changed since the preview, makes the changes, then reads the collection again and **checks every copy** per print: "all 57 copies are there, and nothing else changed", or the prints short, extra (a card imported as another print shows up as one short and one extra) or otherwise changed.
-3. Cards are added Near Mint, English, with their exact set, collector number and finish. The cart stays after an export (to try again); empty it from the last step.
+3. Cards are added Near Mint, English, with their exact set, collector number and finish. The export list stays after an export (to try again); clear it from the last step.
 
-The export is reusable by other pages: `src/lib/export/` (cart, dialog, plan, check, background job) with each site's writes in `src/lib/sites/<type>/export.ts`. One Moxfield job runs at a time: a sync waits for an export and the other way round.
+**Requests, step by step.** Each step reads only what it needs (Moxfield answers 100 rows per page, at your Moxfield pace):
+
+| Target | Target step | Preview | Before the changes | Changes | Check |
+|---|---|---|---|---|---|
+| New binder | binder list (1) | nothing more | binder list (1) | create binder, import(s) | binder list + the binder's pages |
+| Existing binder, add or replace | binder list (1) | the binder's pages | binder list + the binder's pages | (replace: bulk remove) + import(s) | binder list + the binder's pages |
+| Collection, add | binder list (1) | 1 page (its size) | binder list + every page | import(s) | binder list + every page |
+| Collection, replace | binder list (1) | every page | binder list + every page | delete collection + import(s) | binder list + the new collection's pages |
+
+A binder is read with Moxfield's own binder search (`/v1/trade-binders/{publicId}/search`); if that fails, Tithies reads the whole collection instead and keeps that binder's cards. Every read shows its progress (page *n* of *m*, %).
+
+The export is reusable by other pages: `src/lib/export/` (export list, dialog, plan, check, background job) with each site's writes in `src/lib/sites/<type>/export.ts`. One Moxfield job runs at a time: a sync waits for an export and the other way round.
 
 ## Change log
 
@@ -120,7 +131,7 @@ src/features/settings/    Settings page: accounts, Moxfield pace, stored data, r
 src/lib/accounts/         accounts, the current account, and the access layer: the only code that touches per-account data
 src/lib/cards/            site-neutral card types (collection entries, prints)
 src/lib/decks/            reusable deck sync + cache, collection snapshot, background job, folder tree, deck picker
-src/lib/export/           reusable export to a site: page cart, dialog, plan + check, background job
+src/lib/export/           reusable export to a site: page export list, dialog, plan + check, background job
 src/lib/changes/          the change log (every write, by action)
 src/lib/sites/            site providers (account types) + registry, polite client, tab transport, live sessions
 src/lib/sites/moxfield/   Moxfield: API requests, normalisation, session/account in the page, provider

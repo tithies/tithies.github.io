@@ -123,7 +123,12 @@ export default defineBackground(() => {
 
   onMessage('readExportTarget', ({ data }) => {
     if (!isSiteType(data?.type) || !parseAccountKey(data.accountKey)) return { ok: false, code: 'no_account', error: 'Unknown account.' } as const;
-    return exportJobs[data.type].readTarget(data.accountKey);
+    const { type, accountKey } = data;
+    return exportJobs[type].readTarget(accountKey, data.read ?? { kind: 'binders' }, (p) =>
+      void sendMessage('exportReadProgress', { type, accountKey, ...p }).catch(() => {
+        /* no dashboard open */
+      }),
+    );
   });
   onMessage('startExport', ({ data }) => {
     if (!isSiteType(data?.type)) return { ok: false, code: 'unsupported', error: 'Unknown site.' } as const;

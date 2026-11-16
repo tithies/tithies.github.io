@@ -1,7 +1,7 @@
 import { ActionIcon, Anchor, Badge, Button, Group, HoverCard, Menu, MultiSelect, NumberInput, Paper, Stack, Switch, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { useDebouncedCallback, useLocalStorage } from '@mantine/hooks';
-import { IconDownload, IconExternalLink, IconSearch, IconShoppingCart, IconShoppingCartPlus, IconTrash, IconX } from '@tabler/icons-react';
-import { MAX_CART_QTY, type ExportCart } from '@/lib/export/cart';
+import { IconDownload, IconExternalLink, IconFileExport, IconPlus, IconSearch, IconTrash, IconX } from '@tabler/icons-react';
+import { MAX_EXPORT_QTY, type ExportList } from '@/lib/export/list';
 import { rowToItem } from '../export';
 import { DataTable, type DataTableColumn, type DataTableSortStatus } from 'mantine-datatable';
 import { useStickyTableHeader } from '@/lib/ui/useStickyTableHeader';
@@ -86,14 +86,14 @@ function DeckUses({ row, decks, boardLabel }: { row: ComparisonRow; decks: Reado
   );
 }
 
-/** Add to the cart, or (in it) its quantity and remove. */
-function CartCell({ row, cart }: { row: ComparisonRow; cart: ExportCart }) {
-  const item = cart.get(row.key);
+/** Add the row to the export, or (once in it) its quantity and remove. */
+function ExportCell({ row, exportList }: { row: ComparisonRow; exportList: ExportList }) {
+  const item = exportList.get(row.key);
   if (!item) {
     return (
-      <Tooltip label={`Add to the export cart (×${Math.abs(row.diff)})`}>
-        <ActionIcon variant="subtle" onClick={() => cart.add([rowToItem(row)])} aria-label={`Add ${row.name} to the export cart`}>
-          <IconShoppingCartPlus size={16} />
+      <Tooltip label={`Add to the export (×${Math.abs(row.diff)})`}>
+        <ActionIcon variant="subtle" onClick={() => exportList.add([rowToItem(row)])} aria-label={`Add ${row.name} to the export`}>
+          <IconFileExport size={16} />
         </ActionIcon>
       </Tooltip>
     );
@@ -104,32 +104,32 @@ function CartCell({ row, cart }: { row: ComparisonRow; cart: ExportCart }) {
         size="xs"
         w={64}
         min={1}
-        max={MAX_CART_QTY}
+        max={MAX_EXPORT_QTY}
         allowDecimal={false}
         value={item.qty}
-        onChange={(v) => typeof v === 'number' && cart.setQty(row.key, v)}
+        onChange={(v) => typeof v === 'number' && exportList.setQty(row.key, v)}
         aria-label={`Copies of ${row.name} to export`}
       />
-      <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => cart.remove([row.key])} aria-label={`Remove ${row.name} from the export cart`}>
+      <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => exportList.remove([row.key])} aria-label={`Remove ${row.name} from the export`}>
         <IconX size={14} />
       </ActionIcon>
     </Group>
   );
 }
 
-function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: string) => string, cart?: ExportCart): DataTableColumn<ComparisonRow>[] {
+function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: string) => string, exportList?: ExportList): DataTableColumn<ComparisonRow>[] {
   return [
-    ...(cart
+    ...(exportList
       ? [
           {
-            accessor: 'cart',
+            accessor: 'export',
             title: (
-              <Tooltip label="Export cart: what to export to a binder or a collection">
-                <IconShoppingCart size={16} />
+              <Tooltip label="Export: the cards to send to a binder or a collection">
+                <IconFileExport size={16} />
               </Tooltip>
             ),
             ...tight,
-            render: (r: ComparisonRow) => <CartCell row={r} cart={cart} />,
+            render: (r: ComparisonRow) => <ExportCell row={r} exportList={exportList} />,
           } satisfies DataTableColumn<ComparisonRow>,
         ]
       : []),
@@ -238,10 +238,10 @@ function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: s
 
 interface Props {
   rows: ComparisonRow[];
-  /** Every row of the comparison, shown or not (for the cart shortcuts). */
+  /** Every row of the comparison, shown or not (for the export shortcuts). */
   allRows?: ComparisonRow[];
-  /** The page's export cart (adds a cart column and shortcuts). */
-  cart?: ExportCart;
+  /** What the page will export (adds an export column and shortcuts). */
+  exportList?: ExportList;
   decks: ReadonlyMap<string, DeckRow>;
   /** The decks' site board names ("Sideboard"…). */
   boardLabel: (board: string) => string;
@@ -249,7 +249,7 @@ interface Props {
   emptyText: string;
 }
 
-export function ComparisonTable({ rows, allRows = rows, cart, decks, boardLabel, loading, emptyText }: Props) {
+export function ComparisonTable({ rows, allRows = rows, exportList, decks, boardLabel, loading, emptyText }: Props) {
   const tableRef = useStickyTableHeader();
   const [params, setParams] = useSearchParams();
   const [pageSize, setPageSize] = useLocalStorage({ key: 'tithies:decks:pageSize', defaultValue: 50 });
@@ -267,10 +267,10 @@ export function ComparisonTable({ rows, allRows = rows, cart, decks, boardLabel,
   const lastPage = Math.max(1, Math.ceil(view.length / pageSize));
   const safePage = Math.min(page, lastPage);
   const records = view.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const columns = useMemo(() => buildColumns(decks, boardLabel, cart), [decks, boardLabel, cart]);
+  const columns = useMemo(() => buildColumns(decks, boardLabel, exportList), [decks, boardLabel, exportList]);
   const missingRows = useMemo(() => allRows.filter((r) => r.kind === 'missing'), [allRows]);
   const unassignedRows = useMemo(() => allRows.filter((r) => r.kind === 'unassigned'), [allRows]);
-  const shownInCart = cart ? view.filter((r) => cart.has(r.key)).length : 0;
+  const shownInExport = exportList ? view.filter((r) => exportList.has(r.key)).length : 0;
   const sortStatus: DataTableSortStatus<ComparisonRow> = { columnAccessor: sort.key, direction: sort.dir };
 
   const setOptions = useMemo(() => {
@@ -324,37 +324,37 @@ export function ComparisonTable({ rows, allRows = rows, cart, decks, boardLabel,
             Clear filters
           </Button>
         )}
-        {cart && (
+        {exportList && (
           <Menu position="bottom-end" withinPortal>
             <Menu.Target>
-              <Button variant="light" leftSection={<IconShoppingCart size={14} />} ml="auto" disabled={!allRows.length && !cart.prints}>
-                Cart{cart.prints ? ` (${cart.prints})` : ''}
+              <Button variant="light" leftSection={<IconFileExport size={14} />} ml="auto" disabled={!allRows.length && !exportList.prints}>
+                Export{exportList.prints ? ` (${exportList.prints})` : ''}
               </Button>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Label>Add to the export cart (copies = the difference)</Menu.Label>
-              <Menu.Item leftSection={<IconShoppingCartPlus size={14} />} disabled={!view.length} onClick={() => cart.add(view.map(rowToItem))}>
+              <Menu.Label>Add to the export (copies = the difference)</Menu.Label>
+              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!view.length} onClick={() => exportList.add(view.map(rowToItem))}>
                 Rows shown, every page ({view.length})
               </Menu.Item>
-              <Menu.Item leftSection={<IconShoppingCartPlus size={14} />} disabled={!missingRows.length} onClick={() => cart.add(missingRows.map(rowToItem))}>
+              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!missingRows.length} onClick={() => exportList.add(missingRows.map(rowToItem))}>
                 Every “Missing from collection” row ({missingRows.length})
               </Menu.Item>
-              <Menu.Item leftSection={<IconShoppingCartPlus size={14} />} disabled={!unassignedRows.length} onClick={() => cart.add(unassignedRows.map(rowToItem))}>
+              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!unassignedRows.length} onClick={() => exportList.add(unassignedRows.map(rowToItem))}>
                 Every “Not in any deck” row ({unassignedRows.length})
               </Menu.Item>
               <Menu.Divider />
-              <Menu.Item leftSection={<IconX size={14} />} disabled={!shownInCart} onClick={() => cart.remove(view.map((r) => r.key))}>
-                Remove the rows shown ({shownInCart})
+              <Menu.Item leftSection={<IconX size={14} />} disabled={!shownInExport} onClick={() => exportList.remove(view.map((r) => r.key))}>
+                Remove the rows shown from the export ({shownInExport})
               </Menu.Item>
-              <Menu.Item color="red" leftSection={<IconTrash size={14} />} disabled={!cart.prints} onClick={() => cart.clear()}>
-                Clear the cart ({cart.prints})
+              <Menu.Item color="red" leftSection={<IconTrash size={14} />} disabled={!exportList.prints} onClick={() => exportList.clear()}>
+                Clear the export ({exportList.prints})
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
         )}
         <Menu position="bottom-end" withinPortal>
           <Menu.Target>
-            <Button variant="default" leftSection={<IconDownload size={14} />} disabled={!rows.length} ml={cart ? undefined : 'auto'}>
+            <Button variant="default" leftSection={<IconDownload size={14} />} disabled={!rows.length} ml={exportList ? undefined : 'auto'}>
               CSV
             </Button>
           </Menu.Target>
@@ -375,7 +375,7 @@ export function ComparisonTable({ rows, allRows = rows, cart, decks, boardLabel,
           noRecordsText={rows.length ? 'No row matches these filters' : emptyText}
           striped
           highlightOnHover
-          rowBackgroundColor={cart ? (r) => (cart.has(r.key) ? { dark: 'rgba(34, 139, 230, 0.12)', light: 'rgba(34, 139, 230, 0.08)' } : undefined) : undefined}
+          rowBackgroundColor={exportList ? (r) => (exportList.has(r.key) ? { dark: 'rgba(34, 139, 230, 0.12)', light: 'rgba(34, 139, 230, 0.08)' } : undefined) : undefined}
           verticalSpacing={4}
           horizontalSpacing="xs"
           sortStatus={sortStatus}

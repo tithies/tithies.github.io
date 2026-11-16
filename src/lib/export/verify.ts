@@ -1,7 +1,7 @@
 /**
  * After an export: compares the target account's collection with what it should be, print by
  * print (copies per print + finish; in the binder for binder targets). Everything the export
- * didn't touch must be unchanged; for the cart's prints, after = before − removed + added.
+ * didn't touch must be unchanged; for the exported prints, after = before − removed + added.
  */
 import { printKey } from '@/lib/cards/prints';
 import type { CollectionEntry } from '@/lib/cards/types';
@@ -39,7 +39,7 @@ export function verifyExport(plan: ExportPlan, before: readonly CollectionEntry[
   const b = tally(before, inScope);
   const a = tally(after, inScope);
 
-  // Expected in scope: before − removed (the plan's entries, all of them for a collection replace) + the cart.
+  // Expected in scope: before − removed (the plan's entries, all of them for a collection replace) + the export.
   const expected = new Map<string, Slot>();
   for (const s of b.scope.values()) expected.set(s.key, { ...s });
   const removedIds = new Set(plan.remove.entries.map((r) => r.entryId));
@@ -80,7 +80,7 @@ export function verifyExport(plan: ExportPlan, before: readonly CollectionEntry[
     if (exp === found) continue;
     const s = (expected.get(key) ?? a.scope.get(key))!;
     if (cartKeys.has(key)) (found < exp ? short : extra).push(diff(s, exp, found));
-    // Not in the cart: a print that wasn't there is extra (a card imported as another print); one that was there changed.
+    // Not in the export: a print that wasn't there is extra (a card imported as another print); one that was there changed.
     else if (!b.scope.has(key) && found > exp) extra.push(diff(s, exp, found));
     else otherChanged.push(diff(s, exp, found));
   }
@@ -99,6 +99,7 @@ export function verifyExport(plan: ExportPlan, before: readonly CollectionEntry[
   }
   return {
     ok: !short.length && !extra.length && !otherChanged.length,
+    scope: binderId ? 'binder' : 'collection',
     expectedCopies,
     foundCopies,
     short: short.sort(byName),

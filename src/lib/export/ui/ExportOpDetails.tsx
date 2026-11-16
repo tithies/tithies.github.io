@@ -137,7 +137,9 @@ export function ExportOpDetails({ op }: { op: ChangeOp }) {
       {v ? (
         v.ok ? (
           <Alert color="teal" variant="light" icon={<IconCircleCheck size={18} />} p="xs">
-            Checked after the export: all {plural(v.expectedCopies, 'copy', 'copies')} are there, and nothing else changed.
+            {v.scope === 'binder'
+              ? `Checked after the export: all ${plural(v.expectedCopies, 'copy', 'copies')} are in the binder, and nothing else in it changed.`
+              : `Checked after the export: all ${plural(v.expectedCopies, 'copy', 'copies')} are in the collection, and nothing else in it changed.`}
           </Alert>
         ) : (
           <Alert color="orange" variant="light" icon={<IconAlertTriangle size={18} />} p="xs" title="The check after the export found differences">
@@ -177,14 +179,14 @@ export function ExportOpDetails({ op }: { op: ChangeOp }) {
         </Paper>
       )}
       <Group gap={6}>
-        <Badge variant="default">{plural(d.items.length, 'print')} in the cart</Badge>
+        <Badge variant="default">{plural(d.items.length, 'print')} exported</Badge>
         <Button
           size="compact-xs"
           variant="subtle"
           leftSection={<IconDownload size={12} />}
           onClick={() => downloadText(`tithies-export-${op.id}-${date}.csv`, toMoxCsv(d.items), 'text/csv;charset=utf-8')}
         >
-          Cart as CSV
+          Exported cards (CSV)
         </Button>
       </Group>
     </Stack>

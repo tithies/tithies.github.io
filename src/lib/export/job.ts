@@ -12,15 +12,16 @@
 import { getAccount } from '@/lib/accounts/data';
 import { accountLabel, identityOf, type AccountKey, type AccountRow } from '@/lib/accounts/types';
 import { getOp, patchOp, startOp, writeLogger } from '@/lib/changes/log';
-import { readWholeCollection } from '@/lib/decks/collection';
+import type { CollectionEntry } from '@/lib/cards/types';
+import { readBinder, readWholeCollection } from '@/lib/decks/collection';
 import type { SyncTransport } from '@/lib/decks/job';
 import { CancelledError, describeSiteError, SiteAuthError, SiteClient, SiteWrongAccountError, type SiteClientOptions } from '@/lib/sites/client';
 import type { SiteLock } from '@/lib/sites/lock';
 import type { SiteProvider } from '@/lib/sites/provider';
 import type { SiteIdentity } from '@/lib/sites/types';
 import { exporterOf, type SiteExporter } from './exporters';
-import { mergeItems, planExport } from './plan';
-import type { ExportDetails, ExportItem, ExportPlan, ExportTarget, TargetState } from './types';
+import { afterRead, beforeRead, mergeItems, planExport } from './plan';
+import type { ExportDetails, ExportItem, ExportPlan, ExportTarget, ReadProgress, TargetRead, TargetState } from './types';
 import { verifyExport } from './verify';
 
 export interface ExportJobDeps {
@@ -45,6 +46,12 @@ export interface StartExportRequest {
   /** "Collection comparisons of alice" */
   source: string;
 }
+
+const ID = /^[A-Za-z0-9_-]{1,64}$/;
+const validRead = (r: unknown): r is TargetRead => {
+  const x = r as TargetRead | null;
+  return !!x && (x.kind === 'binders' || x.kind === 'totals' || x.kind === 'collection' || (x.kind === 'binder' && typeof x.binderId === 'string' && ID.test(x.binderId)));
+};
 
 /** Stops an export before anything is changed. */
 class ExportStop extends Error {}
@@ -141,14 +148,44 @@ export class ExportJob {
     });
   }
 
-  private async readState(client: SiteClient, signal: AbortSignal | undefined, onProgress?: (p: { done: number; total: number }) => void): Promise<TargetState> {
+  /**
+   * Reads what `read` says (see TargetRead): the binder list (1 request), plus one binder's
+   * cards, or one page for the collection's totals, or every page of the collection.
+   */
+  private async readState(client: SiteClient, read: TargetRead, signal: AbortSignal | undefined, onProgress?: (p: ReadProgress) => void): Promise<TargetState> {
     const binders = this.site.capabilities.exportTo.binders ? await client.binders() : [];
-    const entries = await readWholeCollection(this.site, client, { signal, onProgress: (p) => onProgress?.({ done: p.done, total: p.total }) });
-    return { binders, entries, readAt: Date.now() };
+    const base = { binders, read, entries: [] as CollectionEntry[], totals: null as TargetState['totals'], readAt: Date.now() };
+    if (read.kind === 'binders') return base;
+    if (read.kind === 'totals') {
+      onProgress?.({ done: 0, total: 1 });
+      const page = await client.collectionPage(1, this.site.maxCollectionPageSize);
+      onProgress?.({ done: 1, total: 1 });
+      const copies = page.totalCopies ?? (page.totalPages <= 1 ? page.entries.reduce((s, e) => s + e.qty, 0) : 0);
+      return { ...base, totals: { entries: page.totalResults, copies }, readAt: Date.now() };
+    }
+    const progress = { signal, onProgress: (p: { done: number; total: number }) => onProgress?.({ done: p.done, total: p.total }) };
+    if (read.kind === 'binder') {
+      const binder = binders.find((b) => b.id === read.binderId);
+      // Gone: nothing to read (the plan says so).
+      if (!binder) return base;
+      let all: CollectionEntry[];
+      try {
+        all = await readBinder(this.site, client, binder.publicId, progress);
+      } catch (e) {
+        // The binder search failed: read the whole collection instead (slower, same result).
+        if (e instanceof CancelledError || e instanceof SiteAuthError || e instanceof SiteWrongAccountError || signal?.aborted) throw e;
+        all = await readWholeCollection(this.site, client, progress);
+      }
+      // Only that binder's cards, whatever the site sent.
+      return { ...base, entries: all.filter((e) => e.binderId === read.binderId), readAt: Date.now() };
+    }
+    const entries = await readWholeCollection(this.site, client, progress);
+    return { ...base, entries, totals: { entries: entries.length, copies: entries.reduce((s, e) => s + e.qty, 0) }, readAt: Date.now() };
   }
 
-  /** Reads the target account (its binders and whole collection) for a preview. Changes nothing. */
-  async readTarget(accountKey: AccountKey): Promise<ReadTargetResult> {
+  /** Reads the target account for a preview (what `read` says). Changes nothing. */
+  async readTarget(accountKey: AccountKey, read: TargetRead = { kind: 'binders' }, onProgress?: (p: ReadProgress) => void): Promise<ReadTargetResult> {
+    if (!validRead(read)) return { ok: false, code: 'bad_request', error: 'Unknown read.' };
     const row = await this.account(accountKey);
     if (!row) return { ok: false, code: 'no_account', error: `This ${this.site.label} account isn't in Tithies any more.` };
     if (!this.deps.lock.tryAcquire('export')) return { ok: false, code: 'busy', error: this.busy() };
@@ -163,7 +200,7 @@ export class ExportJob {
         keepOwnTab = connected.code === 'wrong_account';
         return { ok: false, code: connected.code === 'wrong_account' ? 'wrong_account' : 'no_tab', error: connected.message, actual: connected.as ?? null };
       }
-      const state = await this.readState(await this.client(transport, abort.signal), abort.signal);
+      const state = await this.readState(await this.client(transport, abort.signal), read, abort.signal, onProgress);
       return { ok: true, state };
     } catch (e) {
       if (abort.signal.aborted || e instanceof CancelledError) return { ok: false, code: 'cancelled', error: 'Cancelled' };
@@ -266,8 +303,9 @@ export class ExportJob {
       }
       const client = await this.client(transport, signal, (message) => void patchOp(opId, { phase: message }).catch(() => {}));
 
-      await save({ phase: `Reading ${name}'s binders and collection` });
-      before = await this.readState(client, signal, (progress) => void patchOp(opId, { progress }).catch(() => {}));
+      const first = beforeRead(target);
+      await save({ phase: first.kind === 'collection' ? `Reading ${name}'s collection` : first.kind === 'binder' ? `Reading ${name}'s binders and the binder's cards` : `Reading ${name}'s binders`, progress: undefined });
+      before = await this.readState(client, first, signal, (p) => void patchOp(opId, { progress: { ...p, unit: 'page' } }).catch(() => {}));
       plan = planExport(target, items, before, { sourceAccountKey: req.sourceAccountKey, targetName: name, limits: exporter.limits });
       Object.assign(details, {
         targetLabel: plan.targetLabel,
@@ -286,7 +324,7 @@ export class ExportJob {
       const total = plan.writes;
       const write = async (op: Parameters<SiteClient['mutate']>[0], phase: string) => {
         if (signal.aborted) throw new CancelledError();
-        await save({ phase, progress: { done, total } });
+        await save({ phase, progress: { done, total, unit: 'change' } });
         wrote = true;
         const res = await client.mutate(op, log);
         done++;
@@ -312,9 +350,10 @@ export class ExportJob {
         }
       }
 
-      await save({ phase: 'Checking every copy', progress: { done: 0, total: 1 } });
-      const after = await readWholeCollection(this.site, client, { signal, onProgress: (p) => void patchOp(opId, { progress: { done: p.done, total: p.total } }).catch(() => {}) });
-      details.verify = verifyExport(plan, before.entries, after, binderId);
+      const last = afterRead(target, binderId);
+      await save({ phase: last.kind === 'binder' ? 'Checking every copy in the binder' : `Checking every copy in ${name}'s collection`, progress: { done: 0, total: 1, unit: 'page' } });
+      const after = await this.readState(client, last, signal, (p) => void patchOp(opId, { progress: { ...p, unit: 'page' } }).catch(() => {}));
+      details.verify = verifyExport(plan, before.entries, after.entries, binderId);
       await save({ status: 'done', phase: details.verify.ok ? 'Done: every copy is there' : 'Done, with differences (see below)', finishedAt: Date.now() });
     } catch (e) {
       const cancelled = signal.aborted || e instanceof CancelledError;
@@ -324,7 +363,8 @@ export class ExportJob {
       if (wrote && plan && before && !wrong) {
         try {
           const check = await this.client(transport);
-          details.verify = verifyExport(plan, before.entries, await readWholeCollection(this.site, check), binderId);
+          const after = await this.readState(check, afterRead(target, binderId), undefined, (p) => void patchOp(opId, { phase: 'Checking what was made', progress: { ...p, unit: 'page' } }).catch(() => {}));
+          details.verify = verifyExport(plan, before.entries, after.entries, binderId);
         } catch {
           /* the log still lists every request */
         }

@@ -5,24 +5,40 @@
  */
 import type { AccountData } from '@/lib/accounts/data';
 import type { CollectionEntry } from '@/lib/cards/types';
-import { CancelledError, type CollectionSource } from '@/lib/sites/client';
+import { CancelledError, type CollectionPageResult, type CollectionSource, type SiteClient } from '@/lib/sites/client';
 import type { SiteProvider } from '@/lib/sites/provider';
 import type { CollectionMeta } from './types';
 
 const MAX_PAGES = 200;
 
-type ReadControl = { signal?: AbortSignal; onProgress?: (p: { done: number; total: number; entries: number }) => void | Promise<void> };
+type ReadControl = {
+  signal?: AbortSignal;
+  onProgress?: (p: { done: number; total: number; entries: number }) => void | Promise<void>;
+};
 
 /** Reads every row of the collection (each row once), writing nothing. */
-export async function readWholeCollection(site: Pick<SiteProvider, 'maxCollectionPageSize'>, client: CollectionSource, ctl: ReadControl = {}): Promise<CollectionEntry[]> {
-  const first = await client.collectionPage(1, site.maxCollectionPageSize);
+export function readWholeCollection(site: Pick<SiteProvider, 'maxCollectionPageSize'>, client: CollectionSource, ctl: ReadControl = {}): Promise<CollectionEntry[]> {
+  return readPages(site, (page, size) => client.collectionPage(page, size), ctl);
+}
+
+/** Reads every card of one binder (`publicId` as in its URL), writing nothing. */
+export function readBinder(site: Pick<SiteProvider, 'maxCollectionPageSize'>, client: Pick<SiteClient, 'binderPage'>, publicId: string, ctl: ReadControl = {}): Promise<CollectionEntry[]> {
+  return readPages(site, (page, size) => client.binderPage(publicId, page, size), ctl);
+}
+
+async function readPages(
+  site: Pick<SiteProvider, 'maxCollectionPageSize'>,
+  getPage: (page: number, size: number) => Promise<CollectionPageResult>,
+  ctl: ReadControl,
+): Promise<CollectionEntry[]> {
+  const first = await getPage(1, site.maxCollectionPageSize);
   const pageSize = first.pageSize || site.maxCollectionPageSize;
   const totalPages = Math.min(MAX_PAGES, Math.max(1, first.totalPages));
   const all: CollectionEntry[] = [...first.entries];
   await ctl.onProgress?.({ done: 1, total: totalPages, entries: all.length });
   for (let page = 2; page <= totalPages; page++) {
     if (ctl.signal?.aborted) throw new CancelledError();
-    all.push(...(await client.collectionPage(page, pageSize)).entries);
+    all.push(...(await getPage(page, pageSize)).entries);
     await ctl.onProgress?.({ done: page, total: totalPages, entries: all.length });
   }
 

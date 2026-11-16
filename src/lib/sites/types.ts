@@ -19,6 +19,8 @@ export type SiteRequest =
   | { kind: 'deckList' }
   | { kind: 'deck'; publicId: string }
   | { kind: 'collection'; pageNumber: number; pageSize: number }
+  /** One page of one binder's cards (the site's own binder search; `publicId` as in the binder's URL). */
+  | { kind: 'binderPage'; publicId: string; pageNumber: number; pageSize: number }
   | { kind: 'binders' }
   /** A write. Every write goes through this one kind, so the change log sees all of them (see SiteClient.mutate). */
   | { kind: 'mutate'; op: SiteMutation };
@@ -81,7 +83,9 @@ export interface SiteFailure {
 export type SiteSuccess = (
   | { ok: true; kind: 'deckList'; decks: DeckSummary[] }
   | { ok: true; kind: 'deck'; lastUpdatedAt: string; cards: DeckCard[] }
-  | { ok: true; kind: 'collection'; entries: CollectionEntry[]; totalResults: number; totalPages: number; pageSize: number }
+  /** `totalCopies`: copies in what is searched (every page), when the site says. */
+  | { ok: true; kind: 'collection'; entries: CollectionEntry[]; totalResults: number; totalPages: number; pageSize: number; totalCopies?: number }
+  | { ok: true; kind: 'binderPage'; entries: CollectionEntry[]; totalResults: number; totalPages: number; pageSize: number; totalCopies?: number }
   | { ok: true; kind: 'binders'; binders: SiteBinder[] }
   /** `response`: the start of the answer (change log); `binder`: what a createBinder made; `imported`: what an import says it did. */
   | { ok: true; kind: 'mutate'; status: number; response: string; binder?: SiteBinder; imported?: ImportAnswer }

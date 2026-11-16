@@ -43,6 +43,24 @@ export function wholeCollectionUrl(pageNumber: number, pageSize: number): string
   return u.toString();
 }
 
+/**
+ * One binder's cards: the search Moxfield's own binder page makes (`GET_TRADE_BINDER`,
+ * `/v1/trade-binders/{publicId}/search`). (The collection search's `tradeBinderId` filter is
+ * ignored: verified 2026-11-16, an unknown id returned the whole collection.)
+ */
+export function binderSearchUrl(publicId: string, pageNumber: number, pageSize: number): string {
+  const u = new URL(`${MOX_API_ORIGIN}/v1/trade-binders/${encodeURIComponent(publicId)}/search`);
+  for (const [k, v] of [
+    ['pageNumber', String(pageNumber)],
+    ['pageSize', String(pageSize)],
+    ['sortType', 'cardName'],
+    ['sortDirection', 'ascending'],
+    ['pricingProvider', 'tcgplayer'],
+  ])
+    u.searchParams.append(k, v);
+  return u.toString();
+}
+
 /** Validates an incoming request (it crosses a page boundary) and returns its URL, or null. */
 export function requestUrl(req: unknown): string | null {
   if (!req || typeof req !== 'object') return null;
@@ -59,6 +77,12 @@ export function requestUrl(req: unknown): string | null {
       const size = Math.floor(Number(r.pageSize));
       if (!(page >= 1) || !(size >= 1)) return null;
       return wholeCollectionUrl(page, Math.min(size, MAX_COLLECTION_PAGE_SIZE));
+    }
+    case 'binderPage': {
+      const page = Math.floor(Number(r.pageNumber));
+      const size = Math.floor(Number(r.pageSize));
+      if (!(page >= 1) || !(size >= 1) || !isPublicId(r.publicId)) return null;
+      return binderSearchUrl(r.publicId, page, Math.min(size, MAX_COLLECTION_PAGE_SIZE));
     }
     default:
       return null;
@@ -161,17 +185,22 @@ export async function runMoxRequest(req: SiteRequest, doFetch: (url: string, ini
       const { lastUpdatedAt, cards } = normalizeDeckCards(body);
       return { ok: true, kind: 'deck', lastUpdatedAt, cards };
     }
-    case 'collection': {
+    case 'collection':
+    case 'binderPage': {
       const p = body as CollectionPage;
+      // A binder search says which binder once (`tradeBinder`): every card it lists is in it.
+      const inBinder = req.kind === 'binderPage' ? (body as { tradeBinder?: { id?: unknown } })?.tradeBinder?.id : undefined;
       const entries: CollectionEntry[] = [];
       for (const raw of Array.isArray(p?.data) ? p.data : []) {
         const e = normalizeEntry(raw);
-        if (e) entries.push(e);
+        if (e) entries.push(!e.binderId && typeof inBinder === 'string' ? { ...e, binderId: inBinder } : e);
       }
       const pageSize = Number(p?.pageSize) || req.pageSize;
       const totalResults = Number(p?.totalResults) || entries.length;
       const totalPages = Number(p?.totalPages) || Math.max(1, Math.ceil(totalResults / pageSize));
-      return { ok: true, kind: 'collection', entries, totalResults, totalPages, pageSize };
+      // `totalOverall`: copies over every page (5,431 for 4,010 entries, verified 2026-11-16).
+      const copies = Number((p as { totalOverall?: unknown })?.totalOverall);
+      return { ok: true, kind: req.kind, entries, totalResults, totalPages, pageSize, ...(Number.isFinite(copies) ? { totalCopies: copies } : {}) };
     }
   }
 }

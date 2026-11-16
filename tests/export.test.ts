@@ -2,7 +2,7 @@ import Papa from 'papaparse';
 import { getOp, opCalls } from '@/lib/changes/log';
 import type { CollectionEntry, Finish } from '@/lib/cards/types';
 import { ExportJob, type StartExportRequest } from '@/lib/export/job';
-import { mergeItems, planExport, type PlanContext } from '@/lib/export/plan';
+import { afterRead, beforeRead, mergeItems, planExport, previewRead, stateCovers, type PlanContext } from '@/lib/export/plan';
 import type { ExportDetails, ExportItem, ExportTarget, TargetState } from '@/lib/export/types';
 import { verifyExport } from '@/lib/export/verify';
 import { SiteLock } from '@/lib/sites/lock';
@@ -59,68 +59,94 @@ const BINDER: SiteBinder = { id: 'b1', publicId: 'pb1', name: 'Trade', visibilit
 describe('Export plan', () => {
   const state = (): TargetState => ({
     binders: [BINDER],
+    read: { kind: 'collection' },
     entries: [entry('Sol Ring', 'c21', '263', 2, 'nonFoil', 'b1'), entry('Island', 'dsk', '279', 10), entry('Opt', 'xln', '65', 1, 'foil', 'b1')],
+    totals: { entries: 3, copies: 13 },
     readAt: 1,
   });
-  const cart = [item('Sol Ring', 'c21', '263', 1), item('Sol Ring', 'c21', '263', 2), item('Llanowar Elves', 'dom', '168', 4, 'foil'), item('Zero', 'x', '1', 0)];
+  const exportList = [item('Sol Ring', 'c21', '263', 1), item('Sol Ring', 'c21', '263', 2), item('Llanowar Elves', 'dom', '168', 4, 'foil'), item('Zero', 'x', '1', 0)];
 
-  it('merges the cart by print and drops empty items', () => {
-    expect(mergeItems(cart).map((i) => [i.key, i.qty])).toEqual([
+  it('merges the export by print and drops empty items', () => {
+    expect(mergeItems(exportList).map((i) => [i.key, i.qty])).toEqual([
       ['dom|168|foil', 4],
       ['c21|263|nonFoil', 3],
     ]);
   });
 
   it('a new binder: created, then filled', () => {
-    const p = planExport({ accountKey: A_KEY, kind: 'newBinder', name: ' To buy ', visibility: 'private' }, cart, state(), ctx());
+    const p = planExport({ accountKey: A_KEY, kind: 'newBinder', name: ' To buy ', visibility: 'private' }, exportList, state(), ctx());
     expect(p).toMatchObject({ targetLabel: 'the new binder “To buy”', add: { prints: 2, copies: 7 }, before: 0, after: 7, writes: 2, remove: { entries: [] } });
     expect(p.blocked).toBeUndefined();
     expect(p.steps[0]).toMatch(/Create the private binder “To buy”/);
-    const dup = planExport({ accountKey: A_KEY, kind: 'newBinder', name: 'trade', visibility: 'private' }, cart, state(), ctx());
+    const dup = planExport({ accountKey: A_KEY, kind: 'newBinder', name: 'trade', visibility: 'private' }, exportList, state(), ctx());
     expect(dup.warnings.map((w) => w.text).join()).toMatch(/already has a binder named/);
   });
 
   it('replacing a binder deletes its entries (collection cards) first', () => {
-    const p = planExport({ accountKey: A_KEY, kind: 'binder', binderId: 'b1', mode: 'replace' }, cart, state(), ctx());
+    const p = planExport({ accountKey: A_KEY, kind: 'binder', binderId: 'b1', mode: 'replace' }, exportList, state(), ctx());
     expect(p.remove.entries.map((e) => [e.name, e.qty, e.binderId])).toEqual([
       ['Sol Ring', 2, 'b1'],
       ['Opt', 1, 'b1'],
     ]);
     expect(p).toMatchObject({ before: 3, after: 7, writes: 2, remove: { copies: 3, wholeCollection: false } });
     expect(p.warnings[0]).toMatchObject({ level: 'danger' });
-    const add = planExport({ accountKey: A_KEY, kind: 'binder', binderId: 'b1', mode: 'add' }, cart, state(), ctx());
+    const add = planExport({ accountKey: A_KEY, kind: 'binder', binderId: 'b1', mode: 'add' }, exportList, state(), ctx());
     expect(add).toMatchObject({ before: 3, after: 10, writes: 1, remove: { entries: [] } });
-    expect(planExport({ accountKey: A_KEY, kind: 'binder', binderId: 'gone', mode: 'add' }, cart, state(), ctx()).blocked).toMatch(/isn't on alice/);
+    expect(planExport({ accountKey: A_KEY, kind: 'binder', binderId: 'gone', mode: 'add' }, exportList, state(), ctx()).blocked).toMatch(/isn't on alice/);
   });
 
   it('replacing the collection deletes all of it, binders included', () => {
-    const p = planExport({ accountKey: A_KEY, kind: 'collection', mode: 'replace' }, cart, state(), ctx());
+    const p = planExport({ accountKey: A_KEY, kind: 'collection', mode: 'replace' }, exportList, state(), ctx());
     expect(p).toMatchObject({ before: 13, after: 7, writes: 2, remove: { copies: 13, wholeCollection: true } });
     expect(p.remove.entries).toHaveLength(3);
-    expect(planExport({ accountKey: A_KEY, kind: 'collection', mode: 'add' }, cart, state(), ctx())).toMatchObject({ before: 13, after: 20, writes: 1 });
-    expect(planExport({ accountKey: A_KEY, kind: 'collection', mode: 'add' }, [], state(), ctx()).blocked).toMatch(/empty/);
+    expect(planExport({ accountKey: A_KEY, kind: 'collection', mode: 'add' }, exportList, state(), ctx())).toMatchObject({ before: 13, after: 20, writes: 1 });
+    expect(planExport({ accountKey: A_KEY, kind: 'collection', mode: 'add' }, [], state(), ctx()).blocked).toMatch(/Nothing to export/);
+  });
+
+  it('reads only what each target needs, at each step', () => {
+    const nb: ExportTarget = { accountKey: A_KEY, kind: 'newBinder', name: 'X', visibility: 'private' };
+    const b: ExportTarget = { accountKey: A_KEY, kind: 'binder', binderId: 'b1', mode: 'replace' };
+    const add: ExportTarget = { accountKey: A_KEY, kind: 'collection', mode: 'add' };
+    const rep: ExportTarget = { accountKey: A_KEY, kind: 'collection', mode: 'replace' };
+    expect([nb, b, add, rep].map(previewRead)).toEqual([{ kind: 'binders' }, { kind: 'binder', binderId: 'b1' }, { kind: 'totals' }, { kind: 'collection' }]);
+    expect([nb, b, add, rep].map(beforeRead)).toEqual([{ kind: 'binders' }, { kind: 'binder', binderId: 'b1' }, { kind: 'collection' }, { kind: 'collection' }]);
+    expect(afterRead(nb, 'new1')).toEqual({ kind: 'binder', binderId: 'new1' });
+    expect(afterRead(add, null)).toEqual({ kind: 'collection' });
+    const binderOnly: TargetState = { binders: [BINDER], read: { kind: 'binders' }, entries: [], totals: null, readAt: 0 };
+    expect(stateCovers(binderOnly, previewRead(nb))).toBe(true);
+    expect(stateCovers(binderOnly, previewRead(b))).toBe(false);
+    expect(planExport(b, exportList, binderOnly, ctx()).blocked).toMatch(/Read alice's binder first/);
+    // The collection's totals are enough to preview an add; its copies come from them.
+    const totals: TargetState = { ...binderOnly, read: { kind: 'totals' }, totals: { entries: 4010, copies: 5431 } };
+    const p = planExport(add, exportList, totals, ctx({ limits: { importRows: 500, removeEntries: 1000, pageSize: 100 } }));
+    expect(p).toMatchObject({ before: 5431, after: 5438 });
+    // 1 binder list + 41 pages before + 41 pages after.
+    expect(p.reads).toBe(1 + 41 + 41);
+    const nbPlan = planExport(nb, exportList, binderOnly, ctx({ limits: { importRows: 500, removeEntries: 1000, pageSize: 100 } }));
+    expect(nbPlan.reads).toBe(2);
   });
 
   it('warns when the target is the compared account', () => {
-    const p = planExport({ accountKey: A_KEY, kind: 'collection', mode: 'add' }, cart, state(), ctx({ sourceAccountKey: A_KEY }));
+    const p = planExport({ accountKey: A_KEY, kind: 'collection', mode: 'add' }, exportList, state(), ctx({ sourceAccountKey: A_KEY }));
     expect(p.warnings.map((w) => w.text).join()).toMatch(/account you're comparing/);
-    expect(planExport({ accountKey: A_KEY, kind: 'collection', mode: 'add' }, cart, state(), ctx({ sourceAccountKey: 'moxfield:9' as never })).warnings).toEqual([]);
+    expect(planExport({ accountKey: A_KEY, kind: 'collection', mode: 'add' }, exportList, state(), ctx({ sourceAccountKey: 'moxfield:9' as never })).warnings).toEqual([]);
   });
 
   it("the digest changes when what the export depends on changes, not otherwise", () => {
     const t: ExportTarget = { accountKey: A_KEY, kind: 'binder', binderId: 'b1', mode: 'replace' };
     const s = state();
-    const d = planExport(t, cart, s, ctx()).digest;
-    expect(planExport(t, cart, { ...s, readAt: 99 }, ctx()).digest).toBe(d);
+    const d = planExport(t, exportList, s, ctx()).digest;
+    expect(planExport(t, exportList, { ...s, readAt: 99 }, ctx()).digest).toBe(d);
     // An unrelated entry outside the binder doesn't matter for a binder replace.
-    expect(planExport(t, cart, { ...s, entries: [...s.entries, entry('Forest', 'dsk', '286', 1)] }, ctx()).digest).toBe(d);
-    expect(planExport(t, cart, { ...s, entries: [...s.entries, entry('Bolt', 'lea', '161', 1, 'nonFoil', 'b1')] }, ctx()).digest).not.toBe(d);
-    expect(planExport(t, cart.slice(1), s, ctx()).digest).not.toBe(d);
+    expect(planExport(t, exportList, { ...s, entries: [...s.entries, entry('Forest', 'dsk', '286', 1)] }, ctx()).digest).toBe(d);
+    expect(planExport(t, exportList, { ...s, entries: [...s.entries, entry('Bolt', 'lea', '161', 1, 'nonFoil', 'b1')] }, ctx()).digest).not.toBe(d);
+    expect(planExport(t, exportList.slice(1), s, ctx()).digest).not.toBe(d);
   });
 });
 
 describe('Export verification', () => {
-  const plan = (target: ExportTarget, items: ExportItem[], before: CollectionEntry[]) => planExport(target, items, { binders: [BINDER], entries: before, readAt: 0 }, ctx());
+  const plan = (target: ExportTarget, items: ExportItem[], before: CollectionEntry[]) =>
+    planExport(target, items, { binders: [BINDER], read: { kind: 'collection' }, entries: before, totals: null, readAt: 0 }, ctx());
 
   it('all added, nothing else changed', () => {
     const before = [entry('Island', 'dsk', '279', 10)];
@@ -149,7 +175,7 @@ describe('Export verification', () => {
     ]);
   });
 
-  it('a collection replace expects only the cart', () => {
+  it('a collection replace expects only the exported cards', () => {
     const before = [entry('Island', 'dsk', '279', 10), entry('Opt', 'xln', '65', 1, 'nonFoil', 'b1')];
     const p = plan({ accountKey: A_KEY, kind: 'collection', mode: 'replace' }, [item('Opt', 'xln', '65', 2)], before);
     expect(verifyExport(p, before, [entry('Opt', 'xln', '65', 2)], null).ok).toBe(true);
@@ -162,14 +188,33 @@ class FakeMox {
   binders: SiteBinder[] = [];
   entries: CollectionEntry[] = [];
   writes: SiteMutation[] = [];
+  /** Collection pages read: 'collection', or 'binder:<id>'. */
+  reads: string[] = [];
+  /** The binder search answers 404 (the job then reads the whole collection). */
+  binderSearchFails = false;
   /** Imports this card as another print (a mismatch the check must catch). */
   misprint?: { from: string; to: { set: string; cn: string } };
   failOn?: (op: SiteMutation) => SiteResult | null;
   private n = 0;
 
-  answer = (_as: unknown, { req }: { req: { kind: string; op?: SiteMutation; pageNumber?: number; pageSize?: number } }): SiteResult => {
+  answer = (_as: unknown, { req }: { req: { kind: string; op?: SiteMutation; pageNumber?: number; pageSize?: number; publicId?: string } }): SiteResult => {
     if (req.kind === 'binders') return { ok: true, kind: 'binders', binders: [...this.binders] };
-    if (req.kind === 'collection') return { ok: true, kind: 'collection', entries: req.pageNumber === 1 ? this.entries.map((e) => ({ ...e })) : [], totalResults: this.entries.length, totalPages: 1, pageSize: 5000 };
+    if (req.kind === 'collection' || req.kind === 'binderPage') {
+      const binder = req.kind === 'binderPage' ? this.binders.find((b) => b.publicId === req.publicId) : null;
+      if (req.kind === 'binderPage' && (!binder || this.binderSearchFails)) return { ok: false, status: 404, code: 'http', message: 'Moxfield answered HTTP 404' };
+      this.reads.push(binder ? `binder:${binder.id}` : 'collection');
+      // Like Moxfield: a binder search lists entries without their binder; the answer names it once.
+      const rows = binder ? this.entries.filter((e) => e.binderId === binder.id).map(({ binderId: _b, ...e }) => ({ ...e, binderId: binder.id })) : this.entries;
+      return {
+        ok: true,
+        kind: req.kind,
+        entries: req.pageNumber === 1 ? rows.map((e) => ({ ...e })) : [],
+        totalResults: rows.length,
+        totalPages: 1,
+        pageSize: 5000,
+        totalCopies: rows.reduce((s, e) => s + e.qty, 0),
+      };
+    }
     if (req.kind !== 'mutate' || !req.op) throw new Error(`unexpected ${req.kind}`);
     const op = req.op;
     this.writes.push(op);
@@ -222,7 +267,7 @@ describe('Export job', () => {
 
   /** Preview then export, like the dialog. */
   async function exportWith(job: ExportJob, accountKey: never, target: ExportTarget, items: ExportItem[], change?: () => void) {
-    const read = await job.readTarget(accountKey);
+    const read = await job.readTarget(accountKey, previewRead(target));
     if (!read.ok) throw new Error(read.error);
     const plan = planExport(target, items, read.state, { sourceAccountKey: null, targetName: 'alice', limits: { importRows: 500, removeEntries: 1000, pageSize: 5000 } });
     change?.();
@@ -234,12 +279,12 @@ describe('Export job', () => {
     return { op, details: op.details as ExportDetails, calls: await opCalls(res.opId) };
   }
 
-  const CART = [item('Sol Ring', 'c21', '263', 2), item('Llanowar Elves', 'dom', '168', 1, 'foil')];
+  const TO_EXPORT = [item('Sol Ring', 'c21', '263', 2), item('Llanowar Elves', 'dom', '168', 1, 'foil')];
 
-  it('creates a new binder, imports the cart into it, and checks every copy', async () => {
+  it('creates a new binder, imports the export into it, and checks every copy', async () => {
     const { acc, mox, job } = await setup();
     mox.entries = [entry('Island', 'dsk', '279', 10)];
-    const { op, details, calls } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'newBinder', name: 'To buy', visibility: 'private' }, CART);
+    const { op, details, calls } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'newBinder', name: 'To buy', visibility: 'private' }, TO_EXPORT);
     expect(op).toMatchObject({ status: 'done', calls: 2, unknownCalls: 0 });
     expect(op.title).toBe('Export 3 copies (2 prints) to the new binder “To buy”');
     expect(mox.writes.map((w) => w.op)).toEqual(['createBinder', 'importCsv']);
@@ -252,24 +297,40 @@ describe('Export job', () => {
     expect(details.verify).toMatchObject({ ok: true, expectedCopies: 3, foundCopies: 3 });
     expect(details.imported).toEqual({ count: 3, errors: [], failed: 0 });
     expect(details.binder).toMatchObject({ id: 'nb1', name: 'To buy' });
+    // Never the whole collection: the binder list, then only the new binder's cards.
+    expect(mox.reads).toEqual(['binder:nb1']);
+    expect(details.verify!.scope).toBe('binder');
   });
 
-  it('replaces a binder: its entries are removed, the cart imported into it', async () => {
+  it('replaces a binder: its entries are removed, the export imported into it', async () => {
     const { acc, mox, job } = await setup();
     mox.binders = [BINDER];
     const old = entry('Opt', 'xln', '65', 4, 'nonFoil', 'b1');
     mox.entries = [old, entry('Island', 'dsk', '279', 10)];
-    const { op, details } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'binder', binderId: 'b1', mode: 'replace' }, CART);
+    const { op, details } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'binder', binderId: 'b1', mode: 'replace' }, TO_EXPORT);
     expect(op.status).toBe('done');
     expect(mox.writes).toMatchObject([{ op: 'bulkRemove', entryIds: [old.id] }, { op: 'importCsv', binderId: 'b1' }]);
     expect(details.removed).toMatchObject([{ entryId: old.id, name: 'Opt', qty: 4 }]);
     expect(details.verify!.ok).toBe(true);
+    // Preview, before and after: only the binder's cards.
+    expect(mox.reads).toEqual(['binder:b1', 'binder:b1', 'binder:b1']);
+  });
+
+  it("falls back to the whole collection when the binder search fails, and still checks only the binder", async () => {
+    const { acc, mox, job } = await setup();
+    mox.binders = [BINDER];
+    mox.binderSearchFails = true;
+    mox.entries = [entry('Opt', 'xln', '65', 4, 'nonFoil', 'b1'), entry('Island', 'dsk', '279', 10)];
+    const { op, details } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'binder', binderId: 'b1', mode: 'add' }, TO_EXPORT);
+    expect(op.status).toBe('done');
+    expect(mox.reads).toEqual(['collection', 'collection', 'collection']);
+    expect(details).toMatchObject({ before: 4, after: 7, verify: { ok: true, scope: 'binder' } });
   });
 
   it('replaces the whole collection', async () => {
     const { acc, mox, job } = await setup();
     mox.entries = [entry('Island', 'dsk', '279', 10)];
-    const { op, details } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'collection', mode: 'replace' }, CART);
+    const { op, details } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'collection', mode: 'replace' }, TO_EXPORT);
     expect(mox.writes.map((w) => w.op)).toEqual(['deleteCollection', 'importCsv']);
     expect(mox.writes[1]).not.toHaveProperty('binderId');
     expect(op.status).toBe('done');
@@ -279,7 +340,7 @@ describe('Export job', () => {
   it('reports a card Moxfield imported as another print', async () => {
     const { acc, mox, job } = await setup();
     mox.misprint = { from: 'Sol Ring', to: { set: 'cmr', cn: '472' } };
-    const { op, details } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'collection', mode: 'add' }, CART);
+    const { op, details } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'collection', mode: 'add' }, TO_EXPORT);
     expect(op).toMatchObject({ status: 'done', phase: 'Done, with differences (see below)' });
     expect(details.verify).toMatchObject({ ok: false, short: [{ key: 'c21|263|nonFoil' }], extra: [{ key: 'cmr|472|nonFoil' }] });
   });
@@ -288,7 +349,7 @@ describe('Export job', () => {
     const { acc, mox, job } = await setup();
     mox.binders = [BINDER];
     mox.entries = [entry('Opt', 'xln', '65', 4, 'nonFoil', 'b1')];
-    const { op, calls } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'binder', binderId: 'b1', mode: 'replace' }, CART, () =>
+    const { op, calls } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'binder', binderId: 'b1', mode: 'replace' }, TO_EXPORT, () =>
       mox.entries.push(entry('Bolt', 'lea', '161', 1, 'nonFoil', 'b1')),
     );
     expect(op).toMatchObject({ status: 'failed', calls: 0 });
@@ -300,7 +361,7 @@ describe('Export job', () => {
   it('never makes a change as another account', async () => {
     const { acc, mox, job } = await setup(ALICE, BOB);
     expect(await job.readTarget(acc.key as never)).toMatchObject({ ok: false, code: 'wrong_account' });
-    const res = await job.start({ target: { accountKey: acc.key, kind: 'collection', mode: 'add' }, items: CART, digest: 'x', sourceAccountKey: null, source: 't' });
+    const res = await job.start({ target: { accountKey: acc.key, kind: 'collection', mode: 'add' }, items: TO_EXPORT, digest: 'x', sourceAccountKey: null, source: 't' });
     expect(res.ok).toBe(true);
     await job.finished;
     const op = (await getOp((res as { opId: number }).opId))!;
@@ -312,12 +373,12 @@ describe('Export job', () => {
   it('stops at a write with an unknown outcome, never sends it again, and checks what was made', async () => {
     const { acc, mox, job } = await setup();
     mox.failOn = (op) => (op.op === 'importCsv' ? { ok: false, status: 502, code: 'http', message: 'Moxfield answered HTTP 502' } : null);
-    const { op, details, calls } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'newBinder', name: 'X', visibility: 'private' }, CART);
+    const { op, details, calls } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'newBinder', name: 'X', visibility: 'private' }, TO_EXPORT);
     expect(op).toMatchObject({ status: 'failed', unknownCalls: 1 });
     expect(op.error).toMatch(/doesn't know whether Moxfield made the change/);
     expect(calls.map((c) => c.outcome)).toEqual(['ok', 'unknown']);
     expect(mox.writes.map((w) => w.op)).toEqual(['createBinder', 'importCsv']);
-    // The collection was read again afterwards: nothing of the cart is there.
+    // The collection was read again afterwards: nothing of the export is there.
     expect(details.verify).toMatchObject({ ok: false, foundCopies: 0 });
   });
 
@@ -325,7 +386,7 @@ describe('Export job', () => {
     const { acc, job, lock } = await setup();
     lock.tryAcquire('sync');
     expect(await job.readTarget(acc.key as never)).toMatchObject({ ok: false, code: 'busy', error: expect.stringMatching(/syncing/) });
-    expect(await job.start({ target: { accountKey: acc.key, kind: 'collection', mode: 'add' }, items: CART, digest: 'x', sourceAccountKey: null, source: 't' })).toMatchObject({
+    expect(await job.start({ target: { accountKey: acc.key, kind: 'collection', mode: 'add' }, items: TO_EXPORT, digest: 'x', sourceAccountKey: null, source: 't' })).toMatchObject({
       ok: false,
       code: 'busy',
     });
@@ -336,7 +397,7 @@ describe('Export job', () => {
 
   it('refuses malformed items', async () => {
     const { acc, job } = await setup();
-    const bad = [[], [{ ...CART[0], qty: 0 }], [{ ...CART[0], finish: 'gold' }], [{ ...CART[0], set: '' }], 'x'];
+    const bad = [[], [{ ...TO_EXPORT[0], qty: 0 }], [{ ...TO_EXPORT[0], finish: 'gold' }], [{ ...TO_EXPORT[0], set: '' }], 'x'];
     for (const items of bad) {
       expect(await job.start({ target: { accountKey: acc.key, kind: 'collection', mode: 'add' }, items: items as never, digest: 'x', sourceAccountKey: null, source: 't' })).toMatchObject({
         ok: false,
@@ -346,19 +407,19 @@ describe('Export job', () => {
   });
 });
 
-describe('Export cart', () => {
+describe('Export list', () => {
   it('adds new prints only, sets quantities, removes and clears', async () => {
-    const { cartReducer, cartTotals, MAX_CART_QTY } = await import('@/lib/export/cart');
-    let s = cartReducer(new Map(), { type: 'add', items: [item('Sol Ring', 'c21', '263', 2), item('Opt', 'xln', '65', 0)] });
+    const { exportListReducer, exportListTotals, MAX_EXPORT_QTY } = await import('@/lib/export/list');
+    let s = exportListReducer(new Map(), { type: 'add', items: [item('Sol Ring', 'c21', '263', 2), item('Opt', 'xln', '65', 0)] });
     expect([...s.keys()]).toEqual(['c21|263|nonFoil']);
-    s = cartReducer(s, { type: 'setQty', key: 'c21|263|nonFoil', qty: 5 });
-    // Already in the cart: adding again keeps the quantity chosen.
-    s = cartReducer(s, { type: 'add', items: [item('Sol Ring', 'c21', '263', 2), item('Island', 'dsk', '279', 3)] });
-    expect(cartTotals(s)).toEqual({ prints: 2, copies: 8 });
-    expect(cartReducer(s, { type: 'setQty', key: 'dsk|279|nonFoil', qty: 99999 }).get('dsk|279|nonFoil')!.qty).toBe(MAX_CART_QTY);
-    expect(cartReducer(s, { type: 'setQty', key: 'dsk|279|nonFoil', qty: 0 }).has('dsk|279|nonFoil')).toBe(false);
-    expect(cartReducer(s, { type: 'remove', keys: ['nope'] })).toBe(s);
-    expect(cartReducer(s, { type: 'remove', keys: ['c21|263|nonFoil'] }).size).toBe(1);
-    expect(cartReducer(s, { type: 'clear' }).size).toBe(0);
+    s = exportListReducer(s, { type: 'setQty', key: 'c21|263|nonFoil', qty: 5 });
+    // Already in the list: adding again keeps the quantity chosen.
+    s = exportListReducer(s, { type: 'add', items: [item('Sol Ring', 'c21', '263', 2), item('Island', 'dsk', '279', 3)] });
+    expect(exportListTotals(s)).toEqual({ prints: 2, copies: 8 });
+    expect(exportListReducer(s, { type: 'setQty', key: 'dsk|279|nonFoil', qty: 99999 }).get('dsk|279|nonFoil')!.qty).toBe(MAX_EXPORT_QTY);
+    expect(exportListReducer(s, { type: 'setQty', key: 'dsk|279|nonFoil', qty: 0 }).has('dsk|279|nonFoil')).toBe(false);
+    expect(exportListReducer(s, { type: 'remove', keys: ['nope'] })).toBe(s);
+    expect(exportListReducer(s, { type: 'remove', keys: ['c21|263|nonFoil'] }).size).toBe(1);
+    expect(exportListReducer(s, { type: 'clear' }).size).toBe(0);
   });
 });

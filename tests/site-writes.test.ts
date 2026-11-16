@@ -319,3 +319,23 @@ describe('Moxfield import answer (verified 2026-11-16)', () => {
     expect(odd).toEqual({ ok: true, kind: 'mutate', status: 200, response: 'done' });
   });
 });
+
+describe('Moxfield binder search (reads)', () => {
+  it("reads one binder's cards with Moxfield's own binder search", async () => {
+    const { requestUrl } = await import('@/lib/sites/moxfield/api');
+    expect(requestUrl({ kind: 'binderPage', publicId: '8Dr6F5OcBkCMs1E-WbFdFw', pageNumber: 2, pageSize: 100 })).toBe(
+      'https://api2.moxfield.com/v1/trade-binders/8Dr6F5OcBkCMs1E-WbFdFw/search?pageNumber=2&pageSize=100&sortType=cardName&sortDirection=ascending&pricingProvider=tcgplayer',
+    );
+    expect(requestUrl({ kind: 'binderPage', publicId: '../v1/users', pageNumber: 1, pageSize: 100 })).toBeNull();
+    const body = {
+      tradeBinder: { id: 'DOQNN', publicId: '8Dr6F5OcBkCMs1E-WbFdFw', name: 'X' },
+      totalResults: 1,
+      totalPages: 1,
+      pageSize: 100,
+      totalOverall: 2,
+      data: [{ id: 'e1', quantity: 2, finish: 'nonFoil', card: { id: 'c1', name: 'Sol Ring', set: 'c21', cn: '263' } }],
+    };
+    const res = await runMoxRequest({ kind: 'binderPage', publicId: '8Dr6F5OcBkCMs1E-WbFdFw', pageNumber: 1, pageSize: 100 }, async () => new Response(JSON.stringify(body), { status: 200 }));
+    expect(res).toMatchObject({ ok: true, kind: 'binderPage', totalCopies: 2, entries: [{ id: 'e1', binderId: 'DOQNN', qty: 2 }] });
+  });
+});

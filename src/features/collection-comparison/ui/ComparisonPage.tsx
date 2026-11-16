@@ -2,8 +2,8 @@ import { Alert, Anchor, Button, Checkbox, Divider, Group, Modal, Paper, SimpleGr
 import { IconAlertTriangle, IconArrowsDiff, IconPlayerStop, IconRefresh } from '@tabler/icons-react';
 import { useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router';
-import { useExportCart } from '@/lib/export/cart';
-import { cartSummary, ExportCartBar } from '@/lib/export/ui/ExportCart';
+import { useExportList } from '@/lib/export/list';
+import { exportSummary, ExportBar } from '@/lib/export/ui/ExportBar';
 import { ExportDialog } from '@/lib/export/ui/ExportDialog';
 import { accountLabel } from '@/lib/accounts/types';
 import { DeckTreePicker } from '@/lib/decks/DeckTreePicker';
@@ -203,19 +203,19 @@ function OptionsCard({
   );
 }
 
-/** Leaving the page empties its export cart: ask first. */
+/** Leaving the page clears what it was going to export: ask first. */
 function LeaveGuard({ prints, summary }: { prints: number; summary: string }) {
   const blocker = useBlocker(({ currentLocation, nextLocation }) => prints > 0 && currentLocation.pathname !== nextLocation.pathname);
   return (
     <Modal opened={blocker.state === 'blocked'} onClose={() => blocker.reset?.()} title="Leave this page?" centered>
       <Stack>
-        <Text size="sm">The export cart ({summary}) only lives on this page: leaving empties it.</Text>
+        <Text size="sm">The cards to export ({summary}) only live on this page: leaving clears them.</Text>
         <Group justify="flex-end">
           <Button variant="default" onClick={() => blocker.reset?.()}>
             Stay
           </Button>
           <Button color="red" onClick={() => blocker.proceed?.()}>
-            Leave and empty the cart
+            Leave and clear the export
           </Button>
         </Group>
       </Stack>
@@ -226,7 +226,7 @@ function LeaveGuard({ prints, summary }: { prints: number; summary: string }) {
 export function ComparisonPage() {
   const { key, site } = usePageAccount();
   const { account } = useCurrentAccount();
-  const cart = useExportCart();
+  const exportList = useExportList();
   const [exporting, setExporting] = useState(false);
   const decks = useDecks(key);
   const decksMeta = useDecksMeta(key);
@@ -400,7 +400,7 @@ export function ComparisonPage() {
           <ComparisonTable
             rows={shown}
             allRows={result?.rows ?? []}
-            cart={site.capabilities.exportTo.binders || site.capabilities.exportTo.collection ? cart : undefined}
+            exportList={site.capabilities.exportTo.binders || site.capabilities.exportTo.collection ? exportList : undefined}
             decks={deckById}
             boardLabel={site.boardLabel}
             loading={!loaded}
@@ -412,17 +412,17 @@ export function ComparisonPage() {
           />
         </>
       )}
-      <ExportCartBar cart={cart} siteLabel={site.label} onExport={() => setExporting(true)} />
+      <ExportBar exportList={exportList} siteLabel={site.label} onExport={() => setExporting(true)} />
       <ExportDialog
         opened={exporting}
         onClose={() => setExporting(false)}
         site={site}
-        items={cart.items}
+        items={exportList.items}
         sourceAccountKey={key}
         source={`Collection comparisons of ${account ? accountLabel(account) : 'an account'}`}
-        onEmptyCart={() => cart.clear()}
+        onClearExport={() => exportList.clear()}
       />
-      <LeaveGuard prints={cart.prints} summary={cartSummary(cart)} />
+      <LeaveGuard prints={exportList.prints} summary={exportSummary(exportList)} />
     </Stack>
   );
 }

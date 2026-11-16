@@ -1,16 +1,16 @@
-import { ActionIcon, Affix, Badge, Button, Drawer, Group, NumberInput, Paper, ScrollArea, Stack, Table, Text, Tooltip } from '@mantine/core';
-import { IconShoppingCart, IconTrash, IconUpload, IconX } from '@tabler/icons-react';
+import { ActionIcon, Affix, Badge, Button, Drawer, Group, NumberInput, Paper, ScrollArea, Stack, Table, Text } from '@mantine/core';
+import { IconFileExport, IconTrash, IconUpload, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
 import { finishLabel } from '@/lib/format';
-import { MAX_CART_QTY, type ExportCart } from '../cart';
+import { MAX_EXPORT_QTY, type ExportList } from '../list';
 
 const n = (v: number) => v.toLocaleString('en-CA');
 const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
 
 /** "42 prints · 117 copies" */
-export const cartSummary = (cart: Pick<ExportCart, 'prints' | 'copies'>) => `${plural(cart.prints, 'print')} · ${plural(cart.copies, 'copy', 'copies')}`;
+export const exportSummary = (list: Pick<ExportList, 'prints' | 'copies'>) => `${plural(list.prints, 'print')} · ${plural(list.copies, 'copy', 'copies')}`;
 
-function CartTable({ cart }: { cart: ExportCart }) {
+function ExportTable({ exportList }: { exportList: ExportList }) {
   return (
     <Table verticalSpacing={4} striped highlightOnHover fz="sm">
       <Table.Thead>
@@ -22,7 +22,7 @@ function CartTable({ cart }: { cart: ExportCart }) {
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>
-        {cart.items.map((i) => (
+        {exportList.items.map((i) => (
           <Table.Tr key={i.key}>
             <Table.Td>
               <Text size="sm">{i.name}</Text>
@@ -38,10 +38,19 @@ function CartTable({ cart }: { cart: ExportCart }) {
               </Text>
             </Table.Td>
             <Table.Td>
-              <NumberInput size="xs" min={1} max={MAX_CART_QTY} allowDecimal={false} value={i.qty} onChange={(v) => typeof v === 'number' && cart.setQty(i.key, v)} w={90} />
+              <NumberInput
+                size="xs"
+                min={1}
+                max={MAX_EXPORT_QTY}
+                allowDecimal={false}
+                value={i.qty}
+                onChange={(v) => typeof v === 'number' && exportList.setQty(i.key, v)}
+                w={90}
+                aria-label={`Copies of ${i.name} to export`}
+              />
             </Table.Td>
             <Table.Td>
-              <ActionIcon variant="subtle" color="gray" onClick={() => cart.remove([i.key])} aria-label={`Remove ${i.name}`}>
+              <ActionIcon variant="subtle" color="gray" onClick={() => exportList.remove([i.key])} aria-label={`Remove ${i.name} from the export`}>
                 <IconX size={14} />
               </ActionIcon>
             </Table.Td>
@@ -53,20 +62,20 @@ function CartTable({ cart }: { cart: ExportCart }) {
 }
 
 /**
- * The cart of a page: a bar at the bottom while it holds something, a drawer to review it, and
- * the page's export button (`onExport`).
+ * What a page will export: a bar at the bottom while it holds something, a drawer to review it,
+ * and the page's export button (`onExport`).
  */
-export function ExportCartBar({ cart, onExport, siteLabel }: { cart: ExportCart; onExport: () => void; siteLabel: string }) {
+export function ExportBar({ exportList, onExport, siteLabel }: { exportList: ExportList; onExport: () => void; siteLabel: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      {cart.prints > 0 && (
+      {exportList.prints > 0 && (
         <Affix position={{ bottom: 20, right: 24 }} zIndex={150}>
           <Paper withBorder shadow="lg" radius="md" p="xs" pl="md">
             <Group gap="sm" wrap="nowrap">
-              <IconShoppingCart size={18} />
+              <IconFileExport size={18} />
               <Text size="sm" fw={600} className="ti-num" style={{ whiteSpace: 'nowrap' }}>
-                {cartSummary(cart)}
+                To export: {exportSummary(exportList)}
               </Text>
               <Button size="xs" variant="default" onClick={() => setOpen(true)}>
                 Review
@@ -79,29 +88,27 @@ export function ExportCartBar({ cart, onExport, siteLabel }: { cart: ExportCart;
         </Affix>
       )}
       <Drawer
-        opened={open && cart.prints > 0}
+        opened={open && exportList.prints > 0}
         onClose={() => setOpen(false)}
         position="right"
         size="lg"
         title={
           <Group gap="xs">
-            <IconShoppingCart size={18} />
-            <Text fw={600}>Export cart</Text>
-            <Badge variant="light">{cartSummary(cart)}</Badge>
+            <IconFileExport size={18} />
+            <Text fw={600}>To export</Text>
+            <Badge variant="light">{exportSummary(exportList)}</Badge>
           </Group>
         }
         scrollAreaComponent={ScrollArea.Autosize}
       >
         <Stack>
           <Text size="sm" c="dimmed">
-            What will be exported, print by print. Change a quantity, or remove a print. The cart only lives on this page: leaving the page empties it.
+            The cards that will be exported, print by print. Change a quantity, or remove a print. This list only lives on this page: leaving the page clears it.
           </Text>
           <Group justify="space-between">
-            <Tooltip label="Empty the cart">
-              <Button variant="subtle" color="red" size="xs" leftSection={<IconTrash size={14} />} onClick={() => cart.clear()}>
-                Clear cart
-              </Button>
-            </Tooltip>
+            <Button variant="subtle" color="red" size="xs" leftSection={<IconTrash size={14} />} onClick={() => exportList.clear()}>
+              Clear the export
+            </Button>
             <Button
               size="xs"
               leftSection={<IconUpload size={14} />}
@@ -113,7 +120,7 @@ export function ExportCartBar({ cart, onExport, siteLabel }: { cart: ExportCart;
               Export to {siteLabel}…
             </Button>
           </Group>
-          <CartTable cart={cart} />
+          <ExportTable exportList={exportList} />
         </Stack>
       </Drawer>
     </>
