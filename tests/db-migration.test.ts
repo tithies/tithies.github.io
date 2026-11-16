@@ -59,4 +59,18 @@ describe('Database upgrade to per-account data (v3)', () => {
     expect(await storage.getItem('local:deckMismatchConfig')).toBeNull();
     expect(await storage.getItem('local:settings')).toEqual({ batchSize: 30 });
   });
+
+  it('moves the Mismatches options of each account options to Collection comparisons (as the inputs, no preset)', async () => {
+    const old = { showMissing: false, excludedDeckIds: ['d1'] };
+    await storage.setItem('local:deckMismatchConfig:moxfield:111111', old);
+    await storage.setItem('local:deckMismatchConfig:moxfield:222222', { excludedDeckIds: ['x'] });
+    // Already moved: the newer state wins, the old item just goes.
+    await storage.setItem('local:collectionComparison:moxfield:222222', { current: { excludedDeckIds: ['kept'] }, presets: [], loadedPresetId: null });
+    await migrateStorage();
+    await migrateStorage();
+    expect(await storage.getItem('local:deckMismatchConfig:moxfield:111111')).toBeNull();
+    expect(await storage.getItem('local:deckMismatchConfig:moxfield:222222')).toBeNull();
+    expect(await storage.getItem('local:collectionComparison:moxfield:111111')).toEqual({ current: old, presets: [], loadedPresetId: null });
+    expect(await storage.getItem('local:collectionComparison:moxfield:222222')).toMatchObject({ current: { excludedDeckIds: ['kept'] } });
+  });
 });

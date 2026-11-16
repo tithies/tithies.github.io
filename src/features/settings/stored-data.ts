@@ -12,6 +12,9 @@ import type { AccountKey } from '@/lib/accounts/types';
 import { db } from '@/lib/db';
 import { sendMessage } from '@/lib/messaging';
 import { clearCaches } from '@/features/f2f-buylist/runner';
+import { ACCOUNT_STORAGE_PREFIXES } from '@/lib/accounts/storage-keys';
+
+const COMPARISON_PREFIX = ACCOUNT_STORAGE_PREFIXES.collectionComparison.slice('local:'.length);
 
 /** The groups of IndexedDB data the user can clear: the shared F2F cache, or one account's data. */
 export type DataGroup = 'f2fCache' | AccountDataGroup;
@@ -68,16 +71,17 @@ export const PREFERENCE_LABELS: Record<string, string> = {
   updateCheck: 'Update check: last check and dismissed update banners',
   // dashboard localStorage
   'tithies:f2f:pageSize': 'Rows per page in run tables',
-  'tithies:decks:pageSize': 'Rows per page in the mismatch table',
+  'tithies:decks:pageSize': 'Rows per page in the Collection comparisons table',
   'mantine-color-scheme-value': 'Theme (dark, light or system)',
 };
 
-/** Labels of per-account preference keys ("deckMismatchConfig:moxfield:123"), by prefix. */
+/** Labels of per-account preference keys ("collectionComparison:moxfield:123"), by prefix. */
 const ACCOUNT_PREFERENCE_PREFIXES: Record<string, string> = {
-  'deckMismatchConfig:': 'Mismatches page options of one account: decks and folders left out, boards, proxies, what to show',
+  'collectionComparison:': 'Collection comparisons options and presets of one account: decks and folders left out, boards, proxies, what to show',
+  'deckMismatchConfig:': 'Mismatches page options of one account, from an older version',
 };
 
-/** The account a per-account preference key belongs to ("deckMismatchConfig:moxfield:123" → "moxfield:123"), else null. */
+/** The account a per-account preference key belongs to ("collectionComparison:moxfield:123" → "moxfield:123"), else null. */
 export function accountOfPreference(key: string): string | null {
   const prefix = Object.keys(ACCOUNT_PREFERENCE_PREFIXES).find((p) => key.startsWith(p));
   return prefix ? key.slice(prefix.length) : null;
@@ -108,8 +112,19 @@ export async function listStoredPreferences(): Promise<StoredPreference[]> {
  * localStorage. Both hold only Tithies settings and preferences (no data: accounts and the
  * current account live in IndexedDB), and every reader has a fallback, so nothing else is
  * needed. Open pages pick the defaults up through their watchers.
+ *
+ * Saved Collection comparisons presets are the user's own work, not settings: they are kept
+ * (the inputs go back to their defaults).
  */
 export async function resetAllSettings(): Promise<void> {
+  const all = await browser.storage.local.get(null);
+  const keep: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(all)) {
+    if (!key.startsWith(COMPARISON_PREFIX)) continue;
+    const presets = (value as { presets?: unknown } | null)?.presets;
+    if (Array.isArray(presets) && presets.length) keep[key] = { presets, loadedPresetId: null };
+  }
   await browser.storage.local.clear();
+  if (Object.keys(keep).length) await browser.storage.local.set(keep);
   if (typeof localStorage !== 'undefined') localStorage.clear();
 }

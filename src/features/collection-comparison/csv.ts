@@ -1,10 +1,10 @@
 import Papa from 'papaparse';
-import type { MismatchRow } from './compare';
+import type { ComparisonRow } from './compare';
 
-export function mismatchesToCsv(rows: MismatchRow[], deckName: (id: string) => string, boardLabel: (board: string) => string): string {
+export function comparisonToCsv(rows: ComparisonRow[], deckName: (id: string) => string, boardLabel: (board: string) => string): string {
   return Papa.unparse(
     rows.map((r) => ({
-      mismatch: r.kind === 'missing' ? 'missing_from_collection' : 'not_in_any_deck',
+      kind: r.kind === 'missing' ? 'missing_from_collection' : 'not_in_any_deck',
       name: r.name,
       set: r.set.toUpperCase(),
       set_name: r.setName,
@@ -20,11 +20,11 @@ export function mismatchesToCsv(rows: MismatchRow[], deckName: (id: string) => s
   );
 }
 
-export function downloadMismatchCsv(rows: MismatchRow[], deckName: (id: string) => string, boardLabel: (board: string) => string, suffix = '') {
-  const blob = new Blob([mismatchesToCsv(rows, deckName, boardLabel)], { type: 'text/csv;charset=utf-8' });
+export function downloadComparisonCsv(rows: ComparisonRow[], deckName: (id: string) => string, boardLabel: (board: string) => string, suffix = '') {
+  const blob = new Blob([comparisonToCsv(rows, deckName, boardLabel)], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `tithies-deck-mismatches${suffix}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `tithies-collection-comparison${suffix}-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }

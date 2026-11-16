@@ -274,7 +274,7 @@ export class AccountSyncJob {
         onProgress: (p) => this.patch(job, { phase: p.phase, done: p.done, total: p.total, current: p.current, message: undefined, requests: client.requests }),
       });
       await this.patch(job, { decks, current: undefined, requests: client.requests });
-      // Read at this point: a "Find mismatches" may have joined a decks-only sync meanwhile.
+      // Read at this point: a "Compare" may have joined a decks-only sync meanwhile.
       if (job.state.withCollection) {
         await this.patch(job, { phase: 'collection', done: 0, total: 1, message: undefined });
         await refreshCollection(this.site, job.data, client, {

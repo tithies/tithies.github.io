@@ -7,7 +7,7 @@ import { printKey } from '@/lib/cards/prints';
 import type { CardPrint, CollectionEntry, Finish } from '@/lib/cards/types';
 
 /** missing = in decks, not (enough) in the collection; unassigned = in the collection, not (enough) in decks. */
-export type MismatchKind = 'missing' | 'unassigned';
+export type ComparisonKind = 'missing' | 'unassigned';
 
 export interface DeckUse {
   deckId: string;
@@ -28,9 +28,9 @@ export interface OtherPrint {
   sameCn: boolean;
 }
 
-export interface MismatchRow {
+export interface ComparisonRow {
   key: string;
-  kind: MismatchKind;
+  kind: ComparisonKind;
   name: string;
   set: string;
   setName: string;
@@ -88,7 +88,7 @@ export function compareDecksToCollection(
   deckCards: readonly DeckCardsRow[],
   collection: readonly CollectionEntry[],
   opts: CompareOptions,
-): { rows: MismatchRow[]; summary: CompareSummary } {
+): { rows: ComparisonRow[]; summary: CompareSummary } {
   const excluded = new Set(opts.excludedDeckIds);
   const ignoredBoards = new Set(opts.ignoredBoards);
   const cardsByDeck = new Map(deckCards.map((r) => [r.deckId, r]));
@@ -163,12 +163,12 @@ export function compareDecksToCollection(
     summary.collectionCopies += e.qty;
   }
 
-  const rows: MismatchRow[] = [];
+  const rows: ComparisonRow[] = [];
   for (const a of acc.values()) {
     summary.matchedCopies += Math.min(a.deckQty, a.collectionQty);
     const diff = a.collectionQty - a.deckQty;
     if (diff === 0) continue;
-    const kind: MismatchKind = diff < 0 ? 'missing' : 'unassigned';
+    const kind: ComparisonKind = diff < 0 ? 'missing' : 'unassigned';
     if (kind === 'missing') {
       summary.missingPrints++;
       summary.missingCopies -= diff;
@@ -196,7 +196,7 @@ export function compareDecksToCollection(
   }
 
   // Same card, opposite mismatch elsewhere: "deck uses DMU 435 foil, collection has DMU 435 non-foil".
-  const byName = new Map<string, MismatchRow[]>();
+  const byName = new Map<string, ComparisonRow[]>();
   for (const r of rows) {
     const k = nameKey(r.name);
     const list = byName.get(k);

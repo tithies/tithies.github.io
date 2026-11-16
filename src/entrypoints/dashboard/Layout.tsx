@@ -19,7 +19,7 @@ const NAV = [
   {
     label: 'Decks',
     icon: IconCards,
-    links: [{ to: '/decks/mismatches', label: 'Mismatches', icon: IconArrowsDiff }],
+    links: [{ to: '/decks/comparisons', label: 'Collection comparisons', icon: IconArrowsDiff }],
   },
 ];
 

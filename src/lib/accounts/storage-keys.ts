@@ -3,7 +3,10 @@
  * Pure: safe to import from the background worker.
  */
 export const ACCOUNT_STORAGE_PREFIXES = {
-  deckMismatchConfig: 'local:deckMismatchConfig:',
+  /** Collection comparisons: the inputs and the saved presets. */
+  collectionComparison: 'local:collectionComparison:',
+  /** Before presets (moved by migrateStorage); still removed by Forget in case one is left. */
+  legacyDeckMismatchConfig: 'local:deckMismatchConfig:',
 } as const;
 
 export const accountStorageKeys = (accountKey: string): `local:${string}`[] =>

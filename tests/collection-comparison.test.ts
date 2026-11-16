@@ -1,6 +1,20 @@
-import { compareDecksToCollection, type CompareOptions } from '@/features/deck-mismatch/compare';
-import { DEFAULT_MISMATCH_CONFIG, parseMismatchConfig } from '@/features/deck-mismatch/config';
-import { applyMismatchFilters, applyMismatchSort, mismatchFiltersFromParams, writeMismatchParams, DEFAULT_MISMATCH_SORT } from '@/features/deck-mismatch/filtering';
+import { compareDecksToCollection, type CompareOptions } from '@/features/collection-comparison/compare';
+import {
+  DEFAULT_COMPARISON_CONFIG,
+  DEFAULT_COMPARISON_STATE,
+  deletePreset,
+  hasUnsavedOptions,
+  isModified,
+  loadPresetInto,
+  parseComparisonConfig,
+  parseComparisonState,
+  presetNameError,
+  renamePreset,
+  sameConfig,
+  savePreset,
+  type ComparisonState,
+} from '@/features/collection-comparison/config';
+import { applyComparisonFilters, applyComparisonSort, comparisonFiltersFromParams, writeComparisonParams, DEFAULT_COMPARISON_SORT } from '@/features/collection-comparison/filtering';
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
 import type { DeckCard } from '@/lib/decks/types';
 import type { CardPrint, CollectionEntry, Finish } from '@/lib/cards/types';
@@ -138,35 +152,99 @@ describe('compareDecksToCollection', () => {
   });
 });
 
-describe('Mismatch config and filters', () => {
+describe('Comparison config and filters', () => {
   it('defaults and repairs stored config field by field', () => {
-    expect(DEFAULT_MISMATCH_CONFIG).toEqual({ showMissing: true, showUnassigned: false, ignoreProxies: true, ignoredBoards: ['maybeboard'], excludedDeckIds: [] });
-    expect(parseMismatchConfig({ showMissing: false, ignoredBoards: 'oops', excludedDeckIds: ['a'] })).toEqual({
-      ...DEFAULT_MISMATCH_CONFIG,
+    expect(DEFAULT_COMPARISON_CONFIG).toEqual({ showMissing: true, showUnassigned: false, ignoreProxies: true, ignoredBoards: ['maybeboard'], excludedDeckIds: [] });
+    expect(parseComparisonConfig({ showMissing: false, ignoredBoards: 'oops', excludedDeckIds: ['a'] })).toEqual({
+      ...DEFAULT_COMPARISON_CONFIG,
       showMissing: false,
       excludedDeckIds: ['a'],
     });
-    expect(parseMismatchConfig(null)).toEqual(DEFAULT_MISMATCH_CONFIG);
+    expect(parseComparisonConfig(null)).toEqual(DEFAULT_COMPARISON_CONFIG);
   });
 
   it('filters, sorts and round-trips through the URL', () => {
     const { rows } = compareDecksToCollection(DECKS, CARDS, COLLECTION, OPTS);
     const f = { q: 'deck b', sets: [], finishes: [], hinted: false };
-    expect(applyMismatchFilters(rows, f, (id) => `Deck ${id}`).map((r) => r.name)).toEqual(['Sol Ring']);
-    expect(applyMismatchFilters(rows, { ...f, q: '', hinted: true }, String).map((r) => r.key).sort()).toEqual(['dmu|107|foil', 'dmu|107|nonFoil']);
-    expect(applyMismatchSort(rows, { key: 'diff', dir: 'asc' })[0].diff).toBeLessThan(0);
+    expect(applyComparisonFilters(rows, f, (id) => `Deck ${id}`).map((r) => r.name)).toEqual(['Sol Ring']);
+    expect(applyComparisonFilters(rows, { ...f, q: '', hinted: true }, String).map((r) => r.key).sort()).toEqual(['dmu|107|foil', 'dmu|107|nonFoil']);
+    expect(applyComparisonSort(rows, { key: 'diff', dir: 'asc' })[0].diff).toBeLessThan(0);
     // By first deck name; rows used by no deck come first ascending, last descending.
     const names: Record<string, string> = { a: 'Zombies', b: 'Angels', c: 'Merfolk' };
     const deckName = (id: string) => names[id];
-    const first = (dir: 'asc' | 'desc') => applyMismatchSort(rows, { key: 'decks', dir }, deckName).map((r) => (r.decks[0] ? deckName(r.decks[0].deckId) : '-'));
+    const first = (dir: 'asc' | 'desc') => applyComparisonSort(rows, { key: 'decks', dir }, deckName).map((r) => (r.decks[0] ? deckName(r.decks[0].deckId) : '-'));
     const asc = first('asc');
     expect(asc).toEqual([...asc].sort((x, y) => (x === '-' ? -1 : y === '-' ? 1 : x.localeCompare(y))));
     expect(asc[0]).toBe('-');
     expect(asc.at(-1)).toBe('Zombies');
     expect(first('desc')[0]).toBe('Zombies');
     expect(first('desc').at(-1)).toBe('-');
-    const params = writeMismatchParams(new URLSearchParams('x=1'), { q: 'sol', sets: ['c21'], finishes: [], hinted: true }, DEFAULT_MISMATCH_SORT, 2);
+    const params = writeComparisonParams(new URLSearchParams('x=1'), { q: 'sol', sets: ['c21'], finishes: [], hinted: true }, DEFAULT_COMPARISON_SORT, 2);
     expect(params.toString()).toBe('x=1&q=sol&sets=c21&hint=1&page=2');
-    expect(mismatchFiltersFromParams(params)).toEqual({ q: 'sol', sets: ['c21'], finishes: [], hinted: true });
+    expect(comparisonFiltersFromParams(params)).toEqual({ q: 'sol', sets: ['c21'], finishes: [], hinted: true });
+  });
+});
+
+describe('Comparison presets', () => {
+  let n = 0;
+  const id = () => `p${++n}`;
+  const withInputs = (s: ComparisonState, patch: Partial<ComparisonState['current']>): ComparisonState => ({ ...s, current: { ...s.current, ...patch } });
+
+  it('saves a new preset by default, loads it, and tells when the inputs changed', () => {
+    let s = withInputs(DEFAULT_COMPARISON_STATE, { excludedDeckIds: ['a', 'b'] });
+    expect(hasUnsavedOptions(s)).toBe(true);
+    s = savePreset(s, { name: '  Cubes  ' }, 1, id);
+    expect(s.presets).toEqual([{ id: 'p1', name: 'Cubes', config: s.current, savedAt: 1 }]);
+    expect(s.loadedPresetId).toBe('p1');
+    expect(isModified(s)).toBe(false);
+    // List order doesn't make a change.
+    expect(isModified(withInputs(s, { excludedDeckIds: ['b', 'a'] }))).toBe(false);
+    s = withInputs(s, { ignoreProxies: false });
+    expect(isModified(s)).toBe(true);
+    expect(hasUnsavedOptions(s)).toBe(true);
+    // Saving another preset doesn't touch the first one.
+    s = savePreset(s, { name: 'No proxies' }, 2, id);
+    expect(s.presets.map((p) => [p.name, p.config.ignoreProxies])).toEqual([
+      ['Cubes', true],
+      ['No proxies', false],
+    ]);
+    s = loadPresetInto(s, 'p1');
+    expect(s.current.ignoreProxies).toBe(true);
+    expect(s.loadedPresetId).toBe('p1');
+  });
+
+  it('overwrites an existing preset, refuses duplicate names, renames and deletes', () => {
+    let s = savePreset(DEFAULT_COMPARISON_STATE, { name: 'Main' }, 1, () => 'm');
+    s = savePreset(withInputs(s, { showUnassigned: true }), { name: 'Other' }, 2, () => 'o');
+    s = loadPresetInto(s, 'm');
+    s = savePreset(withInputs(s, { ignoredBoards: [] }), { overwriteId: 'm' }, 3);
+    expect(s.presets.find((p) => p.id === 'm')).toMatchObject({ savedAt: 3, config: { ignoredBoards: [] } });
+    expect(presetNameError(s, 'main')).toMatch(/already/);
+    expect(() => savePreset(s, { name: 'MAIN' })).toThrow(/already/);
+    expect(presetNameError(s, ' ')).toMatch(/name/);
+    expect(presetNameError(s, 'Main', 'm')).toBeNull();
+    expect(() => renamePreset(s, 'o', 'Main')).toThrow(/already/);
+    s = renamePreset(s, 'o', 'Commander');
+    expect(s.presets.map((p) => p.name)).toEqual(['Main', 'Commander']);
+    s = deletePreset(s, 'm');
+    expect(s.loadedPresetId).toBeNull();
+    expect(s.current.ignoredBoards).toEqual([]);
+    expect(() => savePreset(s, { overwriteId: 'm' })).toThrow();
+  });
+
+  it('repairs stored state: bad presets dropped, a dangling loaded id cleared', () => {
+    const s = parseComparisonState({
+      current: { showMissing: false, ignoredBoards: 7 },
+      presets: [{ id: 'a', name: 'A', config: { ignoreProxies: false } }, { id: '', name: 'bad' }, { id: 'a', name: 'dup' }, 'junk', { id: 'b', name: ' ', config: {} }],
+      loadedPresetId: 'zz',
+    });
+    expect(s.current).toEqual({ ...DEFAULT_COMPARISON_CONFIG, showMissing: false });
+    expect(s.presets).toEqual([{ id: 'a', name: 'A', config: { ...DEFAULT_COMPARISON_CONFIG, ignoreProxies: false }, savedAt: 0 }]);
+    expect(s.loadedPresetId).toBeNull();
+    expect(parseComparisonState(undefined)).toEqual(DEFAULT_COMPARISON_STATE);
+    expect(sameConfig(DEFAULT_COMPARISON_CONFIG, parseComparisonConfig({}))).toBe(true);
+    // The defaults, or options equal to a preset, are nothing to lose.
+    expect(hasUnsavedOptions(DEFAULT_COMPARISON_STATE)).toBe(false);
+    expect(hasUnsavedOptions({ ...s, current: s.presets[0].config })).toBe(false);
   });
 });

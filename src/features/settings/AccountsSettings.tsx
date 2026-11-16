@@ -65,7 +65,7 @@ export function AccountsSettings() {
         {accounts.length === 0 ? (
           <Text p="md" size="sm" c="dimmed">
             No account yet. An account is added when Tithies acts as it: "Check selling prices" on your Moxfield collection, or "Sync decks" on the
-            Mismatches page.
+            Collection comparisons page.
           </Text>
         ) : (
           <Table.ScrollContainer minWidth={640}>
@@ -139,7 +139,7 @@ export function AccountsSettings() {
           <Stack gap="sm">
             <Text size="sm">
               This deletes, for good, everything Tithies keeps for <b>{forgetting.userName}</b> ({siteOf(forgetting.type).label}): its Selling runs and
-              results, its synced decks and collection, and its Mismatches options. Running checks and syncs of this account are stopped first.
+              results, its synced decks and collection, and its Collection comparisons options and presets. Running checks and syncs of this account are stopped first.
             </Text>
             <Text size="sm" c="dimmed">
               Nothing on {siteOf(forgetting.type).label} is touched. The account comes back (empty) the next time Tithies acts as it. Export the runs you want

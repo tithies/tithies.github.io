@@ -4,7 +4,7 @@ import { forgetAccount } from '@/lib/accounts/forget';
 import type { AccountKey } from '@/lib/accounts/types';
 import { db } from '@/lib/db';
 import { SessionRegistry } from '@/lib/sites/sessions';
-import { mismatchConfigKey } from '@/features/deck-mismatch/config';
+import { comparisonConfigKey } from '@/features/collection-comparison/config';
 import { accountOfPreference } from '@/features/settings/stored-data';
 import { newAccount, resetDb } from './helpers';
 
@@ -21,7 +21,7 @@ async function fill(acc: { key: AccountKey; data: AccountData }, status = 'compl
     await w.meta.put('sync', row({ status: 'running' }));
     await w.collection.replace([row({ id: 'c1', qty: 1 })], { fetchedAt: 1, entries: 1, copies: 1 });
   });
-  await storage.setItem(mismatchConfigKey(acc.key), { excludedDeckIds: ['d1'] });
+  await storage.setItem(comparisonConfigKey(acc.key), { excludedDeckIds: ['d1'] });
   return runId;
 }
 
@@ -64,11 +64,11 @@ describe('Forget account', () => {
     for (const t of [db.accountDecks, db.accountDeckCards, db.collectionEntries, db.accountMeta, db.runs, db.items]) {
       expect(await t.where('accountKey').equals(A.key).count()).toBe(0);
     }
-    expect(await storage.getItem(mismatchConfigKey(A.key))).toBeNull();
+    expect(await storage.getItem(comparisonConfigKey(A.key))).toBeNull();
     // Bob is untouched, and is now the current account.
     expect(await B.data.decks.count()).toBe(1);
     expect(await B.data.runs.count()).toBe(1);
-    expect(await storage.getItem(mismatchConfigKey(B.key))).not.toBeNull();
+    expect(await storage.getItem(comparisonConfigKey(B.key))).not.toBeNull();
     expect((await listAccounts()).map((a) => a.key)).toEqual([B.key]);
     expect((await getCurrentAccount())?.key).toBe(B.key);
   });
@@ -81,7 +81,7 @@ describe('Forget account', () => {
   });
 
   it('finds the account of per-account preferences', () => {
-    expect(accountOfPreference('deckMismatchConfig:moxfield:111111')).toBe('moxfield:111111');
+    expect(accountOfPreference('collectionComparison:moxfield:111111')).toBe('moxfield:111111');
     expect(accountOfPreference('settings')).toBeNull();
   });
 });

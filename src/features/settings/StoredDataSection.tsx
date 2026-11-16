@@ -76,7 +76,7 @@ const YOURS = { label: 'Your data', color: 'red' };
 function accountRows(a: AccountRow, s: AccountStats): Row[] {
   const site = siteOf(a.type);
   const id = (g: AccountDataGroup) => `${a.key}|${g}`;
-  const syncBlock = s.syncing ? `A sync of this account is running: wait for it to finish, or cancel it on the Mismatches page.` : undefined;
+  const syncBlock = s.syncing ? `A sync of this account is running: wait for it to finish, or cancel it on the Collection comparisons page.` : undefined;
   return [
     {
       id: id('decks'),
@@ -96,7 +96,7 @@ function accountRows(a: AccountRow, s: AccountStats): Row[] {
       title: `${site.label} collection`,
       kind: synced(site.label),
       details: [s.collectionMeta ? `${n(s.collectionMeta.entries)} rows (${n(s.collectionMeta.copies)} copies), read ${ago(s.collectionMeta.fetchedAt)}` : `${n(s.collection)} rows`],
-      effect: `Read again the next time you click "Find mismatches". Your collection on ${site.label} is not touched.`,
+      effect: `Read again the next time you click "Compare". Your collection on ${site.label} is not touched.`,
       empty: !s.collection && !s.collectionMeta,
       blocked: syncBlock,
     },

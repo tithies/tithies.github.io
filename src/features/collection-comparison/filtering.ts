@@ -1,8 +1,8 @@
 import { fold } from '@/lib/format';
 import { compareValues } from '@/lib/sort';
-import type { MismatchRow } from './compare';
+import type { ComparisonRow } from './compare';
 
-export interface MismatchFilters {
+export interface ComparisonFilters {
   q: string;
   sets: string[];
   finishes: string[];
@@ -10,36 +10,36 @@ export interface MismatchFilters {
   hinted: boolean;
 }
 
-export const EMPTY_MISMATCH_FILTERS: MismatchFilters = { q: '', sets: [], finishes: [], hinted: false };
+export const EMPTY_COMPARISON_FILTERS: ComparisonFilters = { q: '', sets: [], finishes: [], hinted: false };
 
-export const MISMATCH_SORT_KEYS = ['kind', 'name', 'set', 'cn', 'finish', 'deckQty', 'collectionQty', 'diff', 'decks'] as const;
-export type MismatchSortKey = (typeof MISMATCH_SORT_KEYS)[number];
-export interface MismatchSort {
-  key: MismatchSortKey;
+export const COMPARISON_SORT_KEYS = ['kind', 'name', 'set', 'cn', 'finish', 'deckQty', 'collectionQty', 'diff', 'decks'] as const;
+export type ComparisonSortKey = (typeof COMPARISON_SORT_KEYS)[number];
+export interface ComparisonSort {
+  key: ComparisonSortKey;
   dir: 'asc' | 'desc';
 }
-export const DEFAULT_MISMATCH_SORT: MismatchSort = { key: 'name', dir: 'asc' };
+export const DEFAULT_COMPARISON_SORT: ComparisonSort = { key: 'name', dir: 'asc' };
 
 const list = (v: string | null) => (v ? v.split(',').filter(Boolean) : []);
 
-export function mismatchFiltersFromParams(p: URLSearchParams): MismatchFilters {
+export function comparisonFiltersFromParams(p: URLSearchParams): ComparisonFilters {
   return { q: p.get('q') ?? '', sets: list(p.get('sets')), finishes: list(p.get('fin')), hinted: p.get('hint') === '1' };
 }
 
-export function mismatchSortFromParams(p: URLSearchParams): MismatchSort {
-  const key = p.get('sort') as MismatchSortKey | null;
+export function comparisonSortFromParams(p: URLSearchParams): ComparisonSort {
+  const key = p.get('sort') as ComparisonSortKey | null;
   const dir = p.get('dir') === 'desc' ? 'desc' : 'asc';
-  return key && (MISMATCH_SORT_KEYS as readonly string[]).includes(key) ? { key, dir } : DEFAULT_MISMATCH_SORT;
+  return key && (COMPARISON_SORT_KEYS as readonly string[]).includes(key) ? { key, dir } : DEFAULT_COMPARISON_SORT;
 }
 
 /** Filters, sort and page in the URL (defaults left out). */
-export function writeMismatchParams(base: URLSearchParams, f: MismatchFilters, s: MismatchSort, page: number): URLSearchParams {
+export function writeComparisonParams(base: URLSearchParams, f: ComparisonFilters, s: ComparisonSort, page: number): URLSearchParams {
   const p = new URLSearchParams(base);
   const set = (k: string, v: string | number | null | false) => {
     if (v === null || v === '' || v === false) p.delete(k);
     else p.set(k, String(v));
   };
-  const isDefault = s.key === DEFAULT_MISMATCH_SORT.key && s.dir === DEFAULT_MISMATCH_SORT.dir;
+  const isDefault = s.key === DEFAULT_COMPARISON_SORT.key && s.dir === DEFAULT_COMPARISON_SORT.dir;
   set('q', f.q.trim());
   set('sets', f.sets.join(','));
   set('fin', f.finishes.join(','));
@@ -50,7 +50,7 @@ export function writeMismatchParams(base: URLSearchParams, f: MismatchFilters, s
   return p;
 }
 
-export function applyMismatchFilters(rows: MismatchRow[], f: MismatchFilters, deckName: (id: string) => string): MismatchRow[] {
+export function applyComparisonFilters(rows: ComparisonRow[], f: ComparisonFilters, deckName: (id: string) => string): ComparisonRow[] {
   const terms = fold(f.q).split(/\s+/).filter(Boolean);
   const sets = new Set(f.sets);
   const finishes = new Set(f.finishes);
@@ -72,9 +72,9 @@ const KIND_ORDER = { missing: 0, unassigned: 1 };
  * `decks` sorts by the first deck shown in the row (the one using most copies). Empty values count as
  * the smallest: rows in no deck come first ascending, last descending (like every table in the tool).
  */
-export function applyMismatchSort(rows: MismatchRow[], s: MismatchSort, deckName: (id: string) => string = () => ''): MismatchRow[] {
+export function applyComparisonSort(rows: ComparisonRow[], s: ComparisonSort, deckName: (id: string) => string = () => ''): ComparisonRow[] {
   const dir = s.dir === 'asc' ? 1 : -1;
-  const value = (r: MismatchRow): string | number => {
+  const value = (r: ComparisonRow): string | number => {
     switch (s.key) {
       case 'kind':
         return KIND_ORDER[r.kind];

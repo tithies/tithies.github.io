@@ -21,7 +21,7 @@ export default defineConfig({
     name: 'Tithies',
     // Automatic: <major.minor from package.json>.<commits that changed the extension>.
     version: extensionVersion(),
-    description: 'Moxfield + Face to Face Games tools: check which of your cards F2F buys, and find mismatches between your decks and collection.',
+    description: 'Moxfield + Face to Face Games tools: check which of your cards F2F buys, and compare your decks with your collection.',
     permissions: ['storage', 'unlimitedStorage', 'alarms'],
     // moxfield.com: lets the background find logged-in Moxfield tabs (tabs.query url filter); the content scripts already run there.
     host_permissions: ['https://facetofacegames.com/*', 'https://api2.moxfield.com/*', 'https://moxfield.com/*', 'https://www.moxfield.com/*'],

@@ -9,18 +9,18 @@ import type { DeckRow } from '@/lib/decks/types';
 import { scryfallCardLink, scryfallImage } from '@/lib/f2f/links';
 import { FINISH_LABEL, finishLabel } from '@/lib/format';
 import { CardThumb } from '@/lib/ui/CardThumb';
-import type { MismatchRow, OtherPrint } from '../compare';
-import { downloadMismatchCsv } from '../csv';
+import type { ComparisonRow, OtherPrint } from '../compare';
+import { downloadComparisonCsv } from '../csv';
 import {
-  applyMismatchFilters,
-  applyMismatchSort,
-  EMPTY_MISMATCH_FILTERS,
-  mismatchFiltersFromParams,
-  mismatchSortFromParams,
-  writeMismatchParams,
-  type MismatchFilters,
-  type MismatchSort,
-  type MismatchSortKey,
+  applyComparisonFilters,
+  applyComparisonSort,
+  EMPTY_COMPARISON_FILTERS,
+  comparisonFiltersFromParams,
+  comparisonSortFromParams,
+  writeComparisonParams,
+  type ComparisonFilters,
+  type ComparisonSort,
+  type ComparisonSortKey,
 } from '../filtering';
 
 const PAGE_SIZES = [25, 50, 100, 250, 500];
@@ -38,7 +38,7 @@ function hintText(o: OtherPrint): string {
   return o.diff > 0 ? `Collection has ${print} ×${o.diff} not in a deck` : `Decks use ${print} ×${-o.diff} not in the collection`;
 }
 
-function DeckUses({ row, decks, boardLabel }: { row: MismatchRow; decks: ReadonlyMap<string, DeckRow>; boardLabel: (board: string) => string }) {
+function DeckUses({ row, decks, boardLabel }: { row: ComparisonRow; decks: ReadonlyMap<string, DeckRow>; boardLabel: (board: string) => string }) {
   if (!row.decks.length) return <Text size="sm" c="dimmed">—</Text>;
   const label = (deckId: string, board: string) => `${decks.get(deckId)?.name ?? 'Unknown deck'}${board === 'mainboard' ? '' : ` · ${boardLabel(board)}`}`;
   const first = row.decks.slice(0, 2);
@@ -84,7 +84,7 @@ function DeckUses({ row, decks, boardLabel }: { row: MismatchRow; decks: Readonl
   );
 }
 
-function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: string) => string): DataTableColumn<MismatchRow>[] {
+function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: string) => string): DataTableColumn<ComparisonRow>[] {
   return [
     {
       accessor: 'kind',
@@ -190,7 +190,7 @@ function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: s
 }
 
 interface Props {
-  rows: MismatchRow[];
+  rows: ComparisonRow[];
   decks: ReadonlyMap<string, DeckRow>;
   /** The decks' site board names ("Sideboard"…). */
   boardLabel: (board: string) => string;
@@ -198,26 +198,26 @@ interface Props {
   emptyText: string;
 }
 
-export function MismatchTable({ rows, decks, boardLabel, loading, emptyText }: Props) {
+export function ComparisonTable({ rows, decks, boardLabel, loading, emptyText }: Props) {
   const tableRef = useStickyTableHeader();
   const [params, setParams] = useSearchParams();
   const [pageSize, setPageSize] = useLocalStorage({ key: 'tithies:decks:pageSize', defaultValue: 50 });
-  const filters = useMemo(() => mismatchFiltersFromParams(params), [params]);
-  const sort = useMemo(() => mismatchSortFromParams(params), [params]);
+  const filters = useMemo(() => comparisonFiltersFromParams(params), [params]);
+  const sort = useMemo(() => comparisonSortFromParams(params), [params]);
   const page = Math.max(1, Number(params.get('page')) || 1);
-  const update = (f: MismatchFilters, s: MismatchSort, p: number) => setParams(writeMismatchParams(params, f, s, p), { replace: true });
+  const update = (f: ComparisonFilters, s: ComparisonSort, p: number) => setParams(writeComparisonParams(params, f, s, p), { replace: true });
 
   const [q, setQ] = useState(filters.q);
   useEffect(() => setQ(filters.q), [filters.q]);
   const pushQ = useDebouncedCallback((v: string) => update({ ...filters, q: v }, sort, 1), 250);
 
   const deckName = (id: string) => decks.get(id)?.name ?? 'Unknown deck';
-  const view = useMemo(() => applyMismatchSort(applyMismatchFilters(rows, filters, deckName), sort, deckName), [rows, filters, sort, decks]); // eslint-disable-line react-hooks/exhaustive-deps
+  const view = useMemo(() => applyComparisonSort(applyComparisonFilters(rows, filters, deckName), sort, deckName), [rows, filters, sort, decks]); // eslint-disable-line react-hooks/exhaustive-deps
   const lastPage = Math.max(1, Math.ceil(view.length / pageSize));
   const safePage = Math.min(page, lastPage);
   const records = view.slice((safePage - 1) * pageSize, safePage * pageSize);
   const columns = useMemo(() => buildColumns(decks, boardLabel), [decks, boardLabel]);
-  const sortStatus: DataTableSortStatus<MismatchRow> = { columnAccessor: sort.key, direction: sort.dir };
+  const sortStatus: DataTableSortStatus<ComparisonRow> = { columnAccessor: sort.key, direction: sort.dir };
 
   const setOptions = useMemo(() => {
     const m = new Map<string, string>();
@@ -266,7 +266,7 @@ export function MismatchTable({ rows, decks, boardLabel, loading, emptyText }: P
           mb={6}
         />
         {filtered && (
-          <Button variant="subtle" size="xs" mb={4} onClick={() => update(EMPTY_MISMATCH_FILTERS, sort, 1)}>
+          <Button variant="subtle" size="xs" mb={4} onClick={() => update(EMPTY_COMPARISON_FILTERS, sort, 1)}>
             Clear filters
           </Button>
         )}
@@ -277,26 +277,26 @@ export function MismatchTable({ rows, decks, boardLabel, loading, emptyText }: P
             </Button>
           </Menu.Target>
           <Menu.Dropdown>
-            <Menu.Item onClick={() => downloadMismatchCsv(view, deckName, boardLabel, filtered ? '-filtered' : '')}>Current view ({view.length} rows)</Menu.Item>
-            <Menu.Item onClick={() => downloadMismatchCsv(applyMismatchSort(rows, sort, deckName), deckName, boardLabel)}>All mismatches ({rows.length} rows)</Menu.Item>
+            <Menu.Item onClick={() => downloadComparisonCsv(view, deckName, boardLabel, filtered ? '-filtered' : '')}>Current view ({view.length} rows)</Menu.Item>
+            <Menu.Item onClick={() => downloadComparisonCsv(applyComparisonSort(rows, sort, deckName), deckName, boardLabel)}>All rows ({rows.length})</Menu.Item>
           </Menu.Dropdown>
         </Menu>
       </Group>
 
       <Paper ref={tableRef} withBorder radius="md">
-        <DataTable<MismatchRow>
+        <DataTable<ComparisonRow>
           idAccessor="key"
           records={records}
           columns={columns}
           fetching={loading}
           minHeight={records.length ? undefined : 200}
-          noRecordsText={rows.length ? 'No mismatch matches these filters' : emptyText}
+          noRecordsText={rows.length ? 'No row matches these filters' : emptyText}
           striped
           highlightOnHover
           verticalSpacing={4}
           horizontalSpacing="xs"
           sortStatus={sortStatus}
-          onSortStatusChange={(s) => update(filters, { key: s.columnAccessor as MismatchSortKey, dir: s.direction }, 1)}
+          onSortStatusChange={(s) => update(filters, { key: s.columnAccessor as ComparisonSortKey, dir: s.direction }, 1)}
           totalRecords={view.length}
           recordsPerPage={pageSize}
           page={safePage}

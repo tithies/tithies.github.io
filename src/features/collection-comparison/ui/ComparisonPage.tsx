@@ -16,9 +16,10 @@ import { timeAgo } from '@/lib/format';
 import { siteOf } from '@/lib/sites/registry';
 import { Stat } from '@/lib/ui/Stat';
 import { compareDecksToCollection } from '../compare';
-import { useMismatchConfig, type MismatchConfig } from '../config';
-import { mismatchFiltersFromParams, mismatchSortFromParams, writeMismatchParams } from '../filtering';
-import { MismatchTable } from './MismatchTable';
+import { useComparisonConfig, type ComparisonConfig } from '../config';
+import { PresetBar } from './PresetBar';
+import { comparisonFiltersFromParams, comparisonSortFromParams, writeComparisonParams } from '../filtering';
+import { ComparisonTable } from './ComparisonTable';
 import { SyncProgress } from './SyncProgress';
 
 /** The current account, and the site its decks come from (Moxfield before any account exists). */
@@ -123,8 +124,8 @@ function OptionsCard({
   decksSyncedAt,
   collectionAt,
 }: {
-  config: MismatchConfig;
-  update: (p: Partial<MismatchConfig>) => void;
+  config: ComparisonConfig;
+  update: (p: Partial<ComparisonConfig>) => void;
   boards: Map<string, number>;
   decksSyncedAt?: number;
   collectionAt?: number;
@@ -141,23 +142,6 @@ function OptionsCard({
     <Paper withBorder p="md" radius="md">
       <Stack gap="sm">
         <Title order={4}>Options</Title>
-        <Stack gap={6}>
-          <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-            Show
-          </Text>
-          <Checkbox
-            label="Deck cards missing from the collection"
-            description="Copies used in decks that the collection doesn't have (exact print)"
-            checked={config.showMissing}
-            onChange={(e) => update({ showMissing: e.currentTarget.checked })}
-          />
-          <Checkbox
-            label="Collection cards not in any deck"
-            description="Copies in the collection that no included deck uses"
-            checked={config.showUnassigned}
-            onChange={(e) => update({ showUnassigned: e.currentTarget.checked })}
-          />
-        </Stack>
         <Stack gap={6}>
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
             Deck boards counted
@@ -196,7 +180,7 @@ function OptionsCard({
         <Group gap="xs">
           {/* During a decks-only sync this joins it: the collection is read right after the decks. */}
           <Button leftSection={<IconArrowsDiff size={16} />} loading={running && sync?.withCollection} onClick={() => void start(true)}>
-            Find mismatches
+            Compare
           </Button>
           <Button variant="default" leftSection={<IconRefresh size={16} />} disabled={running} onClick={() => void start(false)}>
             Sync decks only
@@ -208,26 +192,27 @@ function OptionsCard({
           )}
         </Group>
         <Text size="xs" c="dimmed">
-          Find mismatches first syncs decks (only new or changed ones are read), then reads your whole collection. Options and deck choices apply instantly.
+          Compare first syncs decks (only new or changed ones are read), then reads your whole collection. Options, presets and deck choices apply instantly.
         </Text>
       </Stack>
     </Paper>
   );
 }
 
-export function MismatchPage() {
+export function ComparisonPage() {
   const { key, site } = usePageAccount();
   const decks = useDecks(key);
   const decksMeta = useDecksMeta(key);
   const sync = useSyncState(key);
   const collectionMeta = useCollectionMeta(key);
-  const { config, update } = useMismatchConfig(key);
+  const presets = useComparisonConfig(key);
+  const { state, config, update } = presets;
   // The "Likely wrong print" card toggles the table's filter of the same name (kept in the URL).
   const [params, setParams] = useSearchParams();
   const hintedOnly = params.get('hint') === '1';
   const toggleHinted = () => {
-    const f = mismatchFiltersFromParams(params);
-    setParams(writeMismatchParams(params, { ...f, hinted: !f.hinted }, mismatchSortFromParams(params), 1), { replace: true });
+    const f = comparisonFiltersFromParams(params);
+    setParams(writeComparisonParams(params, { ...f, hinted: !f.hinted }, comparisonSortFromParams(params), 1), { replace: true });
   };
 
   // Big tables are reloaded when a sync job ends, not on every deck it writes.
@@ -264,10 +249,10 @@ export function MismatchPage() {
 
   const header = (
     <Stack gap={4}>
-      <Title order={2}>Deck ↔ collection mismatches</Title>
+      <Title order={2}>Collection comparisons</Title>
       <Text size="sm" c="dimmed">
-        Every deck card should be in your collection, and every collection card in a deck. Compared by exact print (set, collector number and finish);
-        copies used by several decks add up.
+        Your decks compared with your collection: deck cards the collection doesn't have, and collection cards no deck uses. Compared by exact print
+        (set, collector number and finish); copies used by several decks add up.
       </Text>
     </Stack>
   );
@@ -282,7 +267,7 @@ export function MismatchPage() {
       </Stack>
     );
   }
-  if (decks === undefined || decksMeta === undefined || config === null) return <Text c="dimmed">Loading…</Text>;
+  if (decks === undefined || decksMeta === undefined || config === null || state === null) return <Text c="dimmed">Loading…</Text>;
 
   if (!decksMeta.lastSuccessAt) {
     return (
@@ -301,6 +286,7 @@ export function MismatchPage() {
     <Stack>
       {header}
       <AccountHint type={site.type} />
+      <PresetBar state={state} load={presets.load} save={presets.save} rename={presets.rename} remove={presets.remove} />
       <SimpleGrid cols={{ base: 1, lg: 2 }}>
         <Paper withBorder p="md" radius="md">
           <Stack gap="xs">
@@ -330,7 +316,7 @@ export function MismatchPage() {
 
       {!collectionMeta ? (
         <Paper withBorder p="lg" radius="md">
-          <Text c="dimmed">Click “Find mismatches” to read your collection and compare it with the selected decks.</Text>
+          <Text c="dimmed">Click “Compare” to read your collection and compare it with the selected decks.</Text>
         </Paper>
       ) : (
         <>
@@ -340,7 +326,7 @@ export function MismatchPage() {
                 label="Missing from collection"
                 value={`${s.missingCopies} copies`}
                 color={config.showMissing ? 'red' : 'dimmed'}
-                lines={[`${s.missingPrints} prints`, !config.showMissing && 'Hidden from the table'].filter(Boolean) as string[]}
+                lines={["Copies used in decks that the collection doesn't have (exact print)", `${s.missingPrints} prints`, !config.showMissing && 'Hidden from the table'].filter(Boolean) as string[]}
                 onClick={() => update({ showMissing: !config.showMissing })}
                 active={config.showMissing}
                 activeSuffix=" · shown"
@@ -350,7 +336,7 @@ export function MismatchPage() {
                 label="Not in any deck"
                 value={`${s.unassignedCopies} copies`}
                 color={config.showUnassigned ? 'orange' : 'dimmed'}
-                lines={[`${s.unassignedPrints} prints`, !config.showUnassigned && 'Hidden from the table'].filter(Boolean) as string[]}
+                lines={['Copies in the collection that no included deck uses', `${s.unassignedPrints} prints`, !config.showUnassigned && 'Hidden from the table'].filter(Boolean) as string[]}
                 onClick={() => update({ showUnassigned: !config.showUnassigned })}
                 active={config.showUnassigned}
                 activeSuffix=" · shown"
@@ -384,12 +370,16 @@ export function MismatchPage() {
               not counted.
             </Alert>
           )}
-          <MismatchTable
+          <ComparisonTable
             rows={shown}
             decks={deckById}
             boardLabel={site.boardLabel}
             loading={!loaded}
-            emptyText={config.showMissing || config.showUnassigned ? 'No mismatches: decks and collection agree' : 'Both “Show” options are off'}
+            emptyText={
+              config.showMissing || config.showUnassigned
+                ? 'No differences: decks and collection agree'
+                : 'Both kinds of rows are hidden: click “Missing from collection” or “Not in any deck” above to show them'
+            }
           />
         </>
       )}

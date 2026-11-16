@@ -4,7 +4,7 @@ import type { AccountData } from '@/lib/accounts/data';
 import type { AccountKey } from '@/lib/accounts/types';
 import { db, getMeta, putMeta } from '@/lib/db';
 import { getSettings, overlayCollapsedItem, saveSettings } from '@/lib/settings';
-import { mismatchConfigKey } from '@/features/deck-mismatch/config';
+import { comparisonConfigKey } from '@/features/collection-comparison/config';
 import { clearStoredData, listStoredPreferences, measureStoredData, resetAllSettings } from '@/features/settings/stored-data';
 import { newAccount, resetDb } from './helpers';
 
@@ -91,10 +91,10 @@ describe('Settings → Reset settings', () => {
     await fill();
     await saveSettings({ requestIntervalMs: 5000 });
     await overlayCollapsedItem.setValue(true);
-    await storage.setItem(mismatchConfigKey(A.key), { showMissing: false, showUnassigned: true, ignoreProxies: false, ignoredBoards: [], excludedDeckIds: ['d1'] });
+    await storage.setItem(comparisonConfigKey(A.key), { current: { showMissing: false, excludedDeckIds: ['d1'] }, presets: [], loadedPresetId: null });
     const prefs = await listStoredPreferences();
-    expect(prefs.map((p) => p.key).sort()).toEqual([`deckMismatchConfig:${A.key}`, 'overlayCollapsed', 'settings']);
-    expect(prefs.find((p) => p.key.startsWith('deckMismatchConfig:'))!.label).toMatch(/^Mismatches page options of one account/);
+    expect(prefs.map((p) => p.key).sort()).toEqual([`collectionComparison:${A.key}`, 'overlayCollapsed', 'settings']);
+    expect(prefs.find((p) => p.key.startsWith('collectionComparison:'))!.label).toMatch(/^Collection comparisons options and presets of one account/);
 
     await resetAllSettings();
 
@@ -106,5 +106,14 @@ describe('Settings → Reset settings', () => {
     expect(await db.runs.count()).toBe(2);
     expect(await db.accounts.count()).toBe(2);
     expect(await getMeta('currentAccount')).toBe(B.key);
+  });
+
+  it('keeps saved comparison presets (only their inputs go back to the defaults)', async () => {
+    const presets = [{ id: 'p', name: 'Cubes', config: { excludedDeckIds: ['d1'] }, savedAt: 1 }];
+    await storage.setItem(comparisonConfigKey(A.key), { current: { showMissing: false }, presets, loadedPresetId: 'p' });
+    await storage.setItem(comparisonConfigKey(B.key), { current: { showMissing: false }, presets: [], loadedPresetId: null });
+    await resetAllSettings();
+    expect(await storage.getItem(comparisonConfigKey(A.key))).toEqual({ presets, loadedPresetId: null });
+    expect(await storage.getItem(comparisonConfigKey(B.key))).toBeNull();
   });
 });

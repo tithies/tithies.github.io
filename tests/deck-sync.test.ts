@@ -218,7 +218,7 @@ describe('AccountSyncJob', () => {
     expect(first).toMatchObject({ ok: true, alreadyRunning: false, accountKey: KEY });
     if (!first.ok) throw new Error('not started');
     expect((await A.meta.get('sync'))!.status).toBe('running');
-    // A "Find mismatches" while the deck sync runs joins it and adds the collection step.
+    // A "Compare" while the deck sync runs joins it and adds the collection step.
     expect(await job.start({ accountKey: KEY, collection: true })).toEqual({ ok: true, jobId: first.jobId, accountKey: KEY, alreadyRunning: true });
     open();
     await job.finished;
