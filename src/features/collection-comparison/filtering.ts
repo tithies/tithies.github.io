@@ -88,6 +88,9 @@ export function applyComparisonSort(rows: ComparisonRow[], s: ComparisonSort, de
         return r.finish;
       case 'decks':
         return r.decks.length ? fold(deckName(r.decks[0].deckId)) : '';
+      case 'diff':
+        // The row's copies, signed like the column: missing −, in no deck +, a match as is.
+        return r.kind === 'missing' ? -r.copies : r.copies;
       default:
         return r[s.key];
     }

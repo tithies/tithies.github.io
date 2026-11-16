@@ -9,7 +9,7 @@ import type { BinderVisibility, SiteBinder } from '@/lib/sites/types';
 
 /** One print to export, with how many copies. */
 export interface ExportItem {
-  /** printKey (set|cn|finish). */
+  /** The item's key in a page's export list (one per row); items of the same print are merged when exported. */
   key: string;
   /** The site's card id, when known. */
   cardId: string;

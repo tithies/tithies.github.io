@@ -33,8 +33,15 @@ export interface OtherPrint {
   decks: DeckUse[];
 }
 
+/**
+ * One group of copies of one print. A print gives up to two rows: its copies on both sides (a
+ * match), and the difference (missing, or in no deck). So every copy lands in exactly one kind.
+ */
 export interface ComparisonRow {
+  /** Unique per row: the print key, with "|match" for the matching part. */
   key: string;
+  /** The print (set|cn|finish), the same for both rows of a print. */
+  printKey: string;
   kind: ComparisonKind;
   name: string;
   set: string;
@@ -46,10 +53,13 @@ export interface ComparisonRow {
   scryfallId: string;
   /** The site's card id (Moxfield's), for exports. */
   cardId: string;
+  /** The print's copies in the included decks, and in the collection (the same on both rows of a print). */
   deckQty: number;
   collectionQty: number;
-  /** collection − decks (< 0: missing, > 0: unassigned, 0: match). */
+  /** The print's collection − decks (< 0: missing copies, > 0: copies in no deck, 0: everything matches). */
   diff: number;
+  /** The copies this row stands for: those on both sides (match), missing, or in no deck. */
+  copies: number;
   decks: DeckUse[];
   otherPrints: OtherPrint[];
 }
@@ -66,11 +76,11 @@ export interface CompareSummary {
   decksWithoutCards: number;
   deckCopies: number;
   collectionCopies: number;
-  /** Copies present on both sides. */
+  /** Copies present on both sides (the match rows' copies). */
   matchedCopies: number;
-  /** Prints with as many copies on both sides (match rows), and their copies. */
+  /** Prints with copies on both sides (match rows); `exactPrints` of them have no difference at all. */
   matchedPrints: number;
-  matchedPrintCopies: number;
+  exactPrints: number;
   missingPrints: number;
   missingCopies: number;
   unassignedPrints: number;
@@ -110,7 +120,7 @@ export function compareDecksToCollection(
     collectionCopies: 0,
     matchedCopies: 0,
     matchedPrints: 0,
-    matchedPrintCopies: 0,
+    exactPrints: 0,
     missingPrints: 0,
     missingCopies: 0,
     unassignedPrints: 0,
@@ -177,21 +187,11 @@ export function compareDecksToCollection(
 
   const rows: ComparisonRow[] = [];
   for (const a of acc.values()) {
-    summary.matchedCopies += Math.min(a.deckQty, a.collectionQty);
+    const matched = Math.min(a.deckQty, a.collectionQty);
     const diff = a.collectionQty - a.deckQty;
-    const kind: ComparisonKind = diff < 0 ? 'missing' : diff > 0 ? 'unassigned' : 'match';
-    if (kind === 'missing') {
-      summary.missingPrints++;
-      summary.missingCopies -= diff;
-    } else if (kind === 'unassigned') {
-      summary.unassignedPrints++;
-      summary.unassignedCopies += diff;
-    } else {
-      summary.matchedPrints++;
-      summary.matchedPrintCopies += a.deckQty;
-    }
-    rows.push({
-      key: a.key,
+    const row = (kind: ComparisonKind, copies: number): ComparisonRow => ({
+      key: kind === 'match' ? `${a.key}|match` : a.key,
+      printKey: a.key,
       kind,
       name: a.card.name,
       set: a.card.set,
@@ -205,14 +205,30 @@ export function compareDecksToCollection(
       deckQty: a.deckQty,
       collectionQty: a.collectionQty,
       diff,
+      copies,
       decks: [...a.decks.values()].sort((x, y) => y.qty - x.qty),
       otherPrints: [],
     });
+    if (matched > 0) {
+      summary.matchedCopies += matched;
+      summary.matchedPrints++;
+      if (diff === 0) summary.exactPrints++;
+      rows.push(row('match', matched));
+    }
+    if (diff < 0) {
+      summary.missingPrints++;
+      summary.missingCopies -= diff;
+      rows.push(row('missing', -diff));
+    } else if (diff > 0) {
+      summary.unassignedPrints++;
+      summary.unassignedCopies += diff;
+      rows.push(row('unassigned', diff));
+    }
   }
 
   // Same card, opposite difference elsewhere: "deck uses DMU 435 foil, collection has DMU 435 non-foil".
-  // Matches neither get nor give hints.
-  const differing = rows.filter((r) => r.diff !== 0);
+  // Match rows neither get nor give hints.
+  const differing = rows.filter((r) => r.kind !== 'match');
   const byName = new Map<string, ComparisonRow[]>();
   for (const r of differing) {
     const k = nameKey(r.name);
@@ -223,11 +239,13 @@ export function compareDecksToCollection(
   for (const r of differing) {
     const others = byName.get(nameKey(r.name))!.filter((o) => o !== r && Math.sign(o.diff) === -Math.sign(r.diff));
     r.otherPrints = others
-      .map((o) => ({ key: o.key, set: o.set, setName: o.setName, cn: o.cn, finish: o.finish, diff: o.diff, sameCn: o.set === r.set && o.cn === r.cn, decks: o.decks }))
+      .map((o) => ({ key: o.printKey, set: o.set, setName: o.setName, cn: o.cn, finish: o.finish, diff: o.diff, sameCn: o.set === r.set && o.cn === r.cn, decks: o.decks }))
       .sort((x, y) => Number(y.sameCn) - Number(x.sameCn) || Math.abs(y.diff) - Math.abs(x.diff));
     if (r.otherPrints.length) summary.hinted++;
   }
 
-  rows.sort((x, y) => x.name.localeCompare(y.name) || x.set.localeCompare(y.set) || x.cn.localeCompare(y.cn, undefined, { numeric: true }));
+  rows.sort(
+    (x, y) => x.name.localeCompare(y.name) || x.set.localeCompare(y.set) || x.cn.localeCompare(y.cn, undefined, { numeric: true }) || x.key.localeCompare(y.key),
+  );
   return { rows, summary };
 }

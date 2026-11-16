@@ -1,8 +1,8 @@
 import type { ExportItem } from '@/lib/export/types';
 import type { ComparisonRow } from './compare';
 
-/** Copies a row exports: the difference, or for a match its copies (as many in decks as in the collection). */
-export const exportQty = (r: ComparisonRow): number => (r.diff === 0 ? r.deckQty : Math.abs(r.diff));
+/** Copies a row exports: its own copies (missing, in no deck, or on both sides for a match). */
+export const exportQty = (r: ComparisonRow): number => r.copies;
 
 /** A comparison row as an export item. */
 export const rowToItem = (r: ComparisonRow): ExportItem => ({

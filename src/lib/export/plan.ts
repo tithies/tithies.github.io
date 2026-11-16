@@ -3,6 +3,7 @@
  * preview and the background job compute the same plan, and compare digests).
  */
 import type { AccountKey } from '@/lib/accounts/types';
+import { printKey } from '@/lib/cards/prints';
 import type { CollectionEntry } from '@/lib/cards/types';
 import type { ExportItem, ExportPlan, ExportTarget, PlanWarning, RemovedEntry, TargetRead, TargetState } from './types';
 
@@ -54,13 +55,14 @@ export function stateCovers(state: TargetState, read: TargetRead): boolean {
   return r.kind === 'collection';
 }
 
-/** Merges items of the same print, drops empty ones. */
+/** Merges items of the same print (set + collector number + finish, whatever their list key), drops empty ones. */
 export function mergeItems(items: readonly ExportItem[]): ExportItem[] {
   const by = new Map<string, ExportItem>();
   for (const i of items) {
     if (!(i.qty > 0)) continue;
-    const prev = by.get(i.key);
-    by.set(i.key, prev ? { ...prev, qty: prev.qty + i.qty } : { ...i });
+    const key = printKey(i.set, i.cn, i.finish);
+    const prev = by.get(key);
+    by.set(key, prev ? { ...prev, qty: prev.qty + i.qty } : { ...i, key });
   }
   return [...by.values()].sort((a, b) => a.name.localeCompare(b.name) || a.key.localeCompare(b.key));
 }

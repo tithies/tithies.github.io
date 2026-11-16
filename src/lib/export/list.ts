@@ -3,6 +3,7 @@
  * page's state only (each page has its own; leaving the page empties it).
  */
 import { useCallback, useMemo, useReducer } from 'react';
+import { printKey } from '@/lib/cards/prints';
 import type { ExportItem } from './types';
 
 export type ExportListState = ReadonlyMap<string, ExportItem>;
@@ -46,10 +47,15 @@ export function exportListReducer(state: ExportListState, a: ExportListAction): 
   }
 }
 
+/** Prints (two rows of one print count once) and copies. */
 export function exportListTotals(state: ExportListState): { prints: number; copies: number } {
   let copies = 0;
-  for (const i of state.values()) copies += i.qty;
-  return { prints: state.size, copies };
+  const prints = new Set<string>();
+  for (const i of state.values()) {
+    copies += i.qty;
+    prints.add(printKey(i.set, i.cn, i.finish));
+  }
+  return { prints: prints.size, copies };
 }
 
 export interface ExportList {

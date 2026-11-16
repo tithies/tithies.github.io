@@ -13,6 +13,7 @@ export function comparisonToCsv(rows: ComparisonRow[], deckName: (id: string) =>
       rarity: r.rarity,
       deck_qty: r.deckQty,
       collection_qty: r.collectionQty,
+      copies: r.kind === 'missing' ? -r.copies : r.copies,
       difference: r.diff,
       decks: r.decks.map((d) => `${deckName(d.deckId)}${d.board === 'mainboard' ? '' : ` (${boardLabel(d.board)})`} ×${d.qty}`).join(' | '),
       other_prints: r.otherPrints.map((o) => `${o.set.toUpperCase()} ${o.cn} ${o.finish} ${o.diff > 0 ? '+' : ''}${o.diff}`).join(' | '),

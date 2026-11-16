@@ -242,14 +242,18 @@ function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: s
     {
       accessor: 'diff',
       title: (
-        <Tooltip label="Collection − decks: negative = copies missing from the collection, positive = copies in no deck, 0 = a match" multiline w={240}>
-          <span>Diff</span>
+        <Tooltip
+          label="The copies of this row: missing from the collection (−), in no deck (+), or on both sides (a match). A print that partly matches has two rows."
+          multiline
+          w={260}
+        >
+          <span>Copies</span>
         </Tooltip>
       ),
       ...tight,
       sortable: true,
       textAlign: 'right',
-      render: (r) => num(r.diff > 0 ? `+${r.diff}` : r.diff, r.diff < 0 ? 'red' : r.diff > 0 ? 'orange' : 'teal'),
+      render: (r) => num(r.kind === 'missing' ? `−${r.copies}` : r.kind === 'unassigned' ? `+${r.copies}` : r.copies, r.kind === 'missing' ? 'red' : r.kind === 'unassigned' ? 'orange' : 'teal'),
     },
     { accessor: 'decks', title: 'Decks', sortable: true, render: (r) => <DeckUses row={r} decks={decks} boardLabel={boardLabel} /> },
     {

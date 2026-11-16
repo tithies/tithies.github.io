@@ -100,13 +100,15 @@ const byKey = <T extends { key: string }>(rows: T[], key: string) => rows.find((
 describe('compareDecksToCollection', () => {
   it('sums copies across decks and compares exact prints', () => {
     const { rows, summary } = compareDecksToCollection(DECKS, CARDS, COLLECTION, OPTS);
-    // Sol Ring in 3 decks, 2 copies owned (French + LP still count).
-    expect(byKey(rows, 'c21|263|nonFoil')).toMatchObject({ kind: 'missing', deckQty: 3, collectionQty: 2, diff: -1 });
+    // Sol Ring in 3 decks, 2 copies owned (French + LP still count): 2 match, 1 missing (two rows of one print).
+    expect(byKey(rows, 'c21|263|nonFoil')).toMatchObject({ kind: 'missing', printKey: 'c21|263|nonFoil', deckQty: 3, collectionQty: 2, diff: -1, copies: 1 });
+    expect(byKey(rows, 'c21|263|nonFoil|match')).toMatchObject({ kind: 'match', printKey: 'c21|263|nonFoil', deckQty: 3, collectionQty: 2, copies: 2 });
     expect(byKey(rows, 'c21|263|nonFoil')!.decks.map((d) => d.deckId).sort()).toEqual(['a', 'b', 'c']);
-    // Commanders count; matching prints are match rows (shown only when asked).
-    expect(byKey(rows, '2x2|211|nonFoil')).toMatchObject({ kind: 'match', diff: 0 });
-    expect(byKey(rows, 'dsk|279|nonFoil')).toMatchObject({ kind: 'match', diff: 0 });
-    expect(byKey(rows, 'neo|5|nonFoil')).toMatchObject({ kind: 'match', diff: 0 });
+    // Commanders count; matching prints are match rows (shown only when asked), and nothing else.
+    expect(byKey(rows, '2x2|211|nonFoil|match')).toMatchObject({ kind: 'match', diff: 0 });
+    expect(byKey(rows, '2x2|211|nonFoil')).toBeUndefined();
+    expect(byKey(rows, 'dsk|279|nonFoil|match')).toMatchObject({ kind: 'match', diff: 0 });
+    expect(byKey(rows, 'neo|5|nonFoil|match')).toMatchObject({ kind: 'match', diff: 0 });
     // Collection-only cards.
     expect(byKey(rows, 'otj|9|nonFoil')).toMatchObject({ kind: 'unassigned', deckQty: 0, collectionQty: 3, diff: 3 });
     // Ignored: maybeboard, proxies (both sides), MTGO/Arena rows.
@@ -114,10 +116,16 @@ describe('compareDecksToCollection', () => {
     expect(byKey(rows, 'lea|1|nonFoil')).toBeUndefined();
     expect(byKey(rows, 'otj|10|nonFoil')).toBeUndefined();
     expect(summary).toMatchObject({ decksIncluded: 3, decksWithoutCards: 0, proxiesSkipped: { decks: 1, collection: 1 }, nonPaperSkipped: 1 });
-    expect(rows.every((r) => (r.kind === 'match') === (r.diff === 0))).toBe(true);
+    // Row keys are unique; every copy is in exactly one kind.
+    expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length);
     const matches = rows.filter((r) => r.kind === 'match');
+    const sum = (kind: string) => rows.filter((r) => r.kind === kind).reduce((s, r) => s + r.copies, 0);
     expect(summary.matchedPrints).toBe(matches.length);
-    expect(summary.matchedPrintCopies).toBe(matches.reduce((s, r) => s + r.deckQty, 0));
+    expect(summary.matchedCopies).toBe(sum('match'));
+    expect([summary.missingCopies, summary.unassignedCopies]).toEqual([sum('missing'), sum('unassigned')]);
+    expect(sum('match') + sum('unassigned')).toBe(summary.collectionCopies);
+    expect(sum('match') + sum('missing')).toBe(summary.deckCopies);
+    expect(summary.exactPrints).toBe(matches.filter((r) => r.diff === 0).length);
     // Matches neither get nor give likely-wrong-print hints.
     expect(matches.every((r) => r.otherPrints.length === 0)).toBe(true);
   });
@@ -138,7 +146,8 @@ describe('compareDecksToCollection', () => {
 
   it('applies deck, board and proxy options', () => {
     const noC = compareDecksToCollection(DECKS, CARDS, COLLECTION, { ...OPTS, excludedDeckIds: ['c'] });
-    expect(byKey(noC.rows, 'c21|263|nonFoil')).toMatchObject({ kind: 'match' }); // 2 decks, 2 copies
+    expect(byKey(noC.rows, 'c21|263|nonFoil|match')).toMatchObject({ kind: 'match', copies: 2 }); // 2 decks, 2 copies
+    expect(byKey(noC.rows, 'c21|263|nonFoil')).toBeUndefined();
     expect(noC.summary.decksIncluded).toBe(2);
 
     const withMaybe = compareDecksToCollection(DECKS, CARDS, COLLECTION, { ...OPTS, ignoredBoards: [] });
@@ -148,7 +157,7 @@ describe('compareDecksToCollection', () => {
     expect(byKey(noSide.rows, 'neo|5|nonFoil')).toMatchObject({ kind: 'unassigned', diff: 2 });
 
     const proxies = compareDecksToCollection(DECKS, CARDS, COLLECTION, { ...OPTS, ignoreProxies: false });
-    expect(byKey(proxies.rows, 'lea|1|nonFoil')).toMatchObject({ kind: 'match' }); // 1 proxy in a deck, 1 proxy owned
+    expect(byKey(proxies.rows, 'lea|1|nonFoil|match')).toMatchObject({ kind: 'match', copies: 1 }); // 1 proxy in a deck, 1 proxy owned
     expect(proxies.summary.proxiesSkipped).toEqual({ decks: 0, collection: 0 });
   });
 
@@ -263,10 +272,15 @@ describe('Comparator rows as export items', () => {
     const { rows } = compareDecksToCollection(DECKS, CARDS, COLLECTION, OPTS);
     const missing = byKey(rows, 'c21|263|nonFoil')!;
     const unassigned = byKey(rows, 'otj|9|nonFoil')!;
-    const match = byKey(rows, 'dsk|279|nonFoil')!;
+    const match = byKey(rows, 'dsk|279|nonFoil|match')!;
     expect([exportQty(missing), exportQty(unassigned)]).toEqual([1, 3]);
     expect(exportQty(match)).toBe(match.deckQty);
     expect(match.deckQty).toBeGreaterThan(0);
-    expect(rowToItem(match)).toMatchObject({ key: 'dsk|279|nonFoil', qty: match.collectionQty, note: 'Matching' });
+    expect(rowToItem(match)).toMatchObject({ key: 'dsk|279|nonFoil|match', qty: match.collectionQty, note: 'Matching' });
+    // Both rows of a partly matching print go into the export as one print with every copy.
+    const { mergeItems } = await import('@/lib/export/plan');
+    const sol = rows.filter((r) => r.printKey === 'c21|263|nonFoil').map(rowToItem);
+    expect(sol.map((i) => i.qty).sort()).toEqual([1, 2]);
+    expect(mergeItems(sol)).toEqual([expect.objectContaining({ key: 'c21|263|nonFoil', qty: 3 })]);
   });
 });

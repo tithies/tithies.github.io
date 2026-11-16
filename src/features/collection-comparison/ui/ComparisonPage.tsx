@@ -402,11 +402,11 @@ export function ComparisonPage() {
               />
               <Stat
                 label="Matching"
-                value={`${s.matchedPrintCopies} copies`}
+                value={`${s.matchedCopies} copies`}
                 color={config.showMatched ? 'teal' : 'dimmed'}
                 lines={[
-                  'Prints with as many copies in decks as in the collection (exact print)',
-                  `${s.matchedPrints} prints`,
+                  'Copies both in decks and in the collection (exact print)',
+                  `${s.matchedPrints} prints${s.matchedPrints > s.exactPrints ? ` (${s.matchedPrints - s.exactPrints} also have a difference, in its own row)` : ''}`,
                   !config.showMatched && 'Hidden from the table',
                 ].filter(Boolean) as string[]}
                 onClick={() => update({ showMatched: !config.showMatched })}
@@ -428,7 +428,6 @@ export function ComparisonPage() {
                 value={`${s.decksIncluded} decks`}
                 lines={[
                   `${s.deckCopies} deck copies · ${s.collectionCopies} collection copies`,
-                  `${s.matchedCopies} copies on both sides`,
                   s.proxiesSkipped.decks + s.proxiesSkipped.collection > 0 &&
                     `Proxies ignored: ${s.proxiesSkipped.decks} in decks, ${s.proxiesSkipped.collection} in collection`,
                   s.nonPaperSkipped > 0 && `${s.nonPaperSkipped} MTGO/Arena copies ignored`,
