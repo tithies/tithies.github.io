@@ -43,9 +43,9 @@ const router = createHashRouter([
       { path: 'settings', element: <SettingsPage /> },
       { path: 'changes', element: <ChangeLogPage /> },
       { path: 'f2f/settings', element: <Navigate to="/settings" replace /> },
-      { path: 'decks/comparison', element: <ComparisonPage /> },
-      { path: 'decks/comparisons', element: <Navigate to="/decks/comparison" replace /> },
-      { path: 'decks/mismatches', element: <Navigate to="/decks/comparison" replace /> },
+      { path: 'collection/comparator', element: <ComparisonPage /> },
+      // Earlier addresses of the same page.
+      ...['decks/comparison', 'decks/comparisons', 'decks/mismatches'].map((path) => ({ path, element: <Navigate to="/collection/comparator" replace /> })),
       { path: '*', element: <Navigate to="/f2f/runs" replace /> },
     ],
   },

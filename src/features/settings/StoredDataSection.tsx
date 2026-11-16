@@ -78,7 +78,7 @@ const YOURS = { label: 'Your data', color: 'red' };
 function accountRows(a: AccountRow, s: AccountStats): Row[] {
   const site = siteOf(a.type);
   const id = (g: AccountDataGroup) => `${a.key}|${g}`;
-  const syncBlock = s.syncing ? `A sync of this account is running: wait for it to finish, or cancel it on the Comparison page.` : undefined;
+  const syncBlock = s.syncing ? `A sync of this account is running: wait for it to finish, or cancel it on the Comparator page.` : undefined;
   return [
     {
       id: id('decks'),

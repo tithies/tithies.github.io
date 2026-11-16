@@ -17,9 +17,9 @@ const NAV = [
     links: [{ to: '/f2f/runs', label: 'Runs', icon: IconHistory }],
   },
   {
-    label: 'Decks',
+    label: 'Collection',
     icon: IconCards,
-    links: [{ to: '/decks/comparison', label: 'Comparison', icon: IconArrowsDiff }],
+    links: [{ to: '/collection/comparator', label: 'Comparator', icon: IconArrowsDiff }],
   },
 ];
 

@@ -152,7 +152,7 @@ describe('compareDecksToCollection', () => {
   });
 });
 
-describe('Comparison config and filters', () => {
+describe('Comparator config and filters', () => {
   it('defaults and repairs stored config field by field', () => {
     expect(DEFAULT_COMPARISON_CONFIG).toEqual({ showMissing: true, showUnassigned: false, ignoreProxies: true, ignoredBoards: ['maybeboard'], excludedDeckIds: [] });
     expect(parseComparisonConfig({ showMissing: false, ignoredBoards: 'oops', excludedDeckIds: ['a'] })).toEqual({
@@ -185,7 +185,7 @@ describe('Comparison config and filters', () => {
   });
 });
 
-describe('Comparison presets', () => {
+describe('Comparator presets', () => {
   let n = 0;
   const id = () => `p${++n}`;
   const withInputs = (s: ComparisonState, patch: Partial<ComparisonState['current']>): ComparisonState => ({ ...s, current: { ...s.current, ...patch } });

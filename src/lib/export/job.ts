@@ -43,7 +43,7 @@ export interface StartExportRequest {
   digest: string;
   /** The account whose page the cards come from (for the same-account warning). */
   sourceAccountKey: AccountKey | null;
-  /** "Comparison of alice" */
+  /** "Comparator of alice" */
   source: string;
 }
 

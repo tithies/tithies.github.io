@@ -12,7 +12,7 @@ const NEW_PREFIX = ACCOUNT_STORAGE_PREFIXES.collectionComparison.slice('local:'.
 export async function migrateStorage(): Promise<void> {
   // Before accounts, the Mismatches options were one global item; they are per account now.
   await storage.removeItem('local:deckMismatchConfig');
-  // Mismatches → Comparison: each account's options become the current inputs (no preset yet).
+  // Mismatches → Comparator: each account's options become the current inputs (no preset yet).
   const all = await browser.storage.local.get(null);
   for (const [key, value] of Object.entries(all)) {
     if (!key.startsWith(LEGACY_PREFIX)) continue;

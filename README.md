@@ -8,7 +8,7 @@ A toolbox for Magic: The Gathering collectors: a Chrome extension (MV3) that add
 
 ## Accounts
 
-Tithies keeps each Moxfield account apart: its Selling runs, synced decks, collection and Comparison options and presets belong to it, and every page shows one account, picked at the top right of the dashboard (with the site's icon, and a green dot when it is logged in on Moxfield right now). Settings are shared by every account.
+Tithies keeps each Moxfield account apart: its Selling runs, synced decks, collection and Comparator options and presets belong to it, and every page shows one account, picked at the top right of the dashboard (with the site's icon, and a green dot when it is logged in on Moxfield right now). Settings are shared by every account.
 
 - **Accounts are added by an action**, never just because a Moxfield tab is open: "Check selling prices" in the Moxfield panel, a first "Sync decks", or "Switch Tithies to …". An action started from Moxfield runs as the account logged in there and switches the dashboard to it.
 - **One login per site at a time.** The browser holds one Moxfield login, so other accounts stay viewable from what Tithies already read, but only the logged-in account can be synced. Syncing an account while Moxfield is logged in as another one stops before anything is read, with a button to switch Tithies to the logged-in account instead. If the login changes in the middle of a sync, the sync stops at the first answer from the other account: what was read before is kept, and nothing is written into (or deleted from) the wrong account.
@@ -36,7 +36,7 @@ Runs are stored in IndexedDB and survive browser restarts. A run interrupted by 
 
 - **Moxfield.** A small script in the Moxfield page remembers the collection-search request the page itself makes (`api2.moxfield.com/v1/collections/search?...`). That request already carries your filters and session, and Tithies replays it page by page. Your session token never leaves the page.
 - **Moxfield decks (feature 2).** The background worker asks a logged-in Moxfield tab to make each request. Your own tab is used if one is open; otherwise Tithies opens one, shows it for a few seconds while Moxfield starts (Moxfield doesn't start in a never-shown tab), then switches back and closes it at the end. The page makes the request with its own session and sends back only trimmed card lists, never the token. Requests: `GET /v3/decks` (the whole deck list), `GET /v3/decks/all/{publicId}` per new or changed deck, and the unfiltered collection search, 100 rows per page (Moxfield answers 100 whatever is asked since November 2026; there is no setting for it any more).
-  - **Reading only what changed.** Moxfield's collection search can list entries most recently changed first (`sortType=lastUpdated`). Compare, and the export's collection reads, read those pages until they reach entries older than Tithies' snapshot (with a 5-minute overlap), usually **1 request** instead of 40 for 4,000 entries. Moxfield's totals over the whole collection (entries and copies) then tell whether anything else happened, such as a deletion, which no listing shows; if they don't match, every page is read. Every page is also read the first time, when the last full read is a week old, or with **Read every page** on the Comparison page. An edit Moxfield made without changing an entry's time (none is known) would be seen at the next full read.
+  - **Reading only what changed.** Moxfield's collection search can list entries most recently changed first (`sortType=lastUpdated`). Compare, and the export's collection reads, read those pages until they reach entries older than Tithies' snapshot (with a 5-minute overlap), usually **1 request** instead of 40 for 4,000 entries. Moxfield's totals over the whole collection (entries and copies) then tell whether anything else happened, such as a deletion, which no listing shows; if they don't match, every page is read. Every page is also read the first time, when the last full read is a week old, or with **Read every page** on the Comparator page. An edit Moxfield made without changing an entry's time (none is known) would be seen at the next full read.
   - **Pace:** one request at a time, 1–1.5 s apart (**Settings → Moxfield**).
   - **Rate limits:** Moxfield sends no `Retry-After`, and its own UI says to wait about 30 s. On HTTP 429 Tithies waits 30 s, 60 s, then 120 s, and stops after that.
   - **Interruptions:** each deck is saved as soon as it's read, so an interrupted sync continues where it stopped.
@@ -48,9 +48,9 @@ Runs are stored in IndexedDB and survive browser restarts. A run interrupted by 
 
 The F2F delays, the batch size, the cache TTL, the credit bonus and the fallback search can be changed under **Settings → Selling**, and the Moxfield pace under **Settings → Moxfield** (saved as you type). **Settings → Stored data** shows everything Tithies keeps in the browser (the shared F2F lookups and the change log, then each account's synced decks, collection and runs) and clears any part of it, or all of it; **Reset settings** puts every setting and preference back to its default (saved comparison presets are kept).
 
-## Feature 2 — Comparison
+## Feature 2 — Comparator
 
-Normally every card in your decks is also in your collection, and every collection card sits in a deck. **Decks → Comparison** in the dashboard lists every exact print (set, collector number and finish) where the two disagree, with quantities:
+Normally every card in your decks is also in your collection, and every collection card sits in a deck. **Collection → Comparator** in the dashboard lists every exact print (set, collector number and finish) where the two disagree, with quantities:
 
 - **Missing from collection**: copies your decks use that the collection doesn't have;
 - **Not in any deck**: collection copies no included deck uses.

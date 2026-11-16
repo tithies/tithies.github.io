@@ -56,7 +56,7 @@ export interface ExportDialogProps {
   items: ExportItem[];
   /** The account the cards come from (its page): another account is offered first. */
   sourceAccountKey: AccountKey | null;
-  /** For the change log: "Comparison of alice". */
+  /** For the change log: "Comparator of alice". */
   source: string;
   /** Offered once the export is over ("Clear the export"); the list is kept otherwise, to try again. */
   onClearExport?: () => void;

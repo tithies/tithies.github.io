@@ -74,13 +74,13 @@ export const PREFERENCE_LABELS: Record<string, string> = {
   updateCheck: 'Update check: last check and dismissed update banners',
   // dashboard localStorage
   'tithies:f2f:pageSize': 'Rows per page in run tables',
-  'tithies:decks:pageSize': 'Rows per page in the Comparison table',
+  'tithies:decks:pageSize': 'Rows per page in the Comparator table',
   'mantine-color-scheme-value': 'Theme (dark, light or system)',
 };
 
 /** Labels of per-account preference keys ("collectionComparison:moxfield:123"), by prefix. */
 const ACCOUNT_PREFERENCE_PREFIXES: Record<string, string> = {
-  'collectionComparison:': 'Comparison options and presets of one account: decks and folders left out, boards, proxies, what to show',
+  'collectionComparison:': 'Comparator options and presets of one account: decks and folders left out, boards, proxies, what to show',
   'deckMismatchConfig:': 'Mismatches page options of one account, from an older version',
 };
 
@@ -116,7 +116,7 @@ export async function listStoredPreferences(): Promise<StoredPreference[]> {
  * current account live in IndexedDB), and every reader has a fallback, so nothing else is
  * needed. Open pages pick the defaults up through their watchers.
  *
- * Saved Comparison presets are the user's own work, not settings: they are kept
+ * Saved Comparator presets are the user's own work, not settings: they are kept
  * (the inputs go back to their defaults).
  */
 export async function resetAllSettings(): Promise<void> {

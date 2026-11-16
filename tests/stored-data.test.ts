@@ -101,7 +101,7 @@ describe('Settings → Reset settings', () => {
     await storage.setItem(comparisonConfigKey(A.key), { current: { showMissing: false, excludedDeckIds: ['d1'] }, presets: [], loadedPresetId: null });
     const prefs = await listStoredPreferences();
     expect(prefs.map((p) => p.key).sort()).toEqual([`collectionComparison:${A.key}`, 'overlayCollapsed', 'settings']);
-    expect(prefs.find((p) => p.key.startsWith('collectionComparison:'))!.label).toMatch(/^Comparison options and presets of one account/);
+    expect(prefs.find((p) => p.key.startsWith('collectionComparison:'))!.label).toMatch(/^Comparator options and presets of one account/);
 
     await resetAllSettings();
 

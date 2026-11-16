@@ -19,7 +19,7 @@ export interface ChangeOp {
   kind: ChangeOpKind;
   /** One line: "Export 42 prints (117 copies) to the binder “To buy”". */
   title: string;
-  /** Where it was started from: "Comparison of alice". */
+  /** Where it was started from: "Comparator of alice". */
   source: string;
   status: ChangeOpStatus;
   /** The step running now, or the last one. */

@@ -60,7 +60,7 @@ describe('Database upgrade to per-account data (v3, then the change log in v4)',
     expect(await storage.getItem('local:settings')).toEqual({ batchSize: 30 });
   });
 
-  it('moves the Mismatches options of each account options to Comparison (as the inputs, no preset)', async () => {
+  it('moves the Mismatches options of each account options to Comparator (as the inputs, no preset)', async () => {
     const old = { showMissing: false, excludedDeckIds: ['d1'] };
     await storage.setItem('local:deckMismatchConfig:moxfield:111111', old);
     await storage.setItem('local:deckMismatchConfig:moxfield:222222', { excludedDeckIds: ['x'] });
