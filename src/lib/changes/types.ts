@@ -1,7 +1,15 @@
 import type { AccountKey } from '@/lib/accounts/types';
 import type { SiteIdentity, SiteType } from '@/lib/sites/types';
 
-export type ChangeOpStatus = 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted';
+/** An action's progress over all its steps, in requests (pages read, changes sent); `step` of `steps` runs. */
+export interface OverallProgress {
+  done: number;
+  total: number;
+  step: number;
+  steps: number;
+}
+
+export type ChangeOpStatus ='running' | 'done' | 'failed' | 'cancelled' | 'interrupted';
 
 /** Kinds of user actions that change a site (more come with later features). */
 export type ChangeOpKind = 'export';
@@ -26,6 +34,8 @@ export interface ChangeOp {
   phase?: string;
   /** The step's progress: pages read, or changes sent. */
   progress?: { done: number; total: number; unit?: 'page' | 'change' };
+  /** The whole action's progress, every step counted (see StepTally). */
+  overall?: OverallProgress;
   error?: string;
   startedAt: number;
   heartbeatAt: number;

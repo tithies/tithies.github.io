@@ -59,7 +59,7 @@ export async function readActivity(): Promise<ActivityItem[]> {
       userName: names.get(op.accountKey)!,
       title: op.title,
       detail: op.phase ?? 'Working…',
-      progress: op.progress && op.progress.total > 0 ? { done: op.progress.done, total: op.progress.total } : undefined,
+      progress: op.overall ?? (op.progress && op.progress.total > 0 ? { done: op.progress.done, total: op.progress.total } : undefined),
       to: fromComparator ? `/collection/comparator?export=${op.id}` : `/changes?op=${op.id}`,
     });
   }

@@ -173,14 +173,11 @@ export function planExport(target: ExportTarget, rawItems: readonly ExportItem[]
   const pages = (entries: number) => Math.max(1, chunks(entries, ctx.limits.pageSize));
   const collectionEntries = state.read.kind === 'collection' ? state.entries.length : (state.totals?.entries ?? 0);
   const targetEntries = target.kind === 'binder' ? state.entries.filter((e) => e.binderId === target.binderId).length : 0;
-  const reads =
-    1 +
-    (target.kind === 'newBinder'
-      ? pages(items.length)
-      : target.kind === 'binder'
-        ? pages(targetEntries) + pages((target.mode === 'replace' ? 0 : targetEntries) + items.length)
-        : // Before: every page, or only the changes since the saved snapshot. Check: only the changes since "before".
-          (ctx.savedCollection ? 1 : pages(collectionEntries)) + pages(items.length));
+  // Before: the binder, or every page of the collection (only the changes since the saved snapshot when there is one).
+  const beforePages = target.kind === 'newBinder' ? 0 : target.kind === 'binder' ? pages(targetEntries) : ctx.savedCollection ? 1 : pages(collectionEntries);
+  // Check: the binder as it is after, or only the collection's changes since "before".
+  const checkPages = target.kind === 'binder' ? pages((target.mode === 'replace' ? 0 : targetEntries) + items.length) : pages(items.length);
+  const reads = 1 + beforePages + checkPages;
 
   // What the run must find unchanged: the binders, and every entry it deletes.
   const digest = hash(
@@ -204,6 +201,7 @@ export function planExport(target: ExportTarget, rawItems: readonly ExportItem[]
     steps,
     writes,
     reads,
+    requests: { before: beforePages, write: writes, check: checkPages },
     warnings,
     digest,
     ...(blocked ? { blocked } : {}),

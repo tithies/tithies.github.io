@@ -12,6 +12,7 @@
 import { accountData, getAccount } from '@/lib/accounts/data';
 import { accountLabel, identityOf, type AccountKey, type AccountRow } from '@/lib/accounts/types';
 import { getOp, patchOp, startOp, writeLogger } from '@/lib/changes/log';
+import { StepTally } from '@/lib/changes/progress';
 import type { CollectionEntry } from '@/lib/cards/types';
 import { FULL_READ_EVERY_MS, readBinder, readCollection, readWholeCollection } from '@/lib/decks/collection';
 import type { SyncTransport } from '@/lib/decks/job';
@@ -45,6 +46,8 @@ export interface StartExportRequest {
   sourceAccountKey: AccountKey | null;
   /** "Comparator of alice" */
   source: string;
+  /** The previewed plan's requests of each step, to size the progress before this run's own plan. */
+  estimate?: ExportPlan['requests'];
 }
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -313,6 +316,12 @@ export class ExportJob {
     let plan: ExportPlan | null = null;
     let binderId: string | null = target.kind === 'binder' ? target.binderId : null;
     const save = (p: Parameters<typeof patchOp>[1]) => patchOp(opId, { ...p, details }).catch(() => {});
+    // One progress over the three steps: read the target, send the changes, check.
+    const [BEFORE, WRITE, CHECK] = [0, 1, 2];
+    const est = req.estimate;
+    const tally = new StepTally([est?.before ?? 1, est?.write ?? 1, est?.check ?? 1]);
+    const readProgress = (step: number, phase?: string) => (p: ReadProgress) =>
+      void patchOp(opId, { ...(phase ? { phase } : {}), progress: { ...p, unit: 'page' }, overall: tally.report(step, p.done, p.total) }).catch(() => {});
 
     try {
       const connected = await transport.connect();
@@ -323,9 +332,13 @@ export class ExportJob {
       const client = await this.client(transport, signal, (message) => void patchOp(opId, { phase: message }).catch(() => {}));
 
       const first = beforeRead(target);
-      await save({ phase: first.kind === 'collection' ? `Reading ${name}'s collection` : first.kind === 'binder' ? `Reading ${name}'s binders and the binder's cards` : `Reading ${name}'s binders`, progress: undefined });
+      await save({
+        phase: first.kind === 'collection' ? `Reading ${name}'s collection` : first.kind === 'binder' ? `Reading ${name}'s binders and the binder's cards` : `Reading ${name}'s binders`,
+        progress: undefined,
+        overall: tally.report(BEFORE, 0, 0),
+      });
       const saved = first.kind === 'collection' ? await this.savedCollection(row.key) : null;
-      before = await this.readState(client, first, signal, (p) => void patchOp(opId, { progress: { ...p, unit: 'page' } }).catch(() => {}), saved);
+      before = await this.readState(client, first, signal, readProgress(BEFORE), saved);
       plan = planExport(target, items, before, { sourceAccountKey: req.sourceAccountKey, targetName: name, limits: exporter.limits });
       Object.assign(details, {
         targetLabel: plan.targetLabel,
@@ -335,7 +348,9 @@ export class ExportJob {
         after: plan.after,
         ...(plan.binder ? { binder: plan.binder } : {}),
       });
-      await save({ title: exportTitle(target, plan.add, plan.targetLabel) });
+      tally.expect(WRITE, plan.writes);
+      tally.expect(CHECK, plan.requests.check);
+      await save({ title: exportTitle(target, plan.add, plan.targetLabel), overall: tally.overall });
       if (plan.blocked) throw new ExportStop(plan.blocked);
       if (plan.digest !== req.digest) throw new ExportStop(`${name}'s binders or collection changed since the preview, so nothing was changed. Open the preview again.`);
 
@@ -344,7 +359,7 @@ export class ExportJob {
       const total = plan.writes;
       const write = async (op: Parameters<SiteClient['mutate']>[0], phase: string) => {
         if (signal.aborted) throw new CancelledError();
-        await save({ phase, progress: { done, total, unit: 'change' } });
+        await save({ phase, progress: { done, total, unit: 'change' }, overall: tally.report(WRITE, done, total) });
         wrote = true;
         const res = await client.mutate(op, log);
         done++;
@@ -370,13 +385,18 @@ export class ExportJob {
         }
       }
 
+      tally.report(WRITE, done, total);
       const last = afterRead(target, binderId);
-      await save({ phase: last.kind === 'binder' ? 'Checking every copy in the binder' : `Checking every copy in ${name}'s collection`, progress: { done: 0, total: 1, unit: 'page' } });
+      await save({
+        phase: last.kind === 'binder' ? 'Checking every copy in the binder' : `Checking every copy in ${name}'s collection`,
+        progress: { done: 0, total: 1, unit: 'page' },
+        overall: tally.report(CHECK, 0, 0),
+      });
       // The check builds on the read just made: only the changes since are read (the totals tell if anything else changed).
       const checkBase = last.kind === 'collection' ? (plan.remove.wholeCollection ? [] : before.entries) : null;
-      const after = await this.readState(client, last, signal, (p) => void patchOp(opId, { progress: { ...p, unit: 'page' } }).catch(() => {}), checkBase);
+      const after = await this.readState(client, last, signal, readProgress(CHECK), checkBase);
       details.verify = verifyExport(plan, before.entries, after.entries, binderId);
-      await save({ status: 'done', phase: details.verify.ok ? 'Done: every copy is there' : 'Done, with differences (see below)', finishedAt: Date.now() });
+      await save({ status: 'done', phase: details.verify.ok ? 'Done: every copy is there' : 'Done, with differences (see below)', overall: tally.finish(), finishedAt: Date.now() });
     } catch (e) {
       const cancelled = signal.aborted || e instanceof CancelledError;
       const wrong = e instanceof SiteWrongAccountError;
@@ -390,7 +410,7 @@ export class ExportJob {
             check,
             lastRead,
             undefined,
-            (p) => void patchOp(opId, { phase: 'Checking what was made', progress: { ...p, unit: 'page' } }).catch(() => {}),
+            readProgress(CHECK, 'Checking what was made'),
             lastRead.kind === 'collection' ? (plan.remove.wholeCollection ? [] : before.entries) : null,
           );
           details.verify = verifyExport(plan, before.entries, after.entries, binderId);

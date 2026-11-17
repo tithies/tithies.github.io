@@ -2,7 +2,8 @@ import { Alert, Anchor, Badge, Button, Group, Loader, Modal, Progress, Stack, Te
 import { IconAlertTriangle, IconUpload } from '@tabler/icons-react';
 import { Link } from 'react-router';
 import { StatusBadge } from '@/lib/changes/ui/StatusBadge';
-import type { ChangeOp } from '@/lib/changes/types';
+import { overallPercent } from '@/lib/changes/progress';
+import type { ChangeOp, OverallProgress } from '@/lib/changes/types';
 import { timeAgo } from '@/lib/format';
 import type { SiteProvider } from '@/lib/sites/provider';
 import { siteOf } from '@/lib/sites/registry';
@@ -31,6 +32,27 @@ export function PercentBar({ progress, unit }: { progress: ReadProgress; unit: '
   );
 }
 
+/** The whole export in one bar (every step counted), and which step runs. */
+function OverallBar({ overall }: { overall: OverallProgress }) {
+  const pct = overallPercent(overall);
+  return (
+    <Group gap="sm" wrap="nowrap">
+      <Progress.Root size="lg" style={{ flex: 1 }}>
+        <Progress.Section value={pct} animated>
+          <Progress.Label>{pct}%</Progress.Label>
+        </Progress.Section>
+      </Progress.Root>
+      <Text size="xs" c="dimmed" className="ti-num" style={{ whiteSpace: 'nowrap' }}>
+        step {overall.step} of {overall.steps}
+      </Text>
+    </Group>
+  );
+}
+
+/** What the running step has done: "page 12 of 41", "3 of 10 changes". */
+const stepCount = (p: NonNullable<ChangeOp['progress']>) =>
+  p.unit === 'page' ? `page ${n(p.done)} of ${n(p.total)}` : `${n(p.done)} of ${plural(p.total, 'change')}`;
+
 /** An export, live: its progress while it runs (with Cancel), then what it did and the check of the result. */
 export function ExportProgress({ opId, site }: { opId: number; site: SiteProvider }) {
   const op = useChangeOp(opId);
@@ -51,9 +73,24 @@ export function ExportProgress({ opId, site }: { opId: number; site: SiteProvide
       </Text>
       {running && (
         <Stack gap={6}>
-          <Text size="sm">{op.phase ?? 'Working…'}</Text>
-          {p && p.total > 0 ? <PercentBar progress={p} unit={p.unit ?? 'change'} /> : <Progress value={100} animated striped />}
+          <Text size="sm">
+            {op.phase ?? 'Working…'}
+            {p && p.total > 0 && (
+              <Text span size="xs" c="dimmed" className="ti-num">
+                {' '}
+                · {stepCount(p)}
+              </Text>
+            )}
+          </Text>
+          {op.overall ? (
+            <OverallBar overall={op.overall} />
+          ) : p && p.total > 0 ? (
+            <PercentBar progress={p} unit={p.unit ?? 'change'} />
+          ) : (
+            <Progress value={100} animated striped />
+          )}
           <Text size="xs" c="dimmed">
+            The bar counts every step: reading, sending the changes, then checking every copy (how many pages the reads take is only known as they go).{' '}
             {plural(op.calls, 'change')} sent so far. You can close this window: the export goes on. Open it again with “Running” at the top of the page, or
             from the export bar of the Comparator.
           </Text>
@@ -135,7 +172,14 @@ export function RecentExportsModal({ opened, ops, onPick, onClose }: { opened: b
                   Started {timeAgo(o.startedAt)}
                   {o.status === 'running' && o.phase ? ` · ${o.phase}` : ''}
                 </Text>
-                {o.status === 'running' && (p && p.total > 0 ? <Progress value={percent(p)} size="xs" /> : <Progress value={100} size="xs" animated striped />)}
+                {o.status === 'running' &&
+                  (o.overall ? (
+                    <Progress value={overallPercent(o.overall)} size="xs" />
+                  ) : p && p.total > 0 ? (
+                    <Progress value={percent(p)} size="xs" />
+                  ) : (
+                    <Progress value={100} size="xs" animated striped />
+                  ))}
               </Stack>
             </UnstyledButton>
           );

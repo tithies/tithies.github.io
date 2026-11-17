@@ -91,6 +91,8 @@ export interface ExportPlan {
   /** Writes the export makes, and reads (before and after). */
   writes: number;
   reads: number;
+  /** The requests of each step, for the progress: pages read before, changes sent, pages the check reads (the reads are estimates). */
+  requests: { before: number; write: number; check: number };
   warnings: PlanWarning[];
   /** Fingerprint of what the plan depends on: the job refuses to run if it changed since the preview. */
   digest: string;

@@ -256,9 +256,31 @@ body :is(.mantine-Modal-content, .mantine-Drawer-content, .mantine-Affix-root > 
   -webkit-backdrop-filter: blur(var(--ti-glass-blur));
   backdrop-filter: blur(var(--ti-glass-blur));
 }
-/* The dialog's title bar is part of its panel (it would paint the panel colour a second time). */
-body .mantine-Modal-header {
+/* The title bar of a dialog or drawer is part of its panel (it would paint the panel colour a
+   second time). It stays on top while the panel scrolls: once scrolled, it gets the panel's tint
+   and blur too, so what scrolls under it doesn't show through. */
+body :is(.mantine-Modal-header, .mantine-Drawer-header) {
   background-color: transparent;
+}
+@keyframes ti-cover-scrolled {
+  to {
+    background-color: color-mix(in srgb, var(--mantine-color-body) var(--ti-glass), transparent);
+    -webkit-backdrop-filter: blur(var(--ti-glass-blur));
+    backdrop-filter: blur(var(--ti-glass-blur));
+    box-shadow: 0 1px 0 var(--mantine-color-default-border);
+  }
+}
+@supports (animation-timeline: scroll()) {
+  body :is(.mantine-Modal-header, .mantine-Drawer-header) {
+    animation: ti-cover-scrolled linear both;
+    animation-timeline: scroll(nearest block);
+    animation-range: 0 12px;
+  }
+}
+@supports not (animation-timeline: scroll()) {
+  body :is(.mantine-Modal-header, .mantine-Drawer-header) {
+    background-color: color-mix(in srgb, var(--mantine-color-body) var(--ti-glass), transparent);
+  }
 }
 body .mantine-Menu-item:where(:hover, :focus, [data-menu-active]):where(:not(:disabled, [data-disabled])) {
   background-color: color-mix(in srgb, var(--menu-item-hover, light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-4))) var(--ti-glass), transparent);

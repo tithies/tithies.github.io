@@ -292,7 +292,7 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
     setStarting(true);
     setStartError(null);
     try {
-      const res = await startExport(site.type, { target, items: plan.items, digest: plan.digest, sourceAccountKey, source });
+      const res = await startExport(site.type, { target, items: plan.items, digest: plan.digest, sourceAccountKey, source, estimate: plan.requests });
       if (!res.ok) setStartError(res.error);
       else {
         setSent({ prints: items.length, copies: items.reduce((s, i) => s + i.qty, 0) });

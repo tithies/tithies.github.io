@@ -1,5 +1,7 @@
 import Papa from 'papaparse';
 import { getOp, opCalls } from '@/lib/changes/log';
+import type { ChangeOp, OverallProgress } from '@/lib/changes/types';
+import { db } from '@/lib/db';
 import type { CollectionEntry, Finish } from '@/lib/cards/types';
 import { ExportJob, type StartExportRequest } from '@/lib/export/job';
 import { afterRead, beforeRead, mergeItems, planExport, previewRead, stateCovers, type PlanContext } from '@/lib/export/plan';
@@ -279,7 +281,7 @@ describe('Export job', () => {
     if (!read.ok) throw new Error(read.error);
     const plan = planExport(target, items, read.state, { sourceAccountKey: null, targetName: 'alice', limits: { importRows: 500, removeEntries: 1000, pageSize: 5000 } });
     change?.();
-    const req: StartExportRequest = { target, items, digest: plan.digest, sourceAccountKey: null, source: 'test' };
+    const req: StartExportRequest = { target, items, digest: plan.digest, sourceAccountKey: null, source: 'test', estimate: plan.requests };
     const res = await job.start(req);
     if (!res.ok) throw new Error(res.error);
     await job.finished;
@@ -353,6 +355,36 @@ describe('Export job', () => {
     expect(details.verify).toMatchObject({ ok: true, scope: 'collection', expectedCopies: 3, foundCopies: 3 });
     // Preview: its size (1 page); before: every page (no snapshot saved yet); check: newest first, only the changes.
     expect(mox.reads).toEqual(['collection', 'collection', 'collection:changes']);
+  });
+
+  it('reports one progress over every step: it only grows, and ends at what was read and sent', async () => {
+    const { acc, mox, job } = await setup();
+    mox.entries = [entry('Island', 'dsk', '279', 10), entry('Opt', 'xln', '65', 2)];
+    const seen: OverallProgress[] = [];
+    // Dexie hands the hook the whole object the first time, then only the fields that changed ("overall.done").
+    const hook = (changes: object, _key: unknown, obj: ChangeOp) => {
+      const mods = changes as Record<string, unknown>;
+      const keys = Object.keys(mods).filter((k) => k === 'overall' || k.startsWith('overall.'));
+      if (!keys.length) return;
+      const o = { ...obj.overall, ...(mods.overall as OverallProgress | undefined) } as Record<string, unknown>;
+      for (const k of keys) if (k !== 'overall') o[k.slice('overall.'.length)] = mods[k];
+      seen.push(o as unknown as OverallProgress);
+    };
+    db.changeOps.hook('updating', hook);
+    try {
+      const { op } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'collection', mode: 'add' }, TO_EXPORT);
+      // Before: 1 page; 1 change (the import); the check: 1 page (only the changes).
+      expect(op.overall).toEqual({ done: 3, total: 3, step: 3, steps: 3 });
+    } finally {
+      db.changeOps.hook('updating').unsubscribe(hook);
+    }
+    expect(seen.length).toBeGreaterThan(3);
+    for (let i = 1; i < seen.length; i++) {
+      expect(seen[i].done).toBeGreaterThanOrEqual(seen[i - 1].done);
+      expect(seen[i].step).toBeGreaterThanOrEqual(seen[i - 1].step);
+    }
+    for (const o of seen) expect(o.done).toBeLessThanOrEqual(o.total);
+    expect(seen.map((o) => o.step)).toEqual(expect.arrayContaining([1, 2, 3]));
   });
 
   it('a deletion by someone else during the export makes the check read every page, and shows it', async () => {

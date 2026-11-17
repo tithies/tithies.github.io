@@ -1,6 +1,7 @@
 import { ActionIcon, Affix, Badge, Button, Drawer, Group, Loader, NumberInput, Paper, ScrollArea, Stack, Table, Text, Tooltip, useMatches } from '@mantine/core';
 import { IconFileExport, IconListDetails, IconTrash, IconUpload, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
+import { overallPercent } from '@/lib/changes/progress';
 import type { ChangeOp } from '@/lib/changes/types';
 import { finishLabel } from '@/lib/format';
 import { MAX_EXPORT_QTY, type ExportList } from '../list';
@@ -72,7 +73,7 @@ function ExportTable({ exportList, narrow }: { exportList: ExportList; narrow: b
 /** The bar's button for the page's exports: the running one (with its progress), or "Exports". */
 function SeeExports({ running, narrow, onClick }: { running?: ChangeOp; narrow: boolean; onClick: () => void }) {
   const p = running?.progress;
-  const count = p && p.total > 0 ? `${n(p.done)}/${n(p.total)}` : '';
+  const count = running?.overall ? `${overallPercent(running.overall)}%` : p && p.total > 0 ? `${n(p.done)}/${n(p.total)}` : '';
   const label = running ? (narrow ? count || 'Running' : `Export running${count ? ` · ${count}` : ''}`) : narrow ? 'Exports' : 'See exports';
   return (
     <Button size="xs" variant="light" leftSection={running ? <Loader size={12} /> : <IconListDetails size={14} />} onClick={onClick} className="ti-num" style={{ whiteSpace: 'nowrap' }}>
