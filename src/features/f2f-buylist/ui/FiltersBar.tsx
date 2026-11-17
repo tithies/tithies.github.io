@@ -2,6 +2,7 @@ import { Badge, Button, Collapse, Group, MultiSelect, NumberInput, Paper, Segmen
 import { useDebouncedCallback, useDisclosure } from '@mantine/hooks';
 import { IconAdjustmentsHorizontal, IconBan, IconBox, IconCards, IconCash, IconSearch, IconX } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
+import { SetMultiSelect } from '@/lib/ui/SetMultiSelect';
 import type { Item } from '../types';
 import { activeFilterCount, detailedFinish, EMPTY_FILTERS, type Filters } from './filtering';
 import { FINISH_LABEL, rarityLabel } from './format';
@@ -57,7 +58,7 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
     const standard = new Set<string>(Object.values(FINISH_LABEL));
     return {
       finishes: [...finishes].filter((v) => !standard.has(v)).sort((a, b) => a.localeCompare(b)).map((v) => ({ value: v, label: v })),
-      sets: [...sets.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([value, name]) => ({ value, label: `${name} (${value.toUpperCase()})` })),
+      sets,
       rarities: [...rarities].filter(Boolean).sort().map((r) => ({ value: r, label: rarityLabel(r) })),
     };
   }, [items]);
@@ -116,7 +117,7 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
       </Group>
       <Collapse expanded={opened}>
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} mt="sm" spacing="sm">
-          <MultiSelect label="Sets" placeholder="Any set" data={options.sets} value={filters.sets} onChange={(v) => set('sets', v)} searchable clearable />
+          <SetMultiSelect label="Sets" placeholder="Any set" names={options.sets} value={filters.sets} onChange={(v) => set('sets', v)} />
           <MultiSelect
             label="Finish"
             placeholder="Any finish"

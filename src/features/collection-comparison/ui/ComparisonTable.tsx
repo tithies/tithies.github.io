@@ -1,4 +1,4 @@
-import { ActionIcon, Anchor, Badge, Button, Group, HoverCard, Menu, MultiSelect, NumberInput, Paper, Stack, Switch, Table, Text, TextInput, Tooltip, type ComboboxParsedItem } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Group, HoverCard, Menu, MultiSelect, NumberInput, Paper, Stack, Switch, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { useDebouncedCallback, useLocalStorage } from '@mantine/hooks';
 import { IconDownload, IconExternalLink, IconFileExport, IconPlus, IconSearch, IconTrash, IconX } from '@tabler/icons-react';
 import { MAX_EXPORT_QTY, type ExportList } from '@/lib/export/list';
@@ -9,8 +9,9 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import type { DeckRow } from '@/lib/decks/types';
 import { scryfallCardLink, scryfallImage } from '@/lib/f2f/links';
-import { finishLabel, FINISH_LABEL, fold } from '@/lib/format';
+import { finishLabel, FINISH_LABEL } from '@/lib/format';
 import { CardThumb } from '@/lib/ui/CardThumb';
+import { ONE_LINE_PILLS, SetMultiSelect } from '@/lib/ui/SetMultiSelect';
 import type { ComparisonRow, DeckUse, OtherPrint } from '../compare';
 import { downloadComparisonCsv } from '../csv';
 import {
@@ -27,7 +28,6 @@ import {
 
 const PAGE_SIZES = [25, 50, 100, 250, 500];
 /** The typing area of a multi-select starts small and grows, so a picked value and it share one line. */
-const ONE_LINE_PILLS = { inputField: { minWidth: 40, flex: '1 1 40px', width: 0 } };
 const tight = { noWrap: true, width: '1%' } as const;
 
 const num = (children: React.ReactNode, c?: string) => (
@@ -317,18 +317,6 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
     for (const r of rows) m.set(r.set, r.setName);
     return m;
   }, [rows]);
-  const setOptions = useMemo(
-    () => [...setNames].sort((a, b) => a[1].localeCompare(b[1])).map(([value]) => ({ value, label: value.toUpperCase() })),
-    [setNames],
-  );
-  const filterSets = ({ options, search }: { options: ComboboxParsedItem[]; search: string }) => {
-    const words = fold(search).split(/\s+/).filter(Boolean);
-    return options.filter((o) => {
-      if (!('value' in o)) return true;
-      const hay = fold(`${setNames.get(String(o.value)) ?? ''} ${o.value}`);
-      return words.every((w) => hay.includes(w));
-    });
-  };
   const filtered = filters.q.trim() !== '' || filters.sets.length > 0 || filters.finishes.length > 0 || filters.hinted;
 
   return (
@@ -345,24 +333,12 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
           }}
           style={{ flex: 1, minWidth: 220 }}
         />
-        <MultiSelect
+        <SetMultiSelect
           label="Set"
           placeholder={filters.sets.length ? undefined : 'Any'}
-          data={setOptions}
+          names={setNames}
           value={filters.sets}
           onChange={(v) => update({ ...filters, sets: v }, sort, 1)}
-          filter={filterSets}
-          renderOption={({ option }) => (
-            <Text size="sm">
-              {setNames.get(option.value) ?? option.value}{' '}
-              <Text span size="xs" c="dimmed">
-                {option.label}
-              </Text>
-            </Text>
-          )}
-          searchable
-          clearable
-          styles={ONE_LINE_PILLS}
           w={260}
         />
         <MultiSelect
