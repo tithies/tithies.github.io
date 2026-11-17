@@ -2,11 +2,12 @@ import { Stack, Text, Title } from '@mantine/core';
 import { SellingSettings } from '@/features/f2f-buylist/ui/SellingSettings';
 import { AccountsSettings } from './AccountsSettings';
 import { GeneralSettings } from './GeneralSettings';
+import { RemoveAllSection } from './RemoveAllSection';
 import { ResetSection } from './ResetSection';
 import { SiteSettings } from './SiteSettings';
 import { StoredDataSection } from './StoredDataSection';
 
-/** One Settings page for the whole extension: shared settings, then each tool's, then data and reset. */
+/** One Settings page for the whole extension: shared settings, then each tool's, then data, reset, and removing everything. */
 export function SettingsPage() {
   return (
     <Stack maw={1100} gap="xl">
@@ -22,6 +23,7 @@ export function SettingsPage() {
       <SellingSettings />
       <StoredDataSection />
       <ResetSection />
+      <RemoveAllSection />
     </Stack>
   );
 }

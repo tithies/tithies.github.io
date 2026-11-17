@@ -1,6 +1,7 @@
 import { storage } from '#imports';
 import { getCurrentAccount, listAccounts, type AccountData } from '@/lib/accounts/data';
-import { forgetAccount } from '@/lib/accounts/forget';
+import { forgetAccount, removeAllData } from '@/lib/accounts/forget';
+import { browser } from 'wxt/browser';
 import type { AccountKey } from '@/lib/accounts/types';
 import { db } from '@/lib/db';
 import { SessionRegistry } from '@/lib/sites/sessions';
@@ -83,5 +84,39 @@ describe('Forget account', () => {
   it('finds the account of per-account preferences', () => {
     expect(accountOfPreference('collectionComparison:moxfield:111111')).toBe('moxfield:111111');
     expect(accountOfPreference('settings')).toBeNull();
+  });
+});
+
+describe('Remove all data', () => {
+  it('stops every job first, then empties every table and the extension storage', async () => {
+    const runA = await fill(A, 'running');
+    const runB = await fill(B, 'queued');
+    await fill(A);
+    await db.f2fCache.add(row({ key: 'x', fetchedAt: 1 }));
+    await db.meta.put({ key: 'bulkRates', value: {}, updatedAt: 1 });
+    await db.changeOps.add(row({ accountKey: A.key, status: 'done', startedAt: 1 }));
+    await storage.setItem('local:settings', { batchSize: 30 });
+    const order: string[] = [];
+    const job = (name: string) => ({
+      cancel: () => (order.push(`cancel ${name}`), true),
+      get finished() {
+        return Promise.resolve().then(() => void order.push(`${name} finished`));
+      },
+    });
+
+    await removeAllData({
+      stopRuns: async (ids) => void order.push(`stop runs ${[...ids].sort().join(',')}`),
+      jobs: [job('sync'), job('export')],
+      clearStorage: async () => {
+        order.push('storage');
+        await browser.storage.local.clear();
+      },
+    });
+
+    expect(order).toEqual([`stop runs ${[runA, runB].sort().join(',')}`, 'cancel sync', 'sync finished', 'cancel export', 'export finished', 'storage']);
+    for (const t of db.tables) expect(await t.count()).toBe(0);
+    expect(await listAccounts()).toEqual([]);
+    expect(await getCurrentAccount()).toBeNull();
+    expect(Object.keys(await browser.storage.local.get(null))).toEqual([]);
   });
 });

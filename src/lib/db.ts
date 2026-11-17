@@ -104,3 +104,10 @@ export async function getMeta<T>(key: GlobalMetaKey): Promise<T | undefined> {
 export async function putMeta(key: GlobalMetaKey, value: unknown): Promise<void> {
   await db.meta.put({ key, value, updatedAt: Date.now() });
 }
+
+/** Empties every table (Settings → Remove all data): the database as after a fresh install. */
+export async function clearDatabase(): Promise<void> {
+  await db.transaction('rw', db.tables, async () => {
+    for (const table of db.tables) await table.clear();
+  });
+}

@@ -41,6 +41,8 @@ interface ProtocolMap {
   pruneSessions(): void;
   /** dashboard → background: stop everything working for the account, then delete all of its data. */
   forgetAccount(data: { accountKey: AccountKey }): void;
+  /** dashboard → background: stop every job, then delete every account, all data and every setting (a fresh install). */
+  removeAllData(): void;
 
   /** dashboard → background: reads what an export preview needs from an account (changes nothing). */
   readExportTarget(data: { type: SiteType; accountKey: AccountKey; read?: TargetRead }): ReadTargetResult;

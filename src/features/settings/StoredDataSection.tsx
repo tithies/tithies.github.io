@@ -349,7 +349,7 @@ export function StoredDataSection() {
               </Text>
             )}
             <Text size="xs" c="dimmed">
-              Tick everything (the box at the top) to clear all of Tithies' data. Accounts and settings are kept: see "Accounts" and "Reset settings".
+              Tick everything (the box at the top) to clear this data. Accounts and settings are kept: see "Accounts" and "Reset settings", or "Remove all data" for everything at once.
             </Text>
           </Stack>
           <Group gap="sm">
