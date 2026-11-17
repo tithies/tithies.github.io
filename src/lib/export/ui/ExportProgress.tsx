@@ -1,52 +1,23 @@
-import { Alert, Anchor, Badge, Button, Group, Loader, Modal, Progress, Stack, Text, UnstyledButton } from '@mantine/core';
+import { Alert, Anchor, Badge, Button, Group, Loader, Modal, Stack, Text, UnstyledButton } from '@mantine/core';
 import { IconAlertTriangle, IconUpload } from '@tabler/icons-react';
 import { Link } from 'react-router';
 import { StatusBadge } from '@/lib/changes/ui/StatusBadge';
-import { overallPercent } from '@/lib/changes/progress';
-import type { ChangeOp, OverallProgress } from '@/lib/changes/types';
+import type { ChangeOp } from '@/lib/changes/types';
 import { timeAgo } from '@/lib/format';
 import type { SiteProvider } from '@/lib/sites/provider';
 import { siteOf } from '@/lib/sites/registry';
+import { JobProgress } from '@/lib/ui/JobProgress';
 import { cancelExport, useChangeOp } from '../client';
 import type { ReadProgress } from '../types';
 import { ExportOpDetails } from './ExportOpDetails';
 
 const n = (v: number) => v.toLocaleString('en-CA');
 const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
-const percent = (p: ReadProgress) => (p.total > 0 ? Math.min(100, Math.round((100 * p.done) / p.total)) : 0);
 
-/** A bar with its percentage, and what is counted ("page 12 of 41"). */
+/** A read's progress (the preview's), as every job shows it: its percent, and the pages read. */
 export function PercentBar({ progress, unit }: { progress: ReadProgress; unit: 'page' | 'change' }) {
-  const pct = percent(progress);
-  return (
-    <Group gap="sm" wrap="nowrap">
-      <Progress.Root size="lg" style={{ flex: 1 }}>
-        <Progress.Section value={pct} animated={pct < 100}>
-          <Progress.Label>{pct}%</Progress.Label>
-        </Progress.Section>
-      </Progress.Root>
-      <Text size="xs" c="dimmed" className="ti-num" style={{ whiteSpace: 'nowrap' }}>
-        {unit === 'page' ? `page ${n(progress.done)} of ${n(progress.total)}` : `${n(progress.done)} of ${plural(progress.total, 'change')}`}
-      </Text>
-    </Group>
-  );
-}
-
-/** The whole export in one bar (every step counted), and which step runs. */
-function OverallBar({ overall }: { overall: OverallProgress }) {
-  const pct = overallPercent(overall);
-  return (
-    <Group gap="sm" wrap="nowrap">
-      <Progress.Root size="lg" style={{ flex: 1 }}>
-        <Progress.Section value={pct} animated>
-          <Progress.Label>{pct}%</Progress.Label>
-        </Progress.Section>
-      </Progress.Root>
-      <Text size="xs" c="dimmed" className="ti-num" style={{ whiteSpace: 'nowrap' }}>
-        step {overall.step} of {overall.steps}
-      </Text>
-    </Group>
-  );
+  const note = unit === 'page' ? `page ${n(progress.done)} of ${n(progress.total)}` : `${n(progress.done)} of ${plural(progress.total, 'change')}`;
+  return <JobProgress size="lg" done={progress.done} total={progress.total} note={note} />;
 }
 
 /** What the running step has done: "page 12 of 41", "3 of 10 changes". */
@@ -83,11 +54,10 @@ export function ExportProgress({ opId, site }: { opId: number; site: SiteProvide
             )}
           </Text>
           {op.overall ? (
-            <OverallBar overall={op.overall} />
-          ) : p && p.total > 0 ? (
-            <PercentBar progress={p} unit={p.unit ?? 'change'} />
+            <JobProgress size="lg" done={op.overall.done} total={op.overall.total} note={`step ${op.overall.step} of ${op.overall.steps}`} />
           ) : (
-            <Progress value={100} animated striped />
+            // Exports from before the overall progress: the step's own.
+            <JobProgress size="lg" done={p?.done ?? 0} total={p?.total ?? 0} />
           )}
           <Text size="xs" c="dimmed">
             The bar counts every step: reading, sending the changes, then checking every copy (how many pages the reads take is only known as they go).{' '}
@@ -172,14 +142,7 @@ export function RecentExportsModal({ opened, ops, onPick, onClose }: { opened: b
                   Started {timeAgo(o.startedAt)}
                   {o.status === 'running' && o.phase ? ` · ${o.phase}` : ''}
                 </Text>
-                {o.status === 'running' &&
-                  (o.overall ? (
-                    <Progress value={overallPercent(o.overall)} size="xs" />
-                  ) : p && p.total > 0 ? (
-                    <Progress value={percent(p)} size="xs" />
-                  ) : (
-                    <Progress value={100} size="xs" animated striped />
-                  ))}
+                {o.status === 'running' && <JobProgress size="xs" done={(o.overall ?? p)?.done ?? 0} total={(o.overall ?? p)?.total ?? 0} />}
               </Stack>
             </UnstyledButton>
           );

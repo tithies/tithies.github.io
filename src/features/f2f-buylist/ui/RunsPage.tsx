@@ -1,6 +1,7 @@
-import { Anchor, Badge, Button, Group, List, Paper, Progress, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Badge, Button, Group, List, Paper, Stack, Text, Title } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { GettingStarted } from '@/lib/ui/GettingStarted';
+import { JobProgress } from '@/lib/ui/JobProgress';
 import { useStickyTableHeader } from '@/lib/ui/useStickyTableHeader';
 import { Link, useNavigate } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
@@ -139,7 +140,6 @@ export function RunsPage() {
                 title: 'Status',
                 width: 210,
                 render: (r) => {
-                  const value = r.totals.prints ? (r.totals.done / r.totals.prints) * 100 : 0;
                   return (
                     <Stack gap={4}>
                       <Group gap={6}>
@@ -158,7 +158,7 @@ export function RunsPage() {
                         )}
                       </Group>
                       {r.status !== 'completed' && (
-                        <Progress value={value} size="sm" animated={r.status === 'running'} color={STATUS_COLOR[r.status]} />
+                        <JobProgress size="sm" done={r.totals.done} total={r.totals.prints} color={STATUS_COLOR[r.status]} active={r.status === 'running'} />
                       )}
                     </Stack>
                   );

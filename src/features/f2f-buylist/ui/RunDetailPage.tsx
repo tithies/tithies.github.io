@@ -1,4 +1,4 @@
-import { Alert, Anchor, Badge, Button, Group, Paper, Progress, SimpleGrid, Stack, Table, Text, Title, Tooltip } from '@mantine/core';
+import { Alert, Anchor, Badge, Button, Group, Paper, SimpleGrid, Stack, Table, Text, Title, Tooltip } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { IconAlertTriangle, IconArrowLeft, IconBox, IconBuildingStore, IconCash } from '@tabler/icons-react';
 import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
@@ -9,6 +9,7 @@ import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { useRun, useRunItems } from '@/lib/accounts/hooks';
 import { accountLabel, type AccountKey } from '@/lib/accounts/types';
 import { siteOf } from '@/lib/sites/registry';
+import { JobProgress } from '@/lib/ui/JobProgress';
 import { SiteIcon } from '@/lib/ui/SiteIcon';
 import { f2fLinks } from '@/lib/f2f/links';
 import { categoryOf, type Item } from '../types';
@@ -19,7 +20,7 @@ import { ColumnsMenu, useHiddenColumns } from './ColumnsMenu';
 import { buildColumns, reviewRowClass } from './columns';
 import { applyFilters, applySort, filtersFromParams, sortFromParams, writeParams, type Filters, type Sort, type SortKey } from './filtering';
 import { FiltersBar } from './FiltersBar';
-import { dateTime, money, pct, PHASE_LABEL, STATUS_COLOR, STATUS_LABEL } from './format';
+import { dateTime, money, pct, PHASE_LABEL, runStep, STATUS_COLOR, STATUS_LABEL } from './format';
 
 const PAGE_SIZES = [25, 50, 100, 250, 500];
 
@@ -128,7 +129,6 @@ export function RunDetailPage() {
     );
   }
 
-  const progress = t.prints ? (t.done / t.prints) * 100 : 0;
   const runAccount = accounts.find((a) => a.key === run.accountKey);
   const site = siteOf(runAccount?.type ?? 'moxfield');
   const reviewCount = t.notFound + t.loose + t.priceCheck + t.errors;
@@ -181,16 +181,11 @@ export function RunDetailPage() {
 
       {run.status !== 'completed' && (
         <Paper withBorder p="sm" radius="md">
-          <Group justify="space-between" mb={6}>
-            <Text size="sm">
-              {PHASE_LABEL[run.phase]} — {t.done}/{t.prints} prints checked
-              {t.errors ? ` · ${t.errors} errors` : ''}
-            </Text>
-            <Text size="sm" className="ti-num">
-              {progress.toFixed(1)} %
-            </Text>
-          </Group>
-          <Progress value={progress} animated={run.status === 'running'} color={STATUS_COLOR[run.status]} />
+          <Text size="sm" mb={6}>
+            {PHASE_LABEL[run.phase]} — {t.done}/{t.prints} prints checked
+            {t.errors ? ` · ${t.errors} errors` : ''}
+          </Text>
+          <JobProgress size="lg" done={t.done} total={t.prints} note={runStep(run.phase)} color={STATUS_COLOR[run.status]} active={run.status === 'running'} />
         </Paper>
       )}
       {run.error && (

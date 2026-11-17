@@ -1,4 +1,4 @@
-import { overallPercent, StepTally } from '@/lib/changes/progress';
+import { overallPercent, StepTally } from '@/lib/progress';
 
 describe('StepTally (one progress over every step)', () => {
   it('sizes steps by their estimates until they run, then by what they report', () => {

@@ -1,5 +1,6 @@
 import type { CardPrint, Finish } from '@/lib/cards/types';
 import type { SiteIdentity } from '@/lib/sites/types';
+import type { OverallProgress } from '@/lib/progress';
 
 /** One deck from the deck list (no cards). */
 export interface DeckSummary {
@@ -106,8 +107,11 @@ export interface SyncState {
   withCollection: boolean;
   /** Read every page of it (else only what changed since the snapshot, when that can be trusted). */
   fullCollection?: boolean;
+  /** The running step's own count (decks read, collection pages). */
   done: number;
   total: number;
+  /** The whole sync's progress: the deck list, the decks, then the collection (see StepTally). */
+  overall?: OverallProgress;
   /** Deck being fetched. */
   current?: string;
   /** Transient note (rate-limit wait, opening a tab…). */

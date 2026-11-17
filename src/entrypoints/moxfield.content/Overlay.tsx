@@ -11,6 +11,7 @@ import { describeQuery } from '@/lib/sites/moxfield/normalize';
 import { onMessage, sendMessage } from '@/lib/messaging';
 import { overlayCollapsedItem as collapsedItem } from '@/lib/settings';
 import type { RunProgress } from '@/features/f2f-buylist/types';
+import { overallPercent } from '@/lib/progress';
 
 type Phase =
   | { kind: 'idle' }
@@ -141,21 +142,27 @@ export function Overlay() {
   }
 
   let body: React.ReactNode = null;
+  // Two steps, each with its bar: reading the collection here, then the check (prints checked, every pass counted).
   let pct = 0;
   if (phase.kind === 'reading') {
-    pct = phase.totalPages ? (phase.page / phase.totalPages) * 100 : 0;
-    body = <div className="ti-line">Reading Moxfield collection… page {phase.page}/{phase.totalPages || '?'} ({phase.fetched} rows)</div>;
+    pct = phase.totalPages ? overallPercent({ done: phase.page, total: phase.totalPages }) : 0;
+    body = (
+      <div className="ti-line">
+        Step 1 of 2 · Reading Moxfield collection… page {phase.page}/{phase.totalPages || '?'} ({phase.fetched} rows){phase.totalPages ? ` · ${pct}%` : ''}
+      </div>
+    );
   } else if (phase.kind === 'starting') {
     body = <div className="ti-line">Saving snapshot…</div>;
   } else if (phase.kind === 'run') {
     const p = phase.progress;
-    pct = p.total ? (p.done / p.total) * 100 : 0;
+    pct = p.total ? overallPercent({ done: p.done, total: p.total }, p.status === 'completed') : 0;
     const label =
       p.status === 'completed' ? 'Done' : p.status === 'paused' ? 'Paused' : p.status === 'queued' ? 'Waiting…' : p.status === 'running' ? 'Checking F2F…' : p.status;
     body = (
       <>
         <div className="ti-line">
-          <b>{label}</b> {p.done}/{p.total} prints
+          {p.status !== 'completed' && 'Step 2 of 2 · '}
+          <b>{label}</b> {p.done}/{p.total} prints{p.total ? ` · ${pct}%` : ''}
         </div>
         <div className="ti-line">
           F2F buys <b>{p.buylistPrints}</b> · {money(p.buylistCash)} cash / {money(p.buylistCredit)} credit
@@ -192,7 +199,7 @@ export function Overlay() {
       {body}
       {(phase.kind === 'reading' || phase.kind === 'run') && (
         <div className="ti-progress">
-          <div className="ti-bar" style={{ width: `${Math.min(100, pct).toFixed(1)}%` }} />
+          <div className="ti-bar" style={{ width: `${pct}%` }} />
         </div>
       )}
       <div className="ti-actions">

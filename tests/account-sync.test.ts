@@ -8,7 +8,8 @@ import type { AccountKey } from '@/lib/accounts/types';
 import type { CollectionEntry } from '@/lib/cards/types';
 import { db } from '@/lib/db';
 import { AccountSyncJob } from '@/lib/decks/job';
-import type { DeckCard, DeckSummary } from '@/lib/decks/types';
+import type { DeckCard, DeckSummary, SyncState } from '@/lib/decks/types';
+import type { OverallProgress } from '@/lib/progress';
 import { normalizeDeckCards } from '@/lib/sites/moxfield/decks';
 import { normalizeEntry } from '@/lib/sites/moxfield/normalize';
 import { moxfieldSite } from '@/lib/sites/moxfield/provider';
@@ -236,5 +237,39 @@ describe('Sync jobs and accounts', () => {
     port.tabs = [];
     expect(await sync(port, null)).toMatchObject({ ok: false, code: 'no_tab' });
     expect(await listAccounts()).toEqual([]);
+  });
+});
+
+describe('Sync progress', () => {
+  /** Runs a sync and records every overall progress it wrote. */
+  async function syncSeen(collection: boolean) {
+    const job = newJob(moxTabs());
+    const seen: OverallProgress[] = [];
+    const j = job as unknown as { patch: (job: unknown, p: Partial<SyncState>) => Promise<void> };
+    const patch = j.patch.bind(job);
+    j.patch = (running, p) => {
+      if (p.overall) seen.push({ ...p.overall });
+      return patch(running, p);
+    };
+    await job.start({ accountKey: A.key, collection });
+    await job.finished;
+    for (let i = 1; i < seen.length; i++) {
+      expect(seen[i].done).toBeGreaterThanOrEqual(seen[i - 1].done);
+      expect(seen[i].step).toBeGreaterThanOrEqual(seen[i - 1].step);
+    }
+    for (const o of seen) expect(o.done).toBeLessThanOrEqual(o.total);
+    return { seen, state: await A.data.meta.get('sync') };
+  }
+
+  it('one progress over the deck list, the decks and the collection: it only grows, and ends at the requests made', async () => {
+    const { seen, state } = await syncSeen(true);
+    // 1 deck list + 5 decks + 2 collection pages.
+    expect(state?.overall).toEqual({ done: 8, total: 8, step: 3, steps: 3 });
+    expect(seen.map((o) => o.step)).toEqual(expect.arrayContaining([1, 2, 3]));
+  });
+
+  it('a sync of the decks only has two steps', async () => {
+    const { state } = await syncSeen(false);
+    expect(state?.overall).toEqual({ done: 6, total: 6, step: 2, steps: 2 });
   });
 });

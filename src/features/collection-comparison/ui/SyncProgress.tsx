@@ -1,9 +1,10 @@
-import { Alert, Button, Group, Progress, Stack, Text } from '@mantine/core';
+import { Alert, Button, Group, Stack, Text } from '@mantine/core';
 import { IconAlertTriangle, IconUserExclamation } from '@tabler/icons-react';
 import type { SyncState } from '@/lib/decks/types';
 import type { SiteProvider } from '@/lib/sites/provider';
 import type { SiteIdentity } from '@/lib/sites/types';
 import { duration, timeAgo } from '@/lib/format';
+import { JobProgress } from '@/lib/ui/JobProgress';
 
 /** Average time per deck request (≈ 0.2 s answer + 1–1.5 s polite gap), for the time-left estimate. */
 const MS_PER_DECK = 1400;
@@ -38,7 +39,8 @@ export function SyncProgress({
 
   if (state.status === 'running') {
     const decksPhase = state.phase === 'decks' && state.total > 0;
-    const pct = decksPhase ? (state.done / state.total) * 100 : 100;
+    // The whole sync (a sync from before it was kept: the decks' own count).
+    const o = state.overall;
     return (
       <Stack gap={4}>
         <Group justify="space-between" gap="xs" wrap="nowrap">
@@ -52,7 +54,12 @@ export function SyncProgress({
             </Text>
           )}
         </Group>
-        <Progress value={pct} animated={!decksPhase || state.done < state.total} striped={!decksPhase} size="sm" />
+        <JobProgress
+          size="sm"
+          done={o ? o.done : decksPhase ? state.done : 0}
+          total={o ? o.total : decksPhase ? state.total : 0}
+          note={o ? `step ${o.step} of ${o.steps}` : undefined}
+        />
         {state.message && (
           <Text size="xs" c="yellow">
             {state.message}

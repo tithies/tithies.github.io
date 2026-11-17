@@ -88,7 +88,7 @@ export async function readActivity(): Promise<ActivityItem[]> {
       userName: names.get(a.key)!,
       title: s.withCollection ? 'Deck and collection sync' : 'Deck sync',
       detail: syncDetail(s),
-      progress: s.total > 1 || s.phase === 'decks' ? (s.total > 0 ? { done: s.done, total: s.total } : undefined) : undefined,
+      progress: s.overall ?? (s.phase === 'decks' && s.total > 0 ? { done: s.done, total: s.total } : undefined),
       to: '/collection/comparator',
     });
   }

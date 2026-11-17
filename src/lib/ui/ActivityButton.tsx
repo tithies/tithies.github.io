@@ -1,9 +1,10 @@
-import { Anchor, Button, Group, Loader, Popover, Progress, Stack, Text, UnstyledButton } from '@mantine/core';
+import { Anchor, Button, Group, Loader, Popover, Stack, Text, UnstyledButton } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconArrowsDiff, IconHistory, IconListDetails } from '@tabler/icons-react';
 import { Link, useNavigate } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { useActivity, type ActivityItem } from '@/lib/activity';
+import { JobProgress } from './JobProgress';
 
 const ICON = { export: IconListDetails, run: IconHistory, sync: IconArrowsDiff } as const;
 
@@ -48,11 +49,7 @@ export function ActivityButton() {
                       {it.detail}
                       {accounts.length > 1 ? ` · ${it.userName}` : ''}
                     </Text>
-                    {it.progress ? (
-                      <Progress value={(it.progress.done / it.progress.total) * 100} size="xs" />
-                    ) : (
-                      <Progress value={100} size="xs" animated striped />
-                    )}
+                    <JobProgress size="xs" done={it.progress?.done ?? 0} total={it.progress?.total ?? 0} />
                   </Stack>
                 </Group>
               </UnstyledButton>

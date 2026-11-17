@@ -1,7 +1,7 @@
 import { ActionIcon, Affix, Badge, Button, Drawer, Group, Loader, NumberInput, Paper, ScrollArea, Stack, Table, Text, Tooltip, useMatches } from '@mantine/core';
 import { IconFileExport, IconListDetails, IconTrash, IconUpload, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
-import { overallPercent } from '@/lib/changes/progress';
+import { overallPercent } from '@/lib/progress';
 import type { ChangeOp } from '@/lib/changes/types';
 import { finishLabel } from '@/lib/format';
 import { MAX_EXPORT_QTY, type ExportList } from '../list';

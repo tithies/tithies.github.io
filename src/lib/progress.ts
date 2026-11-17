@@ -1,10 +1,18 @@
 /**
- * One progress for an action made of steps (read, send the changes, check), counted in requests:
- * pages read and changes sent, which all go at the site's pace. A step is sized by an estimate
+ * One progress for a background job made of steps (an export: read, send the changes, check; a
+ * sync: the deck list, the decks, the collection), counted in requests: pages read and changes
+ * sent, which all go at the site's pace. A step is sized by an estimate
  * until it runs, then by what it reports, never less than the estimate while it runs (reads only
  * learn their page count as they go): the bar may jump forward when a step ends early, never back.
  */
-import type { OverallProgress } from './types';
+
+/** A job's progress over all its steps, in requests (pages read, changes sent); `step` of `steps` runs. */
+export interface OverallProgress {
+  done: number;
+  total: number;
+  step: number;
+  steps: number;
+}
 
 const size = (n: number) => (Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 1_000_000) : 0);
 
@@ -43,10 +51,9 @@ export class StepTally {
     return this.overall;
   }
 
-  /** Every step is over. */
+  /** Every step is over (the step stays the last one that ran: a step may not be needed). */
   finish(): OverallProgress {
     for (const s of this.steps) s.total = s.done;
-    this.current = this.steps.length - 1;
     return this.overall;
   }
 
@@ -57,6 +64,6 @@ export class StepTally {
   }
 }
 
-/** Percent done; 99 at most until the action is over (the last request is still to answer). */
+/** Percent done, the same for every job: whole numbers, 99 at most until it is over (the last request is still to answer). */
 export const overallPercent = (o: Pick<OverallProgress, 'done' | 'total'>, over = false): number =>
   over ? 100 : Math.min(99, Math.floor((100 * o.done) / Math.max(o.total, 1)));

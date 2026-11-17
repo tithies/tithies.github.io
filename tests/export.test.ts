@@ -1,6 +1,7 @@
 import Papa from 'papaparse';
 import { getOp, opCalls } from '@/lib/changes/log';
-import type { ChangeOp, OverallProgress } from '@/lib/changes/types';
+import type { ChangeOp } from '@/lib/changes/types';
+import type { OverallProgress } from '@/lib/progress';
 import { db } from '@/lib/db';
 import type { CollectionEntry, Finish } from '@/lib/cards/types';
 import { ExportJob, type StartExportRequest } from '@/lib/export/job';

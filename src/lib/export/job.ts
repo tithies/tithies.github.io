@@ -12,7 +12,7 @@
 import { accountData, getAccount } from '@/lib/accounts/data';
 import { accountLabel, identityOf, type AccountKey, type AccountRow } from '@/lib/accounts/types';
 import { getOp, patchOp, startOp, writeLogger } from '@/lib/changes/log';
-import { StepTally } from '@/lib/changes/progress';
+import { StepTally } from '@/lib/progress';
 import type { CollectionEntry } from '@/lib/cards/types';
 import { FULL_READ_EVERY_MS, readBinder, readCollection, readWholeCollection } from '@/lib/decks/collection';
 import type { SyncTransport } from '@/lib/decks/job';

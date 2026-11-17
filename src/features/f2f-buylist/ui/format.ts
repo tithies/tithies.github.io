@@ -46,3 +46,10 @@ export const PHASE_LABEL: Record<RunPhase, string> = {
   shop_search: 'Shopify search',
   done: 'Done',
 };
+
+/** The passes of a check, in order: "step 2 of 4" (null once done). Its progress counts prints checked, over every pass. */
+const RUN_STEPS: RunPhase[] = ['bulk_rates', 'lookup', 'fallback', 'shop_search'];
+export const runStep = (phase: RunPhase): string | null => {
+  const i = RUN_STEPS.indexOf(phase);
+  return i < 0 ? null : `step ${i + 1} of ${RUN_STEPS.length}`;
+};
