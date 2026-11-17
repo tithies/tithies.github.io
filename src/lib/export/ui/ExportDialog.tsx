@@ -58,8 +58,11 @@ export interface ExportDialogProps {
   sourceAccountKey: AccountKey | null;
   /** For the change log: "Comparator of alice". */
   source: string;
-  /** Offered once the export is over ("Clear the export"); the list is kept otherwise, to try again. */
-  onClearExport?: () => void;
+  /**
+   * Called once the export has started: the cards are handed over to it, so the page clears its
+   * list (to try again after a failure, pick the cards again; the Change log keeps what was sent).
+   */
+  onStarted?: () => void;
 }
 
 /** About how long the requests take at the site's pace. */
@@ -218,7 +221,7 @@ function ProgressStep({ opId, site, onCancel }: { opId: number; site: SiteProvid
     <Stack>
       <Group justify="space-between">
         <StatusBadge op={op} />
-        <Anchor component={Link} to="/changes" size="sm">
+        <Anchor component={Link} to={`/changes?op=${opId}`} size="sm">
           Open the Change log
         </Anchor>
       </Group>
@@ -258,7 +261,7 @@ function ProgressStep({ opId, site, onCancel }: { opId: number; site: SiteProvid
  * from the target, a confirmation, then the progress and the check of the result. Each step
  * reads only what it needs (the binder list, then the binder's cards or the collection).
  */
-export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, source, onClearExport }: ExportDialogProps) {
+export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, source, onStarted }: ExportDialogProps) {
   const { accounts: all } = useCurrentAccount();
   const { liveKeys } = useSiteSessions();
   const accounts = useMemo(() => all.filter((a) => a.type === site.type), [all, site.type]);
@@ -278,8 +281,8 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [opId, setOpId] = useState<number | null>(null);
-  const op = useChangeOp(opId);
-  const over = !!op && op.status !== 'running';
+  /** What the started export sent: the page's list is cleared once it starts. */
+  const [sent, setSent] = useState<{ prints: number; copies: number } | null>(null);
   const progress = useReadProgress(reading ? accountKey : null);
   const savedMeta = useCollectionMeta(accountKey);
   const savedCollection = !!savedMeta?.fullReadAt && Date.now() - savedMeta.fullReadAt < FULL_READ_EVERY_MS;
@@ -289,6 +292,7 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
     if (!opened) return;
     setStep(0);
     setOpId(null);
+    setSent(null);
     setStartError(null);
     setUnderstood(false);
     setSameUnderstood(false);
@@ -356,8 +360,10 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
       const res = await startExport(site.type, { target, items: plan.items, digest: plan.digest, sourceAccountKey, source });
       if (!res.ok) setStartError(res.error);
       else {
+        setSent({ prints: items.length, copies: items.reduce((s, i) => s + i.qty, 0) });
         setOpId(res.opId);
         setStep(3);
+        onStarted?.();
       }
     } catch (e) {
       setStartError(e instanceof Error ? e.message : String(e));
@@ -377,7 +383,7 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
           <IconUpload size={18} />
           <Text fw={600}>Export to {site.label}</Text>
           <Badge variant="light">
-            {plural(items.length, 'print')} · {plural(items.reduce((s, i) => s + i.qty, 0), 'copy', 'copies')}
+            {plural(sent?.prints ?? items.length, 'print')} · {plural(sent?.copies ?? items.reduce((s, i) => s + i.qty, 0), 'copy', 'copies')}
           </Badge>
         </Group>
       }
@@ -576,18 +582,6 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
           <Stack mt="md">
             {opId != null && <ProgressStep opId={opId} site={site} onCancel={() => void cancelExport(site.type)} />}
             <Group justify="flex-end">
-              {onClearExport && over && items.length > 0 && (
-                <Button
-                  variant="subtle"
-                  color="red"
-                  onClick={() => {
-                    onClearExport();
-                    onClose();
-                  }}
-                >
-                  Clear the export and close
-                </Button>
-              )}
               <Button variant="default" onClick={onClose}>
                 Close
               </Button>

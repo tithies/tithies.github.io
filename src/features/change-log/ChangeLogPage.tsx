@@ -3,6 +3,7 @@ import { IconAlertTriangle, IconChevronDown, IconChevronRight, IconDownload } fr
 import { useLiveQuery } from 'dexie-react-hooks';
 import { DataTable } from 'mantine-datatable';
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { accountLabel, type AccountKey } from '@/lib/accounts/types';
 import { listOps, opCalls } from '@/lib/changes/log';
@@ -117,7 +118,12 @@ export function ChangeLogPage() {
   const { accounts } = useCurrentAccount();
   const [account, setAccount] = useState<string | null>(null);
   const [only, setOnly] = useState<'all' | 'problems'>('all');
-  const [expanded, setExpanded] = useState<number[]>([]);
+  // `?op=<id>` (from the export dialog, the export bar or "Running"): that action opens expanded.
+  const [params] = useSearchParams();
+  const [expanded, setExpanded] = useState<number[]>(() => {
+    const id = Number(params.get('op'));
+    return Number.isInteger(id) && id > 0 ? [id] : [];
+  });
   const [page, setPage] = useState(1);
   const byKey = useMemo(() => new Map(accounts.map((a) => [a.key, a])), [accounts]);
   const shown = (ops ?? []).filter(

@@ -388,7 +388,7 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
                 Remove the rows shown from the export ({shownInExport})
               </Menu.Item>
               <Menu.Item color="red" leftSection={<IconTrash size={14} />} disabled={!exportList.prints} onClick={() => exportList.clear()}>
-                Clear the export ({exportList.prints})
+                Clear the list to export ({exportList.prints})
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>

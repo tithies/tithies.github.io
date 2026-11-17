@@ -54,7 +54,7 @@ export async function readActivity(): Promise<ActivityItem[]> {
       title: op.title,
       detail: op.phase ?? 'Working…',
       progress: op.progress && op.progress.total > 0 ? { done: op.progress.done, total: op.progress.total } : undefined,
-      to: '/changes',
+      to: `/changes?op=${op.id}`,
     });
   }
 

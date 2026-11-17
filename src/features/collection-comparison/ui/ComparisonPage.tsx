@@ -2,6 +2,7 @@ import { Alert, Anchor, Button, Checkbox, Divider, Group, Modal, Paper, SimpleGr
 import { IconAlertTriangle, IconArrowsDiff, IconPlayerStop, IconRefresh } from '@tabler/icons-react';
 import { useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router';
+import { useActivity } from '@/lib/activity';
 import { useExportList } from '@/lib/export/list';
 import { exportSummary, ExportBar } from '@/lib/export/ui/ExportBar';
 import { ExportDialog } from '@/lib/export/ui/ExportDialog';
@@ -231,19 +232,25 @@ function OptionsCard({
   );
 }
 
-/** Leaving the page clears what it was going to export: ask first. */
+/** Leaving the page clears the cards picked for export (not yet exported): ask first. */
 function LeaveGuard({ prints, summary }: { prints: number; summary: string }) {
   const blocker = useBlocker(({ currentLocation, nextLocation }) => prints > 0 && currentLocation.pathname !== nextLocation.pathname);
+  const exportRunning = useActivity().some((a) => a.kind === 'export');
   return (
     <Modal opened={blocker.state === 'blocked'} onClose={() => blocker.reset?.()} title="Leave this page?" centered>
       <Stack>
-        <Text size="sm">The cards to export ({summary}) only live on this page: leaving clears them.</Text>
+        <Text size="sm">The cards picked for export ({summary}) only live on this page: leaving clears that list.</Text>
+        {exportRunning && (
+          <Text size="sm" c="dimmed">
+            The export already started isn't affected: it goes on in the background.
+          </Text>
+        )}
         <Group justify="flex-end">
           <Button variant="default" onClick={() => blocker.reset?.()}>
             Stay
           </Button>
           <Button color="red" onClick={() => blocker.proceed?.()}>
-            Leave and clear the export
+            Leave and clear the list
           </Button>
         </Group>
       </Stack>
@@ -470,7 +477,7 @@ export function ComparisonPage() {
         items={exportList.items}
         sourceAccountKey={key}
         source={`Comparator of ${account ? accountLabel(account) : 'an account'}`}
-        onClearExport={() => exportList.clear()}
+        onStarted={() => exportList.clear()}
       />
       <LeaveGuard prints={exportList.prints} summary={exportSummary(exportList)} />
     </Stack>

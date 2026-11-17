@@ -1,6 +1,8 @@
-import { ActionIcon, Affix, Badge, Button, Drawer, Group, NumberInput, Paper, ScrollArea, Stack, Table, Text } from '@mantine/core';
-import { IconFileExport, IconTrash, IconUpload, IconX } from '@tabler/icons-react';
+import { ActionIcon, Affix, Badge, Button, Drawer, Group, Loader, NumberInput, Paper, ScrollArea, Stack, Table, Text, Tooltip } from '@mantine/core';
+import { IconFileExport, IconListDetails, IconTrash, IconUpload, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
+import { Link } from 'react-router';
+import { useActivity } from '@/lib/activity';
 import { finishLabel } from '@/lib/format';
 import { MAX_EXPORT_QTY, type ExportList } from '../list';
 
@@ -61,28 +63,60 @@ function ExportTable({ exportList }: { exportList: ExportList }) {
   );
 }
 
+/** Opens the Change log, on the running export when there is one. */
+function SeeExports() {
+  const running = useActivity().find((a) => a.kind === 'export');
+  const p = running?.progress;
+  return (
+    <Button
+      component={Link}
+      to={running?.to ?? '/changes'}
+      size="xs"
+      variant="light"
+      leftSection={running ? <Loader size={12} /> : <IconListDetails size={14} />}
+      style={{ whiteSpace: 'nowrap' }}
+    >
+      {running ? `Export running${p ? ` · ${n(p.done)}/${n(p.total)}` : ''}` : 'See exports'}
+    </Button>
+  );
+}
+
 /**
- * What a page will export: a bar at the bottom while it holds something, a drawer to review it,
- * and the page's export button (`onExport`).
+ * What a page will export: a bar at the bottom while it holds something or an export runs, a
+ * drawer to review the list, and the page's export button (`onExport`).
  */
 export function ExportBar({ exportList, onExport, siteLabel }: { exportList: ExportList; onExport: () => void; siteLabel: string }) {
   const [open, setOpen] = useState(false);
+  const exportRunning = useActivity().some((a) => a.kind === 'export');
+  const picked = exportList.prints > 0;
   return (
     <>
-      {exportList.prints > 0 && (
+      {(picked || exportRunning) && (
         <Affix position={{ bottom: 20, right: 24 }} zIndex={150}>
           <Paper withBorder shadow="lg" radius="md" p="xs" pl="md">
             <Group gap="sm" wrap="nowrap">
-              <IconFileExport size={18} />
-              <Text size="sm" fw={600} className="ti-num" style={{ whiteSpace: 'nowrap' }}>
-                To export: {exportSummary(exportList)}
-              </Text>
-              <Button size="xs" variant="default" onClick={() => setOpen(true)}>
-                Review
-              </Button>
-              <Button size="xs" leftSection={<IconUpload size={14} />} onClick={onExport}>
-                Export to {siteLabel}…
-              </Button>
+              {picked && (
+                <>
+                  <IconFileExport size={18} />
+                  <Text size="sm" fw={600} className="ti-num" style={{ whiteSpace: 'nowrap' }}>
+                    To export: {exportSummary(exportList)}
+                  </Text>
+                  <Tooltip label="Clear the list">
+                    <ActionIcon variant="subtle" color="red" onClick={() => exportList.clear()} aria-label="Clear the list of cards to export">
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                  <Button size="xs" variant="default" onClick={() => setOpen(true)}>
+                    Review
+                  </Button>
+                </>
+              )}
+              <SeeExports />
+              {picked && (
+                <Button size="xs" leftSection={<IconUpload size={14} />} onClick={onExport}>
+                  Export to {siteLabel}…
+                </Button>
+              )}
             </Group>
           </Paper>
         </Affix>
@@ -107,7 +141,7 @@ export function ExportBar({ exportList, onExport, siteLabel }: { exportList: Exp
           </Text>
           <Group justify="space-between">
             <Button variant="subtle" color="red" size="xs" leftSection={<IconTrash size={14} />} onClick={() => exportList.clear()}>
-              Clear the export
+              Clear the list
             </Button>
             <Button
               size="xs"
