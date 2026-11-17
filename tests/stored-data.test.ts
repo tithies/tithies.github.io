@@ -98,10 +98,10 @@ describe('Settings → Reset settings', () => {
     await fill();
     await saveSettings({ requestIntervalMs: 5000 });
     await overlayCollapsedItem.setValue(true);
-    await storage.setItem(comparisonConfigKey(A.key), { current: { showMissing: false, excludedDeckIds: ['d1'] }, presets: [], loadedPresetId: null });
+    await storage.setItem(comparisonConfigKey(A.key), { current: { showMissing: false, excludedDeckIds: ['d1'] } });
     const prefs = await listStoredPreferences();
     expect(prefs.map((p) => p.key).sort()).toEqual([`collectionComparison:${A.key}`, 'overlayCollapsed', 'settings']);
-    expect(prefs.find((p) => p.key.startsWith('collectionComparison:'))!.label).toMatch(/^Comparator options and presets of one account/);
+    expect(prefs.find((p) => p.key.startsWith('collectionComparison:'))!.label).toMatch(/^Comparator options of one account/);
 
     await resetAllSettings();
 
@@ -115,12 +115,11 @@ describe('Settings → Reset settings', () => {
     expect(await getMeta('currentAccount')).toBe(B.key);
   });
 
-  it('keeps saved comparison presets (only their inputs go back to the defaults)', async () => {
-    const presets = [{ id: 'p', name: 'Cubes', config: { excludedDeckIds: ['d1'] }, savedAt: 1 }];
-    await storage.setItem(comparisonConfigKey(A.key), { current: { showMissing: false }, presets, loadedPresetId: 'p' });
-    await storage.setItem(comparisonConfigKey(B.key), { current: { showMissing: false }, presets: [], loadedPresetId: null });
+  it("puts every account's Comparator options back to their defaults", async () => {
+    await storage.setItem(comparisonConfigKey(A.key), { current: { showMissing: false } });
+    await storage.setItem(comparisonConfigKey(B.key), { current: { excludedDeckIds: ['d1'] } });
     await resetAllSettings();
-    expect(await storage.getItem(comparisonConfigKey(A.key))).toEqual({ presets, loadedPresetId: null });
+    expect(await storage.getItem(comparisonConfigKey(A.key))).toBeNull();
     expect(await storage.getItem(comparisonConfigKey(B.key))).toBeNull();
   });
 });

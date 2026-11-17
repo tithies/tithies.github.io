@@ -104,7 +104,7 @@ export function ResetSection() {
         <Stack>
           <Text size="sm">
             Every tool's settings, the Comparator inputs, hidden columns, page sizes, the theme and the Moxfield panel go back to their defaults. Runs,
-            synced decks, caches and saved Comparator presets are kept.
+            synced decks and caches are kept.
           </Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setConfirming(false)}>

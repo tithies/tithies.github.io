@@ -2,17 +2,8 @@ import { compareDecksToCollection, type CompareOptions } from '@/features/collec
 import {
   DEFAULT_COMPARISON_CONFIG,
   DEFAULT_COMPARISON_STATE,
-  deletePreset,
-  hasUnsavedOptions,
-  isModified,
-  loadPresetInto,
   parseComparisonConfig,
   parseComparisonState,
-  presetNameError,
-  renamePreset,
-  sameConfig,
-  savePreset,
-  type ComparisonState,
 } from '@/features/collection-comparison/config';
 import { applyComparisonFilters, applyComparisonSort, comparisonFiltersFromParams, writeComparisonParams, DEFAULT_COMPARISON_SORT } from '@/features/collection-comparison/filtering';
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
@@ -202,67 +193,12 @@ describe('Comparator config and filters', () => {
   });
 });
 
-describe('Comparator presets', () => {
-  let n = 0;
-  const id = () => `p${++n}`;
-  const withInputs = (s: ComparisonState, patch: Partial<ComparisonState['current']>): ComparisonState => ({ ...s, current: { ...s.current, ...patch } });
-
-  it('saves a new preset by default, loads it, and tells when the inputs changed', () => {
-    let s = withInputs(DEFAULT_COMPARISON_STATE, { excludedDeckIds: ['a', 'b'] });
-    expect(hasUnsavedOptions(s)).toBe(true);
-    s = savePreset(s, { name: '  Cubes  ' }, 1, id);
-    expect(s.presets).toEqual([{ id: 'p1', name: 'Cubes', config: s.current, savedAt: 1 }]);
-    expect(s.loadedPresetId).toBe('p1');
-    expect(isModified(s)).toBe(false);
-    // List order doesn't make a change.
-    expect(isModified(withInputs(s, { excludedDeckIds: ['b', 'a'] }))).toBe(false);
-    s = withInputs(s, { ignoreProxies: false });
-    expect(isModified(s)).toBe(true);
-    expect(hasUnsavedOptions(s)).toBe(true);
-    // Saving another preset doesn't touch the first one.
-    s = savePreset(s, { name: 'No proxies' }, 2, id);
-    expect(s.presets.map((p) => [p.name, p.config.ignoreProxies])).toEqual([
-      ['Cubes', true],
-      ['No proxies', false],
-    ]);
-    s = loadPresetInto(s, 'p1');
-    expect(s.current.ignoreProxies).toBe(true);
-    expect(s.loadedPresetId).toBe('p1');
-  });
-
-  it('overwrites an existing preset, refuses duplicate names, renames and deletes', () => {
-    let s = savePreset(DEFAULT_COMPARISON_STATE, { name: 'Main' }, 1, () => 'm');
-    s = savePreset(withInputs(s, { showUnassigned: true }), { name: 'Other' }, 2, () => 'o');
-    s = loadPresetInto(s, 'm');
-    s = savePreset(withInputs(s, { ignoredBoards: [] }), { overwriteId: 'm' }, 3);
-    expect(s.presets.find((p) => p.id === 'm')).toMatchObject({ savedAt: 3, config: { ignoredBoards: [] } });
-    expect(presetNameError(s, 'main')).toMatch(/already/);
-    expect(() => savePreset(s, { name: 'MAIN' })).toThrow(/already/);
-    expect(presetNameError(s, ' ')).toMatch(/name/);
-    expect(presetNameError(s, 'Main', 'm')).toBeNull();
-    expect(() => renamePreset(s, 'o', 'Main')).toThrow(/already/);
-    s = renamePreset(s, 'o', 'Commander');
-    expect(s.presets.map((p) => p.name)).toEqual(['Main', 'Commander']);
-    s = deletePreset(s, 'm');
-    expect(s.loadedPresetId).toBeNull();
-    expect(s.current.ignoredBoards).toEqual([]);
-    expect(() => savePreset(s, { overwriteId: 'm' })).toThrow();
-  });
-
-  it('repairs stored state: bad presets dropped, a dangling loaded id cleared', () => {
-    const s = parseComparisonState({
-      current: { showMissing: false, ignoredBoards: 7 },
-      presets: [{ id: 'a', name: 'A', config: { ignoreProxies: false } }, { id: '', name: 'bad' }, { id: 'a', name: 'dup' }, 'junk', { id: 'b', name: ' ', config: {} }],
-      loadedPresetId: 'zz',
-    });
-    expect(s.current).toEqual({ ...DEFAULT_COMPARISON_CONFIG, showMissing: false });
-    expect(s.presets).toEqual([{ id: 'a', name: 'A', config: { ...DEFAULT_COMPARISON_CONFIG, ignoreProxies: false }, savedAt: 0 }]);
-    expect(s.loadedPresetId).toBeNull();
+describe('Comparator options', () => {
+  it('repairs stored state field by field, and ignores the presets of before', () => {
+    const s = parseComparisonState({ current: { showMissing: false, ignoredBoards: 7 }, presets: [{ id: 'a', name: 'A', config: {} }], loadedPresetId: 'a' });
+    expect(s).toEqual({ current: { ...DEFAULT_COMPARISON_CONFIG, showMissing: false } });
     expect(parseComparisonState(undefined)).toEqual(DEFAULT_COMPARISON_STATE);
-    expect(sameConfig(DEFAULT_COMPARISON_CONFIG, parseComparisonConfig({}))).toBe(true);
-    // The defaults, or options equal to a preset, are nothing to lose.
-    expect(hasUnsavedOptions(DEFAULT_COMPARISON_STATE)).toBe(false);
-    expect(hasUnsavedOptions({ ...s, current: s.presets[0].config })).toBe(false);
+    expect(parseComparisonConfig('junk')).toEqual(DEFAULT_COMPARISON_CONFIG);
   });
 });
 

@@ -8,7 +8,7 @@ A toolbox for Magic: The Gathering collectors: a Chrome extension (MV3) that add
 
 ## Accounts
 
-Tithies keeps each Moxfield account apart: its Selling runs, synced decks, collection and Comparator options and presets belong to it, and every page shows one account, picked at the top right of the dashboard (with the site's icon, and a green dot when it is logged in on Moxfield right now). Settings are shared by every account.
+Tithies keeps each Moxfield account apart: its Selling runs, synced decks, collection and Comparator options belong to it, and every page shows one account, picked at the top right of the dashboard (with the site's icon, and a green dot when it is logged in on Moxfield right now). Settings are shared by every account.
 
 - **Accounts are added by an action**, never just because a Moxfield tab is open: "Check selling prices" in the Moxfield panel, a first "Sync decks", or "Switch Tithies to …". An action started from Moxfield runs as the account logged in there and switches the dashboard to it.
 - **One login per site at a time.** The browser holds one Moxfield login, so other accounts stay viewable from what Tithies already read, but only the logged-in account can be synced. Syncing an account while Moxfield is logged in as another one stops before anything is read, with a button to switch Tithies to the logged-in account instead. If the login changes in the middle of a sync, the sync stops at the first answer from the other account: what was read before is kept, and nothing is written into (or deleted from) the wrong account.
@@ -46,7 +46,7 @@ Runs are stored in IndexedDB and survive browser restarts. A run interrupted by 
 - **Moxfield writes (exports only).** Tithies changes Moxfield only when you confirm an export, and only through these requests (each one in the change log, exactly as sent): `POST /v1/trade-binders` (create a binder), `POST /v1/collections/bulk/remove` (delete entries, up to 1000 per request), `DELETE /v1/collections` (a collection replace), and `POST /v1/collections/import-file` (Moxfield's own CSV import, 500 rows per request, into a binder with `tradeBinderId`). They are made by the page like the reads, and only as the account you picked: the page refuses to send them as anyone else. **A write is never sent twice**: when its outcome is unknown (timeout, lost tab, network or server error) the export stops, and the collection is read again to show what was made. Only refusals (HTTP 429, a wrong account before sending) are retried.
 - **Shop/sell mode.** F2F keeps a cart attribute `site=shop|sell`. Sell links use F2F's own `?site=sell`. Buy links use `?tithies=shop`, which a tiny content script turns back into shop mode.
 
-The F2F delays, the batch size, the cache TTL, the credit bonus and the fallback search can be changed under **Settings → Selling**, and the Moxfield pace under **Settings → Moxfield** (saved as you type). **Settings → Stored data** shows everything Tithies keeps in the browser (the shared F2F lookups and the change log, then each account's synced decks, collection and runs) and clears any part of it, or all of it; **Reset settings** puts every setting and preference back to its default (saved comparison presets are kept).
+The F2F delays, the batch size, the cache TTL, the credit bonus and the fallback search can be changed under **Settings → Selling**, and the Moxfield pace under **Settings → Moxfield** (saved as you type). **Settings → Stored data** shows everything Tithies keeps in the browser (the shared F2F lookups and the change log, then each account's synced decks, collection and runs) and clears any part of it, or all of it; **Reset settings** puts every setting and preference back to its default.
 
 ## Feature 2 — Comparator
 
@@ -62,7 +62,7 @@ Each list is shown or hidden by clicking its panel above the table, since not ev
 3. Choose the boards that count (maybeboard off by default) and whether to **ignore proxies** (on by default, both sides).
 4. Click **Compare**. It syncs decks again (1 request for the list plus 1 per new or changed deck, compared on Moxfield's last-updated time), then reads what changed in your collection (every page the first time, once a week, after a deletion, or with **Read every page**). The line above the buttons says how the last read went. Options apply instantly afterwards, without new requests.
 
-**Presets.** A preset keeps the options (decks and folders left out, boards, proxies, which rows are shown) under a name. **Save as…** saves them as a new preset (typing the name of an existing one overwrites it, as its button says); **Save** saves your changes into the preset you loaded (without one, it asks for a name). Picking a preset in the list puts its options back; a *Modified* badge shows when you changed them since, and switching away from unsaved options asks first (and can save them into the loaded preset on the way). The options you're using are always kept as they are, presets only change when you save. Presets belong to the account, and **Reset settings** keeps them.
+The options (decks and folders left out, boards, proxies, which rows are shown) are saved as you change them, per account; **Reset settings** puts them back to their defaults.
 
 Rows show which decks use the print. A yellow hint flags the likely fix when the same card differs the other way in another print or finish (e.g. the deck says foil, the collection has non-foil); when decks use that other print, the hint links them, since that is where to fix it. Filters, sort and CSV export work like the F2F results table.
 
@@ -126,7 +126,7 @@ Every push to `master` runs `.github/workflows/pages.yml`: typecheck, tests, `np
 ```
 src/entrypoints/          background worker, content scripts (Moxfield hook + panel, F2F mode helper), dashboard page
 src/features/f2f-buylist/ runner (batches, cache, resume), matcher, bulk rates, dashboard UI
-src/features/collection-comparison/ deck ↔ collection comparison, options and presets, comparison page
+src/features/collection-comparison/ deck ↔ collection comparison, options, comparison page
 src/features/change-log/  Change log page: every change made to a site, request by request
 src/features/settings/    Settings page: accounts, Moxfield pace, stored data, reset
 src/lib/accounts/         accounts, the current account, and the access layer: the only code that touches per-account data

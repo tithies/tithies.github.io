@@ -12,13 +12,18 @@ const NEW_PREFIX = ACCOUNT_STORAGE_PREFIXES.collectionComparison.slice('local:'.
 export async function migrateStorage(): Promise<void> {
   // Before accounts, the Mismatches options were one global item; they are per account now.
   await storage.removeItem('local:deckMismatchConfig');
-  // Mismatches → Comparator: each account's options become the current inputs (no preset yet).
+  // Mismatches → Comparator: each account's options become the Comparator's.
   const all = await browser.storage.local.get(null);
   for (const [key, value] of Object.entries(all)) {
     if (!key.startsWith(LEGACY_PREFIX)) continue;
     const accountKey = key.slice(LEGACY_PREFIX.length);
     const next = `${NEW_PREFIX}${accountKey}`;
-    if (!(next in all)) await browser.storage.local.set({ [next]: { current: value, presets: [], loadedPresetId: null } });
+    if (!(next in all)) await browser.storage.local.set({ [next]: { current: value } });
     await browser.storage.local.remove(key);
+  }
+  // The Comparator had saved presets once: only its options are kept.
+  for (const [key, value] of Object.entries(all)) {
+    if (!key.startsWith(NEW_PREFIX) || !value || typeof value !== 'object') continue;
+    if ('presets' in value || 'loadedPresetId' in value) await browser.storage.local.set({ [key]: { current: (value as { current?: unknown }).current } });
   }
 }

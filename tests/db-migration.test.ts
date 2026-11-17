@@ -60,17 +60,28 @@ describe('Database upgrade to per-account data (v3, then the change log in v4)',
     expect(await storage.getItem('local:settings')).toEqual({ batchSize: 30 });
   });
 
-  it('moves the Mismatches options of each account options to Comparator (as the inputs, no preset)', async () => {
+  it("moves each account's Mismatches options to the Comparator", async () => {
     const old = { showMissing: false, excludedDeckIds: ['d1'] };
     await storage.setItem('local:deckMismatchConfig:moxfield:111111', old);
     await storage.setItem('local:deckMismatchConfig:moxfield:222222', { excludedDeckIds: ['x'] });
     // Already moved: the newer state wins, the old item just goes.
-    await storage.setItem('local:collectionComparison:moxfield:222222', { current: { excludedDeckIds: ['kept'] }, presets: [], loadedPresetId: null });
+    await storage.setItem('local:collectionComparison:moxfield:222222', { current: { excludedDeckIds: ['kept'] } });
     await migrateStorage();
     await migrateStorage();
     expect(await storage.getItem('local:deckMismatchConfig:moxfield:111111')).toBeNull();
     expect(await storage.getItem('local:deckMismatchConfig:moxfield:222222')).toBeNull();
-    expect(await storage.getItem('local:collectionComparison:moxfield:111111')).toEqual({ current: old, presets: [], loadedPresetId: null });
+    expect(await storage.getItem('local:collectionComparison:moxfield:111111')).toEqual({ current: old });
     expect(await storage.getItem('local:collectionComparison:moxfield:222222')).toMatchObject({ current: { excludedDeckIds: ['kept'] } });
+  });
+
+  it('drops the Comparator presets of before, keeping the options in use', async () => {
+    const current = { showMissing: false, excludedDeckIds: ['d1'] };
+    const presets = [{ id: 'p', name: 'Cubes', config: { excludedDeckIds: ['x'] }, savedAt: 1 }];
+    await storage.setItem('local:collectionComparison:moxfield:111111', { current, presets, loadedPresetId: 'p' });
+    await storage.setItem('local:collectionComparison:moxfield:222222', { current: { showMatched: true } });
+    await migrateStorage();
+    await migrateStorage(); // idempotent
+    expect(await storage.getItem('local:collectionComparison:moxfield:111111')).toEqual({ current });
+    expect(await storage.getItem('local:collectionComparison:moxfield:222222')).toEqual({ current: { showMatched: true } });
   });
 });

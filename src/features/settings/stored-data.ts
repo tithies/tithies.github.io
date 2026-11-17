@@ -12,10 +12,8 @@ import type { AccountKey } from '@/lib/accounts/types';
 import { db } from '@/lib/db';
 import { sendMessage } from '@/lib/messaging';
 import { clearCaches } from '@/features/f2f-buylist/runner';
-import { ACCOUNT_STORAGE_PREFIXES } from '@/lib/accounts/storage-keys';
 import { clearChangeLog, measureChangeLog } from '@/lib/changes/log';
 
-const COMPARISON_PREFIX = ACCOUNT_STORAGE_PREFIXES.collectionComparison.slice('local:'.length);
 
 /** The groups of IndexedDB data the user can clear: the shared F2F cache, the change log (every account's), or one account's data. */
 export type DataGroup = 'f2fCache' | 'changeLog' | AccountDataGroup;
@@ -80,7 +78,7 @@ export const PREFERENCE_LABELS: Record<string, string> = {
 
 /** Labels of per-account preference keys ("collectionComparison:moxfield:123"), by prefix. */
 const ACCOUNT_PREFERENCE_PREFIXES: Record<string, string> = {
-  'collectionComparison:': 'Comparator options and presets of one account: decks and folders left out, boards, proxies, what to show',
+  'collectionComparison:': 'Comparator options of one account: decks and folders left out, boards, proxies, what to show',
   'deckMismatchConfig:': 'Mismatches page options of one account, from an older version',
 };
 
@@ -115,19 +113,8 @@ export async function listStoredPreferences(): Promise<StoredPreference[]> {
  * localStorage. Both hold only Tithies settings and preferences (no data: accounts and the
  * current account live in IndexedDB), and every reader has a fallback, so nothing else is
  * needed. Open pages pick the defaults up through their watchers.
- *
- * Saved Comparator presets are the user's own work, not settings: they are kept
- * (the inputs go back to their defaults).
  */
 export async function resetAllSettings(): Promise<void> {
-  const all = await browser.storage.local.get(null);
-  const keep: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(all)) {
-    if (!key.startsWith(COMPARISON_PREFIX)) continue;
-    const presets = (value as { presets?: unknown } | null)?.presets;
-    if (Array.isArray(presets) && presets.length) keep[key] = { presets, loadedPresetId: null };
-  }
   await browser.storage.local.clear();
-  if (Object.keys(keep).length) await browser.storage.local.set(keep);
   if (typeof localStorage !== 'undefined') localStorage.clear();
 }

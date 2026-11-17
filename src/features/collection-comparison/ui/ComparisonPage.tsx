@@ -24,7 +24,6 @@ import { siteOf } from '@/lib/sites/registry';
 import { Stat } from '@/lib/ui/Stat';
 import { compareDecksToCollection } from '../compare';
 import { useComparisonConfig, type ComparisonConfig } from '../config';
-import { PresetBar } from './PresetBar';
 import { comparisonFiltersFromParams, comparisonSortFromParams, writeComparisonParams } from '../filtering';
 import { ComparisonTable } from './ComparisonTable';
 import { SyncProgress } from './SyncProgress';
@@ -227,7 +226,7 @@ function OptionsCard({
         </Group>
         <Text size="xs" c="dimmed">
           Compare first syncs decks (only new or changed ones are read), then reads what changed in your collection (every page once a week, or when
-          something was deleted). Options, presets and deck choices apply instantly.
+          something was deleted). Options and deck choices apply instantly.
         </Text>
       </Stack>
     </Paper>
@@ -269,8 +268,7 @@ export function ComparisonPage() {
   const decksMeta = useDecksMeta(key);
   const sync = useSyncState(key);
   const collectionMeta = useCollectionMeta(key);
-  const presets = useComparisonConfig(key);
-  const { state, config, update } = presets;
+  const { config, update } = useComparisonConfig(key);
   // The "Likely wrong print" card toggles the table's filter of the same name (kept in the URL).
   const [params, setParams] = useSearchParams();
   // The export shown in its own window (`?export=<id>`, also opened from the header's "Running" list).
@@ -351,7 +349,7 @@ export function ComparisonPage() {
       </Stack>
     );
   }
-  if (decks === undefined || decksMeta === undefined || config === null || state === null) return <Text c="dimmed">Loading…</Text>;
+  if (decks === undefined || decksMeta === undefined || config === null) return <Text c="dimmed">Loading…</Text>;
 
   if (!decksMeta.lastSuccessAt) {
     return (
@@ -370,7 +368,6 @@ export function ComparisonPage() {
     <Stack>
       {header}
       <AccountHint type={site.type} />
-      <PresetBar state={state} load={presets.load} save={presets.save} rename={presets.rename} remove={presets.remove} />
       <SimpleGrid cols={{ base: 1, lg: 2 }}>
         <Paper withBorder p="md" radius="md">
           <Stack gap="xs">
