@@ -10,6 +10,7 @@ import { useRun, useRunItems } from '@/lib/accounts/hooks';
 import { accountLabel, type AccountKey } from '@/lib/accounts/types';
 import { siteOf } from '@/lib/sites/registry';
 import { JobProgress } from '@/lib/ui/JobProgress';
+import { renderPagination } from '@/lib/ui/pagination';
 import { SiteIcon } from '@/lib/ui/SiteIcon';
 import { f2fLinks } from '@/lib/f2f/links';
 import { categoryOf, type Item } from '../types';
@@ -332,6 +333,7 @@ export function RunDetailPage() {
           }}
           recordsPerPageLabel="Cards per page"
           paginationText={({ from, to, totalRecords }) => `${from}–${to} of ${totalRecords}`}
+          renderPagination={renderPagination}
         />
       </Paper>
     </Stack>

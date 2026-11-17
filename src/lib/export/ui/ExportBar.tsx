@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { overallPercent } from '@/lib/progress';
 import type { ChangeOp } from '@/lib/changes/types';
 import { finishLabel } from '@/lib/format';
+import { renderPagination } from '@/lib/ui/pagination';
 import { MAX_EXPORT_QTY, type ExportList } from '../list';
 import type { ExportItem } from '../types';
 
@@ -106,6 +107,7 @@ function ExportTable({ exportList, narrow }: { exportList: ExportList; narrow: b
       }}
       recordsPerPageLabel={narrow ? '' : 'Rows per page'}
       paginationText={({ from, to, totalRecords }) => `${from}–${to} of ${totalRecords}`}
+      renderPagination={renderPagination}
       paginationSize={narrow ? 'xs' : 'sm'}
     />
   );

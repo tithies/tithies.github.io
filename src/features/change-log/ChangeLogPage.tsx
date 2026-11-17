@@ -13,6 +13,7 @@ import { ExportOpDetails } from '@/lib/export/ui/ExportOpDetails';
 import { dateTime, duration, timeAgo } from '@/lib/format';
 import { downloadText } from '@/lib/ui/download';
 import { SiteIcon } from '@/lib/ui/SiteIcon';
+import { renderPagination } from '@/lib/ui/pagination';
 
 const OUTCOME: Record<ChangeCall['outcome'], { label: string; color: string; tip: string }> = {
   sent: { label: 'Sending', color: 'blue', tip: 'Sent, no answer yet' },
@@ -182,6 +183,7 @@ export function ChangeLogPage() {
           recordsPerPage={PAGE}
           page={page}
           onPageChange={setPage}
+          renderPagination={renderPagination}
           rowExpansion={{
             allowMultiple: true,
             expanded: { recordIds: expanded, onRecordIdsChange: (ids: unknown[]) => setExpanded(ids as number[]) },

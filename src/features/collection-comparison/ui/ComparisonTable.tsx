@@ -11,6 +11,7 @@ import type { DeckRow } from '@/lib/decks/types';
 import { scryfallCardLink, scryfallImage } from '@/lib/f2f/links';
 import { finishLabel, FINISH_LABEL } from '@/lib/format';
 import { CardThumb } from '@/lib/ui/CardThumb';
+import { renderPagination } from '@/lib/ui/pagination';
 import { ONE_LINE_PILLS, SetMultiSelect } from '@/lib/ui/SetMultiSelect';
 import type { ComparisonRow, DeckUse, OtherPrint } from '../compare';
 import { downloadComparisonCsv } from '../csv';
@@ -443,6 +444,7 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
           }}
           recordsPerPageLabel="Rows per page"
           paginationText={({ from, to, totalRecords }) => `${from}–${to} of ${totalRecords}`}
+          renderPagination={renderPagination}
         />
       </Paper>
     </Stack>
