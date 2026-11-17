@@ -1,4 +1,5 @@
-import { ActionIcon, Affix, Badge, Button, Drawer, Group, Loader, NumberInput, Paper, ScrollArea, Stack, Table, Text, Tooltip, useMatches } from '@mantine/core';
+import { ActionIcon, Affix, Badge, Button, Drawer, Group, Loader, NumberInput, Paper, ScrollArea, Stack, Text, Tooltip, useMatches } from '@mantine/core';
+import { DataTable, type DataTableColumn } from 'mantine-datatable';
 import { IconFileExport, IconListDetails, IconTrash, IconUpload, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
 import { overallPercent } from '@/lib/progress';
@@ -15,58 +16,98 @@ const printLabel = (i: ExportItem) => `${i.set.toUpperCase()} #${i.cn} · ${fini
 /** "42 prints · 117 copies" */
 export const exportSummary = (list: Pick<ExportList, 'prints' | 'copies'>) => `${plural(list.prints, 'print')} · ${plural(list.copies, 'copy', 'copies')}`;
 
-/** The list, print by print. Narrow (a phone): the print goes under the card's name, so the table fits. */
+const PAGE_SIZES = [25, 50, 100];
+
+/**
+ * The list, print by print, a page at a time (a list of thousands of prints, each with its
+ * quantity input, would take seconds to open). Narrow (a phone): the print goes under the
+ * card's name, so the table fits.
+ */
 function ExportTable({ exportList, narrow }: { exportList: ExportList; narrow: boolean }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const items = exportList.items;
+  // Removing the last rows of the last page goes back a page.
+  const pages = Math.max(1, Math.ceil(items.length / pageSize));
+  const current = Math.min(page, pages);
+  const records = items.slice((current - 1) * pageSize, current * pageSize);
+  const columns: DataTableColumn<ExportItem>[] = [
+    {
+      accessor: 'name',
+      title: 'Card',
+      render: (i) => (
+        <>
+          <Text size="sm">{i.name}</Text>
+          {narrow && <Text size="xs">{printLabel(i)}</Text>}
+          {i.note && (
+            <Text size="xs" c="dimmed">
+              {i.note}
+            </Text>
+          )}
+        </>
+      ),
+    },
+    {
+      accessor: 'print',
+      title: 'Print',
+      hidden: narrow,
+      render: (i) => (
+        <Text size="xs" style={{ whiteSpace: 'nowrap' }}>
+          {printLabel(i)}
+        </Text>
+      ),
+    },
+    {
+      accessor: 'qty',
+      title: 'Copies',
+      width: narrow ? 80 : 110,
+      render: (i) => (
+        <NumberInput
+          size="xs"
+          min={1}
+          max={MAX_EXPORT_QTY}
+          allowDecimal={false}
+          value={i.qty}
+          onChange={(v) => typeof v === 'number' && exportList.setQty(i.key, v)}
+          w={narrow ? 70 : 90}
+          aria-label={`Copies of ${i.name} to export`}
+        />
+      ),
+    },
+    {
+      accessor: 'remove',
+      title: '',
+      width: 36,
+      render: (i) => (
+        <ActionIcon variant="subtle" color="gray" onClick={() => exportList.remove([i.key])} aria-label={`Remove ${i.name} from the export`}>
+          <IconX size={14} />
+        </ActionIcon>
+      ),
+    },
+  ];
   return (
-    <Table verticalSpacing={4} striped highlightOnHover fz="sm">
-      <Table.Thead>
-        <Table.Tr>
-          <Table.Th>Card</Table.Th>
-          {!narrow && <Table.Th>Print</Table.Th>}
-          <Table.Th w={narrow ? 80 : 110}>Copies</Table.Th>
-          <Table.Th w={36} />
-        </Table.Tr>
-      </Table.Thead>
-      <Table.Tbody>
-        {exportList.items.map((i) => (
-          <Table.Tr key={i.key}>
-            <Table.Td>
-              <Text size="sm">{i.name}</Text>
-              {narrow && <Text size="xs">{printLabel(i)}</Text>}
-              {i.note && (
-                <Text size="xs" c="dimmed">
-                  {i.note}
-                </Text>
-              )}
-            </Table.Td>
-            {!narrow && (
-              <Table.Td>
-                <Text size="xs" style={{ whiteSpace: 'nowrap' }}>
-                  {printLabel(i)}
-                </Text>
-              </Table.Td>
-            )}
-            <Table.Td>
-              <NumberInput
-                size="xs"
-                min={1}
-                max={MAX_EXPORT_QTY}
-                allowDecimal={false}
-                value={i.qty}
-                onChange={(v) => typeof v === 'number' && exportList.setQty(i.key, v)}
-                w={narrow ? 70 : 90}
-                aria-label={`Copies of ${i.name} to export`}
-              />
-            </Table.Td>
-            <Table.Td>
-              <ActionIcon variant="subtle" color="gray" onClick={() => exportList.remove([i.key])} aria-label={`Remove ${i.name} from the export`}>
-                <IconX size={14} />
-              </ActionIcon>
-            </Table.Td>
-          </Table.Tr>
-        ))}
-      </Table.Tbody>
-    </Table>
+    <DataTable<ExportItem>
+      idAccessor="key"
+      records={records}
+      columns={columns}
+      striped
+      highlightOnHover
+      verticalSpacing={4}
+      horizontalSpacing="xs"
+      fz="sm"
+      totalRecords={items.length}
+      recordsPerPage={pageSize}
+      page={current}
+      onPageChange={setPage}
+      recordsPerPageOptions={PAGE_SIZES}
+      onRecordsPerPageChange={(size) => {
+        setPageSize(size);
+        setPage(1);
+      }}
+      recordsPerPageLabel={narrow ? '' : 'Rows per page'}
+      paginationText={({ from, to, totalRecords }) => `${from}–${to} of ${totalRecords}`}
+      paginationSize={narrow ? 'xs' : 'sm'}
+    />
   );
 }
 
