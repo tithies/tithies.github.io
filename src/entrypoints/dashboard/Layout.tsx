@@ -4,6 +4,7 @@ import { IconArrowsDiff, IconCards, IconCash, IconHistory, IconListDetails, Icon
 import { Link, Outlet, useLocation } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { AccountSelector } from '@/lib/ui/AccountSelector';
+import { ActivityButton } from '@/lib/ui/ActivityButton';
 import { UpdateBanner } from '@/lib/ui/UpdateBanner';
 import { UpdateCheckButton } from '@/lib/ui/UpdateCheck';
 import iconUrl from '@/assets/tithies-icon.webp';
@@ -45,6 +46,7 @@ export function Layout() {
             </Text>
           </Group>
           <Group gap="sm" wrap="nowrap">
+            <ActivityButton />
             <UpdateCheckButton />
             <AccountSelector />
             <Tooltip label={scheme === 'dark' ? 'Light theme' : 'Dark theme'}>

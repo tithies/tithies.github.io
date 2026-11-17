@@ -78,7 +78,9 @@ export async function setNickname(key: AccountKey, nickname: string | null): Pro
 // Runs by id (a run says which account it belongs to)
 
 export const findRun = (runId: number): Promise<Run | undefined> => db.runs.get(runId);
-export const itemsOfRun = (runId: number): Promise<Item[]> => db.items.where('runId').equals(runId).toArray();
+/** Runs still being made, of every account (each says which one it belongs to). */
+export const unfinishedRuns = (): Promise<Run[]> => db.runs.where('status').anyOf('fetching_collection', 'queued', 'running').toArray();
+export const itemsOfRun =(runId: number): Promise<Item[]> => db.items.where('runId').equals(runId).toArray();
 
 // ---------------------------------------------------------------------------------------------
 // One account's data

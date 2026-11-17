@@ -230,7 +230,7 @@ function ProgressStep({ opId, site, onCancel }: { opId: number; site: SiteProvid
           <Text size="sm">{op.phase ?? 'Working…'}</Text>
           {p && p.total > 0 ? <PercentBar progress={p} unit={p.unit ?? 'change'} /> : <Progress value={100} animated striped />}
           <Text size="xs" c="dimmed">
-            {plural(op.calls, 'change')} sent so far. You can close this window: the export goes on, and the Change log shows it.
+            {plural(op.calls, 'change')} sent so far. You can close this window: the export goes on. Find it again with “Running” at the top of the page, or in the Change log.
           </Text>
           <Group>
             <Button size="xs" variant="default" onClick={onCancel}>
