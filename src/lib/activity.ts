@@ -4,11 +4,14 @@ import { accountData, listAccounts, unfinishedRuns } from '@/lib/accounts/data';
 import type { AccountKey } from '@/lib/accounts/types';
 import { db } from '@/lib/db';
 import type { SyncState } from '@/lib/decks/types';
+import type { ExportDetails } from '@/lib/export/types';
 
 export interface ActivityItem {
   id: string;
   kind: 'export' | 'run' | 'sync';
+  /** The account whose page `to` shows (switched to before opening it). */
   accountKey: AccountKey;
+  /** The account the job acts as. */
   userName: string;
   title: string;
   detail: string;
@@ -46,15 +49,18 @@ export async function readActivity(): Promise<ActivityItem[]> {
 
   for (const op of await db.changeOps.where('status').equals('running').toArray()) {
     if (!names.has(op.accountKey)) continue;
+    // An export opens on the Comparator it was made from, in its window; else in the Change log.
+    const source = (op.details as ExportDetails | undefined)?.sourceAccountKey;
+    const fromComparator = op.kind === 'export' && !!source && names.has(source);
     items.push({
       id: `export:${op.id}`,
       kind: 'export',
-      accountKey: op.accountKey,
+      accountKey: fromComparator ? source : op.accountKey,
       userName: names.get(op.accountKey)!,
       title: op.title,
       detail: op.phase ?? 'Working…',
       progress: op.progress && op.progress.total > 0 ? { done: op.progress.done, total: op.progress.total } : undefined,
-      to: `/changes?op=${op.id}`,
+      to: fromComparator ? `/collection/comparator?export=${op.id}` : `/changes?op=${op.id}`,
     });
   }
 

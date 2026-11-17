@@ -266,6 +266,14 @@ body .mantine-Menu-item:where(:hover, :focus, [data-menu-active]):where(:not(:di
 .ti-num {
   font-variant-numeric: tabular-nums;
 }
+/* A row of a list to pick from (the Exports window, the header "Running" list): tinted on hover. */
+.ti-pick-row {
+  display: block;
+  width: 100%;
+}
+.ti-pick-row:is(:hover, :focus-visible) {
+  background-color: var(--ti-row-hover);
+}
 
 /* Clickable stat cards (Stat with onClick): the last line says what a click does, in the link
    colour; on hover the card lifts, takes a primary tint and border. While on (a filter applied,

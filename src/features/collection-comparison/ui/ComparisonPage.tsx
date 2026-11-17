@@ -5,7 +5,9 @@ import { useBlocker, useSearchParams } from 'react-router';
 import { useActivity } from '@/lib/activity';
 import { useExportList } from '@/lib/export/list';
 import { exportSummary, ExportBar } from '@/lib/export/ui/ExportBar';
+import { useRecentExports } from '@/lib/export/client';
 import { ExportDialog } from '@/lib/export/ui/ExportDialog';
+import { ExportProgressModal, RecentExportsModal } from '@/lib/export/ui/ExportProgress';
 import { accountLabel } from '@/lib/accounts/types';
 import { DeckTreePicker } from '@/lib/decks/DeckTreePicker';
 import { cancelSync, startSync, useCollectionMeta, useDeckData, useDecks, useDecksMeta, useSyncState } from '@/lib/decks/hooks';
@@ -271,6 +273,23 @@ export function ComparisonPage() {
   const { state, config, update } = presets;
   // The "Likely wrong print" card toggles the table's filter of the same name (kept in the URL).
   const [params, setParams] = useSearchParams();
+  // The export shown in its own window (`?export=<id>`, also opened from the header's "Running" list).
+  const recentExports = useRecentExports(key);
+  const [pickingExport, setPickingExport] = useState(false);
+  const viewedExport = Number(params.get('export')) || null;
+  const viewExport = (opId: number | null) =>
+    setParams(
+      (p) => {
+        const q = new URLSearchParams(p);
+        if (opId == null) q.delete('export');
+        else q.set('export', String(opId));
+        return q;
+      },
+      { replace: true },
+    );
+  /** One export: open it; several: pick one first. */
+  const showExports = () => (recentExports.length === 1 ? viewExport(recentExports[0].id!) : setPickingExport(true));
+  const runningExport = recentExports.find((o) => o.status === 'running');
   const hintedOnly = params.get('hint') === '1';
   const toggleHinted = () => {
     const f = comparisonFiltersFromParams(params);
@@ -459,6 +478,8 @@ export function ComparisonPage() {
             decks={deckById}
             boardLabel={site.boardLabel}
             loading={!loaded}
+            recentExports={recentExports.length}
+            onSeeExports={showExports}
             emptyText={
               config.showMissing || config.showUnassigned || config.showMatched
                 ? config.showMatched
@@ -469,7 +490,23 @@ export function ComparisonPage() {
           />
         </>
       )}
-      <ExportBar exportList={exportList} siteLabel={site.label} onExport={() => setExporting(true)} />
+      <ExportBar
+        exportList={exportList}
+        siteLabel={site.label}
+        onExport={() => setExporting(true)}
+        exports={recentExports}
+        onSeeExports={runningExport ? () => viewExport(runningExport.id!) : showExports}
+      />
+      <RecentExportsModal
+        opened={pickingExport}
+        ops={recentExports}
+        onPick={(id) => {
+          setPickingExport(false);
+          viewExport(id);
+        }}
+        onClose={() => setPickingExport(false)}
+      />
+      <ExportProgressModal opId={viewedExport} onClose={() => viewExport(null)} />
       <ExportDialog
         opened={exporting}
         onClose={() => setExporting(false)}

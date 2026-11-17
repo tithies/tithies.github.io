@@ -1,6 +1,5 @@
 import {
   Alert,
-  Anchor,
   Badge,
   Button,
   Checkbox,
@@ -8,7 +7,6 @@ import {
   List,
   Loader,
   Modal,
-  Progress,
   Radio,
   ScrollArea,
   SegmentedControl,
@@ -23,10 +21,8 @@ import {
 } from '@mantine/core';
 import { IconAlertTriangle, IconEye, IconInfoCircle, IconRefresh, IconUpload } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { accountLabel, type AccountKey, type AccountRow } from '@/lib/accounts/types';
-import { StatusBadge } from '@/lib/changes/ui/StatusBadge';
 import { finishLabel } from '@/lib/format';
 import type { SiteProvider } from '@/lib/sites/provider';
 import type { BinderVisibility } from '@/lib/sites/types';
@@ -35,17 +31,16 @@ import { SiteIcon } from '@/lib/ui/SiteIcon';
 import { Stat } from '@/lib/ui/Stat';
 import { FULL_READ_EVERY_MS } from '@/lib/decks/collection';
 import { useCollectionMeta } from '@/lib/decks/hooks';
-import { cancelExport, readExportTarget, startExport, useChangeOp, useReadProgress } from '../client';
+import { readExportTarget, startExport, useReadProgress } from '../client';
 import { exporterOf } from '../exporters';
 import type { ReadTargetResult } from '../job';
 import { planExport, previewRead, stateCovers } from '../plan';
-import type { ExportItem, ExportMode, ExportPlan, ExportTarget, ReadProgress, TargetRead, TargetState } from '../types';
-import { ExportOpDetails } from './ExportOpDetails';
+import type { ExportItem, ExportMode, ExportPlan, ExportTarget, TargetRead, TargetState } from '../types';
+import { ExportProgress, PercentBar } from './ExportProgress';
 
 const n = (v: number) => v.toLocaleString('en-CA');
 const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
 const today = () => new Date().toISOString().slice(0, 10);
-const percent = (p: ReadProgress) => (p.total > 0 ? Math.min(100, Math.round((100 * p.done) / p.total)) : 0);
 
 type Kind = ExportTarget['kind'];
 
@@ -69,23 +64,6 @@ export interface ExportDialogProps {
 function estimate(site: SiteProvider, requests: number): string {
   const s = Math.round((requests * (site.pacing.intervalMs + site.pacing.jitterMs / 2)) / 1000);
   return s < 60 ? `about ${Math.max(5, s)} seconds` : `about ${Math.round(s / 60)} minute${Math.round(s / 60) === 1 ? '' : 's'}`;
-}
-
-/** A bar with its percentage, and what is counted ("page 12 of 41"). */
-export function PercentBar({ progress, unit }: { progress: ReadProgress; unit: 'page' | 'change' }) {
-  const pct = percent(progress);
-  return (
-    <Group gap="sm" wrap="nowrap">
-      <Progress.Root size="lg" style={{ flex: 1 }}>
-        <Progress.Section value={pct} animated={pct < 100}>
-          <Progress.Label>{pct}%</Progress.Label>
-        </Progress.Section>
-      </Progress.Root>
-      <Text size="xs" c="dimmed" className="ti-num" style={{ whiteSpace: 'nowrap' }}>
-        {unit === 'page' ? `page ${n(progress.done)} of ${n(progress.total)}` : `${n(progress.done)} of ${plural(progress.total, 'change')}`}
-      </Text>
-    </Group>
-  );
 }
 
 /** "the binder's cards" / "the collection" */
@@ -208,49 +186,6 @@ function PreviewStep({ site, plan, name }: { site: SiteProvider; plan: ExportPla
           </Text>
         </Tabs.Panel>
       </Tabs>
-    </Stack>
-  );
-}
-
-function ProgressStep({ opId, site, onCancel }: { opId: number; site: SiteProvider; onCancel: () => void }) {
-  const op = useChangeOp(opId);
-  if (!op) return <Loader size="sm" />;
-  const running = op.status === 'running';
-  const p = op.progress;
-  return (
-    <Stack>
-      <Group justify="space-between">
-        <StatusBadge op={op} />
-        <Anchor component={Link} to={`/changes?op=${opId}`} size="sm">
-          Open the Change log
-        </Anchor>
-      </Group>
-      <Text size="sm" fw={600}>
-        {op.title}
-      </Text>
-      {running && (
-        <Stack gap={6}>
-          <Text size="sm">{op.phase ?? 'Working…'}</Text>
-          {p && p.total > 0 ? <PercentBar progress={p} unit={p.unit ?? 'change'} /> : <Progress value={100} animated striped />}
-          <Text size="xs" c="dimmed">
-            {plural(op.calls, 'change')} sent so far. You can close this window: the export goes on. Find it again with “Running” at the top of the page, or in the Change log.
-          </Text>
-          <Group>
-            <Button size="xs" variant="default" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Text size="xs" c="dimmed">
-              Cancelling stops before the next change; what {site.label} already made stays.
-            </Text>
-          </Group>
-        </Stack>
-      )}
-      {op.error && (
-        <Alert color={op.status === 'cancelled' ? 'gray' : 'red'} variant="light" icon={<IconAlertTriangle size={18} />}>
-          {op.error}
-        </Alert>
-      )}
-      {!running && <ExportOpDetails op={op} />}
     </Stack>
   );
 }
@@ -580,7 +515,7 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
         </Stepper.Step>
         <Stepper.Completed>
           <Stack mt="md">
-            {opId != null && <ProgressStep opId={opId} site={site} onCancel={() => void cancelExport(site.type)} />}
+            {opId != null && <ExportProgress opId={opId} site={site} />}
             <Group justify="flex-end">
               <Button variant="default" onClick={onClose}>
                 Close

@@ -23,10 +23,13 @@ export function ActivityButton() {
   };
 
   return (
-    <Popover opened={opened} onChange={(o) => !o && close()} position="bottom-end" width={360} shadow="md" withArrow>
+    <Popover opened={opened} onChange={(o) => !o && close()} position="bottom-end" width="min(360px, calc(100vw - 24px))" shadow="md" withArrow>
       <Popover.Target>
         <Button variant="light" size="compact-md" leftSection={<Loader size={14} />} onClick={toggle} aria-label="Running in the background">
-          Running · {items.length}
+          <Text span inherit visibleFrom="sm">
+            Running ·&nbsp;
+          </Text>
+          {items.length}
         </Button>
       </Popover.Target>
       <Popover.Dropdown>
@@ -34,7 +37,7 @@ export function ActivityButton() {
           {items.map((it) => {
             const Icon = ICON[it.kind];
             return (
-              <UnstyledButton key={it.id} onClick={() => void open(it)}>
+              <UnstyledButton key={it.id} onClick={() => void open(it)} p={6} className="ti-pick-row" style={{ borderRadius: 'var(--mantine-radius-sm)' }}>
                 <Group gap="xs" wrap="nowrap" align="flex-start">
                   <Icon size={18} style={{ flexShrink: 0, marginTop: 2 }} />
                   <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>

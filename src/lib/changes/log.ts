@@ -76,6 +76,9 @@ export async function markStaleOps(now = Date.now()): Promise<void> {
 
 /** Every action, newest first (for the log page; use inside a live query). */
 export const listOps = (): Promise<ChangeOp[]> => db.changeOps.orderBy('startedAt').reverse().toArray();
+/** The `limit` newest actions that pass `keep`. */
+export const latestOps = (keep: (op: ChangeOp) => boolean, limit: number): Promise<ChangeOp[]> =>
+  db.changeOps.orderBy('startedAt').reverse().filter(keep).limit(limit).toArray();
 
 /** Counts for Settings → Stored data (use inside a live query). */
 export async function changeLogCounts(): Promise<{ ops: number; calls: number; running: number }> {

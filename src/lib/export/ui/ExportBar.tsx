@@ -1,25 +1,28 @@
-import { ActionIcon, Affix, Badge, Button, Drawer, Group, Loader, NumberInput, Paper, ScrollArea, Stack, Table, Text, Tooltip } from '@mantine/core';
+import { ActionIcon, Affix, Badge, Button, Drawer, Group, Loader, NumberInput, Paper, ScrollArea, Stack, Table, Text, Tooltip, useMatches } from '@mantine/core';
 import { IconFileExport, IconListDetails, IconTrash, IconUpload, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
-import { Link } from 'react-router';
-import { useActivity } from '@/lib/activity';
+import type { ChangeOp } from '@/lib/changes/types';
 import { finishLabel } from '@/lib/format';
 import { MAX_EXPORT_QTY, type ExportList } from '../list';
+import type { ExportItem } from '../types';
 
 const n = (v: number) => v.toLocaleString('en-CA');
 const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
 
+const printLabel = (i: ExportItem) => `${i.set.toUpperCase()} #${i.cn} · ${finishLabel(i.finish)}`;
+
 /** "42 prints · 117 copies" */
 export const exportSummary = (list: Pick<ExportList, 'prints' | 'copies'>) => `${plural(list.prints, 'print')} · ${plural(list.copies, 'copy', 'copies')}`;
 
-function ExportTable({ exportList }: { exportList: ExportList }) {
+/** The list, print by print. Narrow (a phone): the print goes under the card's name, so the table fits. */
+function ExportTable({ exportList, narrow }: { exportList: ExportList; narrow: boolean }) {
   return (
     <Table verticalSpacing={4} striped highlightOnHover fz="sm">
       <Table.Thead>
         <Table.Tr>
           <Table.Th>Card</Table.Th>
-          <Table.Th>Print</Table.Th>
-          <Table.Th w={110}>Copies</Table.Th>
+          {!narrow && <Table.Th>Print</Table.Th>}
+          <Table.Th w={narrow ? 80 : 110}>Copies</Table.Th>
           <Table.Th w={36} />
         </Table.Tr>
       </Table.Thead>
@@ -28,17 +31,20 @@ function ExportTable({ exportList }: { exportList: ExportList }) {
           <Table.Tr key={i.key}>
             <Table.Td>
               <Text size="sm">{i.name}</Text>
+              {narrow && <Text size="xs">{printLabel(i)}</Text>}
               {i.note && (
                 <Text size="xs" c="dimmed">
                   {i.note}
                 </Text>
               )}
             </Table.Td>
-            <Table.Td>
-              <Text size="xs" style={{ whiteSpace: 'nowrap' }}>
-                {i.set.toUpperCase()} #{i.cn} · {finishLabel(i.finish)}
-              </Text>
-            </Table.Td>
+            {!narrow && (
+              <Table.Td>
+                <Text size="xs" style={{ whiteSpace: 'nowrap' }}>
+                  {printLabel(i)}
+                </Text>
+              </Table.Td>
+            )}
             <Table.Td>
               <NumberInput
                 size="xs"
@@ -47,7 +53,7 @@ function ExportTable({ exportList }: { exportList: ExportList }) {
                 allowDecimal={false}
                 value={i.qty}
                 onChange={(v) => typeof v === 'number' && exportList.setQty(i.key, v)}
-                w={90}
+                w={narrow ? 70 : 90}
                 aria-label={`Copies of ${i.name} to export`}
               />
             </Table.Td>
@@ -63,58 +69,66 @@ function ExportTable({ exportList }: { exportList: ExportList }) {
   );
 }
 
-/** Opens the Change log, on the running export when there is one. */
-function SeeExports() {
-  const running = useActivity().find((a) => a.kind === 'export');
+/** The bar's button for the page's exports: the running one (with its progress), or "Exports". */
+function SeeExports({ running, narrow, onClick }: { running?: ChangeOp; narrow: boolean; onClick: () => void }) {
   const p = running?.progress;
+  const count = p && p.total > 0 ? `${n(p.done)}/${n(p.total)}` : '';
+  const label = running ? (narrow ? count || 'Running' : `Export running${count ? ` · ${count}` : ''}`) : narrow ? 'Exports' : 'See exports';
   return (
-    <Button
-      component={Link}
-      to={running?.to ?? '/changes'}
-      size="xs"
-      variant="light"
-      leftSection={running ? <Loader size={12} /> : <IconListDetails size={14} />}
-      style={{ whiteSpace: 'nowrap' }}
-    >
-      {running ? `Export running${p ? ` · ${n(p.done)}/${n(p.total)}` : ''}` : 'See exports'}
+    <Button size="xs" variant="light" leftSection={running ? <Loader size={12} /> : <IconListDetails size={14} />} onClick={onClick} className="ti-num" style={{ whiteSpace: 'nowrap' }}>
+      {label}
     </Button>
   );
 }
 
+export interface ExportBarProps {
+  exportList: ExportList;
+  /** Opens the export dialog. */
+  onExport: () => void;
+  siteLabel: string;
+  /** The latest exports made from this page (running first): the bar's "See exports" button shows when there are some. */
+  exports: ChangeOp[];
+  onSeeExports: () => void;
+}
+
 /**
- * What a page will export: a bar at the bottom while it holds something or an export runs, a
- * drawer to review the list, and the page's export button (`onExport`).
+ * What a page will export: a bar at the bottom while it holds something or one of its exports
+ * runs, a drawer to review the list, the page's export button (`onExport`), and a button to see
+ * its exports again (`onSeeExports`). On a phone it spans the width and wraps.
  */
-export function ExportBar({ exportList, onExport, siteLabel }: { exportList: ExportList; onExport: () => void; siteLabel: string }) {
+export function ExportBar({ exportList, onExport, siteLabel, exports, onSeeExports }: ExportBarProps) {
   const [open, setOpen] = useState(false);
-  const exportRunning = useActivity().some((a) => a.kind === 'export');
+  const narrow = useMatches({ base: true, sm: false });
+  const running = exports.find((o) => o.status === 'running');
   const picked = exportList.prints > 0;
   return (
     <>
-      {(picked || exportRunning) && (
-        <Affix position={{ bottom: 20, right: 24 }} zIndex={150}>
-          <Paper withBorder shadow="lg" radius="md" p="xs" pl="md">
-            <Group gap="sm" wrap="nowrap">
+      {(picked || running) && (
+        <Affix position={narrow ? { bottom: 12, left: 12, right: 12 } : { bottom: 20, right: 24 }} zIndex={150}>
+          <Paper withBorder shadow="lg" radius="md" p="xs" pl={narrow ? 'sm' : 'md'}>
+            <Group gap={narrow ? 'xs' : 'sm'} wrap={narrow ? 'wrap' : 'nowrap'} justify="flex-end">
               {picked && (
-                <>
-                  <IconFileExport size={18} />
+                <Group gap={6} wrap="nowrap" mr="auto">
+                  <IconFileExport size={18} style={{ flexShrink: 0 }} />
                   <Text size="sm" fw={600} className="ti-num" style={{ whiteSpace: 'nowrap' }}>
-                    To export: {exportSummary(exportList)}
+                    {narrow ? exportSummary(exportList) : `To export: ${exportSummary(exportList)}`}
                   </Text>
                   <Tooltip label="Clear the list">
                     <ActionIcon variant="subtle" color="red" onClick={() => exportList.clear()} aria-label="Clear the list of cards to export">
                       <IconTrash size={16} />
                     </ActionIcon>
                   </Tooltip>
-                  <Button size="xs" variant="default" onClick={() => setOpen(true)}>
-                    Review
-                  </Button>
-                </>
+                </Group>
               )}
-              <SeeExports />
               {picked && (
-                <Button size="xs" leftSection={<IconUpload size={14} />} onClick={onExport}>
-                  Export to {siteLabel}…
+                <Button size="xs" variant="default" onClick={() => setOpen(true)}>
+                  Review
+                </Button>
+              )}
+              {exports.length > 0 && <SeeExports running={running} narrow={narrow} onClick={onSeeExports} />}
+              {picked && (
+                <Button size="xs" leftSection={<IconUpload size={14} />} onClick={onExport} style={{ whiteSpace: 'nowrap' }}>
+                  {narrow ? 'Export…' : `Export to ${siteLabel}…`}
                 </Button>
               )}
             </Group>
@@ -125,7 +139,7 @@ export function ExportBar({ exportList, onExport, siteLabel }: { exportList: Exp
         opened={open && exportList.prints > 0}
         onClose={() => setOpen(false)}
         position="right"
-        size="lg"
+        size={narrow ? '100%' : 'lg'}
         title={
           <Group gap="xs">
             <IconFileExport size={18} />
@@ -154,7 +168,7 @@ export function ExportBar({ exportList, onExport, siteLabel }: { exportList: Exp
               Export to {siteLabel}…
             </Button>
           </Group>
-          <ExportTable exportList={exportList} />
+          <ExportTable exportList={exportList} narrow={narrow} />
         </Stack>
       </Drawer>
     </>

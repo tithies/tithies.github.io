@@ -1,6 +1,6 @@
 import { ActionIcon, Anchor, Badge, Button, Group, HoverCard, Menu, MultiSelect, NumberInput, Paper, Stack, Switch, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { useDebouncedCallback, useLocalStorage } from '@mantine/hooks';
-import { IconDownload, IconExternalLink, IconFileExport, IconPlus, IconSearch, IconTrash, IconX } from '@tabler/icons-react';
+import { IconDownload, IconExternalLink, IconFileExport, IconListDetails, IconPlus, IconSearch, IconTrash, IconX } from '@tabler/icons-react';
 import { MAX_EXPORT_QTY, type ExportList } from '@/lib/export/list';
 import { exportQty, rowToItem } from '../export';
 import { DataTable, type DataTableColumn, type DataTableSortStatus } from 'mantine-datatable';
@@ -284,9 +284,12 @@ interface Props {
   boardLabel: (board: string) => string;
   loading?: boolean;
   emptyText: string;
+  /** How many exports this page made lately, and how to see them again (in the export menu). */
+  recentExports?: number;
+  onSeeExports?: () => void;
 }
 
-export function ComparisonTable({ rows, allRows = rows, exportList, decks, boardLabel, loading, emptyText }: Props) {
+export function ComparisonTable({ rows, allRows = rows, exportList, decks, boardLabel, loading, emptyText, recentExports = 0, onSeeExports }: Props) {
   const tableRef = useStickyTableHeader();
   const [params, setParams] = useSearchParams();
   const [pageSize, setPageSize] = useLocalStorage({ key: 'tithies:decks:pageSize', defaultValue: 50 });
@@ -390,6 +393,14 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
               <Menu.Item color="red" leftSection={<IconTrash size={14} />} disabled={!exportList.prints} onClick={() => exportList.clear()}>
                 Clear the list to export ({exportList.prints})
               </Menu.Item>
+              {onSeeExports && (
+                <>
+                  <Menu.Divider />
+                  <Menu.Item leftSection={<IconListDetails size={14} />} disabled={!recentExports} onClick={onSeeExports}>
+                    Recent exports ({recentExports})
+                  </Menu.Item>
+                </>
+              )}
             </Menu.Dropdown>
           </Menu>
         )}

@@ -1,12 +1,13 @@
 /** Dashboard side of the export: messages to the background, and the live change-log row. */
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { AccountKey } from '@/lib/accounts/types';
-import { getOp } from '@/lib/changes/log';
+import { getOp, latestOps } from '@/lib/changes/log';
+import type { ChangeOp } from '@/lib/changes/types';
 import { useEffect, useState } from 'react';
 import { onMessage, sendMessage } from '@/lib/messaging';
 import type { SiteType } from '@/lib/sites/types';
 import type { StartExportRequest } from './job';
-import type { ReadProgress, TargetRead } from './types';
+import type { ExportDetails, ReadProgress, TargetRead } from './types';
 
 export const readExportTarget = (type: SiteType, accountKey: AccountKey, read: TargetRead) => sendMessage('readExportTarget', { type, accountKey, read });
 
@@ -27,4 +28,15 @@ export const cancelExport = (type: SiteType) => sendMessage('cancelExport', { ty
 /** An action of the change log, live (undefined while loading, null when gone). */
 export function useChangeOp(opId: number | null) {
   return useLiveQuery(async () => (opId == null ? null : ((await getOp(opId)) ?? null)), [opId]);
+}
+
+/** The latest exports made from `sourceAccountKey`'s pages, running first then newest first, live. */
+export function useRecentExports(sourceAccountKey: AccountKey | null, limit = 10): ChangeOp[] {
+  return (
+    useLiveQuery(async () => {
+      if (!sourceAccountKey) return [];
+      const ops = await latestOps((o) => o.kind === 'export' && (o.details as ExportDetails | undefined)?.sourceAccountKey === sourceAccountKey, limit);
+      return ops.sort((a, b) => Number(b.status === 'running') - Number(a.status === 'running'));
+    }, [sourceAccountKey, limit]) ?? []
+  );
 }
