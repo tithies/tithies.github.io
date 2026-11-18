@@ -19,6 +19,13 @@ export interface ExportItem {
   setName: string;
   cn: string;
   finish: Finish;
+  /** The language the copies are written with (the site's Language field). Unset: English (exports made before languages). */
+  lang?: string;
+  /**
+   * The print's own language (the site's card object for it, `cardId`), when known. A site whose
+   * import can't pick that print adds the item on its own, by card id (see PlanLimits.oneByOne).
+   */
+  printLang?: string;
   qty: number;
   /** Where the item came from ("Missing from collection"…). */
   note?: string;
@@ -107,6 +114,10 @@ export interface VerifyDiff {
   set: string;
   cn: string;
   finish: Finish;
+  /** The copies' language (Language field); unset in checks made before languages. */
+  lang?: string;
+  /** The print's language; unset in checks made before it was compared. */
+  printLang?: string;
   /** In the target (binder or collection) unless `outside`. */
   expected: number;
   found: number;

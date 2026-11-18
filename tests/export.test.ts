@@ -10,6 +10,8 @@ import type { ExportDetails, ExportItem, ExportTarget, TargetState } from '@/lib
 import { verifyExport } from '@/lib/export/verify';
 import { SiteLock } from '@/lib/sites/lock';
 import { moxfieldSite } from '@/lib/sites/moxfield/provider';
+import { moxfieldExporter } from '@/lib/sites/moxfield/export';
+import { MOX_LANGUAGES } from '@/lib/sites/moxfield/languages';
 import { TabTransport } from '@/lib/sites/tab-transport';
 import type { SiteBinder, SiteMutation, SiteResult } from '@/lib/sites/types';
 import { ALICE, BOB, FakeTabs } from './fake-tabs';
@@ -25,6 +27,7 @@ const card = (name: string, set: string, cn: string) => ({
   faces: [name],
   flavorName: '',
   cn,
+  lang: 'en',
   rarity: 'rare',
   typeLine: '',
   isToken: false,
@@ -70,10 +73,31 @@ describe('Export plan', () => {
   });
   const exportList = [item('Sol Ring', 'c21', '263', 1), item('Sol Ring', 'c21', '263', 2), item('Llanowar Elves', 'dom', '168', 4, 'foil'), item('Zero', 'x', '1', 0)];
 
+  it('plans one write per print in another language than English, and says why', () => {
+    const fr = { ...item('Suspend', 'mh2', '68', 1), cardId: '1MR1a', lang: 'fr', printLang: 'fr' };
+    const p = planExport({ accountKey: A_KEY, kind: 'newBinder', name: 'x', visibility: 'private' }, [...exportList, fr], state(), ctx({ limits: { ...moxfieldExporter.limits } }));
+    expect(p.writes).toBe(1 + 1 + 1); // the binder, one CSV import, the French print
+    expect(p.steps.join('\n')).toMatch(/1 print in another language than English one by one, to keep their exact print/);
+    // Without a card id it can only go through the CSV.
+    expect(moxfieldExporter.importItems([{ ...fr, cardId: '' }], null).map((w) => w.op)).toEqual(['importCsv']);
+  });
+
+  it('keeps languages apart when merging, and writes each one in the CSV', () => {
+    const fr = { ...item('Sol Ring', 'c21', '263', 1), key: 'c21|263|nonFoil|fr', lang: 'fr' };
+    const merged = mergeItems([item('Sol Ring', 'c21', '263', 2), fr, { ...fr, key: 'other', qty: 2 }]);
+    expect(merged.map((i) => [i.key, i.lang ?? 'en', i.qty])).toEqual([
+      ['c21|263|nonFoil|en', 'en', 2],
+      ['c21|263|nonFoil|fr', 'fr', 3],
+    ]);
+    const [write] = moxfieldExporter.importItems([...merged, { ...fr, key: 'zhs', lang: 'zhs', qty: 1 }], null);
+    const rows = Papa.parse<string[]>((write as { csv: string }).csv.trim()).data.slice(1);
+    expect(rows.map((r) => r[5])).toEqual(['English', 'French', 'Simplified Chinese']);
+  });
+
   it('merges the export by print and drops empty items', () => {
     expect(mergeItems(exportList).map((i) => [i.key, i.qty])).toEqual([
-      ['dom|168|foil', 4],
-      ['c21|263|nonFoil', 3],
+      ['dom|168|foil|en', 4],
+      ['c21|263|nonFoil|en', 3],
     ]);
   });
 
@@ -161,12 +185,34 @@ describe('Export verification', () => {
     expect(verifyExport(p, before, after, 'b1')).toMatchObject({ ok: true, expectedCopies: 2, foundCopies: 2, short: [], extra: [], otherChanged: [] });
   });
 
+  it("checks the print's language too: a French print imported as the English one is one short and one extra", () => {
+    const fr = { ...item('Suspend', 'mh2', '68', 1), lang: 'fr', printLang: 'fr' };
+    const p = plan({ accountKey: A_KEY, kind: 'collection', mode: 'add' }, [fr], []);
+    const exact = { ...entry('Suspend', 'mh2', '68', 1), lang: 'fr', card: { ...card('Suspend', 'mh2', '68'), lang: 'fr' } };
+    expect(verifyExport(p, [], [exact], null).ok).toBe(true);
+    // What Moxfield's CSV import makes of it: Language French, but the English print.
+    const v = verifyExport(p, [], [{ ...exact, card: { ...exact.card, lang: 'en' } }], null);
+    expect(v.short).toMatchObject([{ key: 'mh2|68|nonFoil|fr', lang: 'fr', printLang: 'fr' }]);
+    expect(v.extra).toMatchObject([{ key: 'mh2|68|nonFoil|fr|en', lang: 'fr', printLang: 'en' }]);
+  });
+
+  it('checks the language too: a card imported in another language is one short and one extra', () => {
+    // Language French on the English print (like WOC #70 Mantle of the Ancients).
+    const fr = { ...item('Suspend', 'mh2', '68', 1), lang: 'fr', printLang: 'en' };
+    const p = plan({ accountKey: A_KEY, kind: 'collection', mode: 'add' }, [fr], []);
+    const french = { ...entry('Suspend', 'mh2', '68', 1), lang: 'fr' };
+    expect(verifyExport(p, [], [french], null)).toMatchObject({ ok: true, expectedCopies: 1, foundCopies: 1 });
+    const v = verifyExport(p, [], [entry('Suspend', 'mh2', '68', 1)], null);
+    expect(v.short).toMatchObject([{ key: 'mh2|68|nonFoil|fr|en', lang: 'fr', printLang: 'en', expected: 1, found: 0 }]);
+    expect(v.extra).toMatchObject([{ key: 'mh2|68|nonFoil|en', lang: 'en', expected: 0, found: 1 }]);
+  });
+
   it('a card imported as another print is one short and one extra', () => {
     const p = plan({ accountKey: A_KEY, kind: 'collection', mode: 'add' }, [item('Sol Ring', 'c21', '263', 1)], []);
     const v = verifyExport(p, [], [entry('Sol Ring', 'cmr', '472', 1)], null);
     expect(v.ok).toBe(false);
-    expect(v.short).toMatchObject([{ key: 'c21|263|nonFoil', expected: 1, found: 0 }]);
-    expect(v.extra).toMatchObject([{ key: 'cmr|472|nonFoil', expected: 0, found: 1 }]);
+    expect(v.short).toMatchObject([{ key: 'c21|263|nonFoil|en', expected: 1, found: 0 }]);
+    expect(v.extra).toMatchObject([{ key: 'cmr|472|nonFoil|en', expected: 0, found: 1 }]);
   });
 
   it('notices other prints that changed, and what a replace failed to delete', () => {
@@ -200,6 +246,8 @@ class FakeMox {
   binderSearchFails = false;
   /** Imports this card as another print (a mismatch the check must catch). */
   misprint?: { from: string; to: { set: string; cn: string } };
+  /** Moxfield's card objects by id, for addCard (one per print and language). */
+  catalog = new Map<string, { name: string; set: string; cn: string; lang: string }>();
   failOn?: (op: SiteMutation) => SiteResult | null;
   private n = 0;
 
@@ -249,10 +297,20 @@ class FakeMox {
           let { Edition: set, 'Collector Number': cn } = r;
           if (this.misprint && r.Name === this.misprint.from) ({ set, cn } = this.misprint.to);
           const finish = (r.Foil || 'nonFoil') as Finish;
-          this.entries.push({ ...entry(r.Name, set, cn, Number(r.Count), finish, op.binderId), updatedAt: new Date(Date.UTC(2026, 10, 16) + ++this.n * 1000).toISOString() });
+          // Like Moxfield: the Language column sets the Language field, but the print is the English one.
+          const lang = MOX_LANGUAGES.find((l) => l.name === r.Language)?.code ?? 'en';
+          this.entries.push({ ...entry(r.Name, set, cn, Number(r.Count), finish, op.binderId), lang, updatedAt: new Date(Date.UTC(2026, 10, 16) + ++this.n * 1000).toISOString() });
         }
         const count = rows.reduce((s, r) => s + Number(r.Count), 0);
         return { ok: true, kind: 'mutate', status: 200, response: `{"isSuccessful":true,"totalImportedCount":${count},"errors":[]}`, imported: { ok: true, count, errors: [] } };
+      }
+      case 'addCard': {
+        const c = this.catalog.get(op.cardId);
+        if (!c) return { ok: false, status: 400, code: 'http', message: 'Moxfield answered HTTP 400' };
+        const lang = MOX_LANGUAGES.find((l) => l.id === op.languageId)!.code;
+        const e = entry(c.name, c.set, c.cn, op.quantity, op.finish, op.binderId);
+        this.entries.push({ ...e, lang, card: { ...e.card, id: op.cardId, lang: c.lang }, updatedAt: new Date(Date.UTC(2026, 10, 16) + ++this.n * 1000).toISOString() });
+        return { ok: true, kind: 'mutate', status: 200, response: '{}', imported: { ok: true, count: op.quantity, errors: [] } };
       }
     }
   };
@@ -280,7 +338,7 @@ describe('Export job', () => {
   async function exportWith(job: ExportJob, accountKey: never, target: ExportTarget, items: ExportItem[], change?: () => void) {
     const read = await job.readTarget(accountKey, previewRead(target));
     if (!read.ok) throw new Error(read.error);
-    const plan = planExport(target, items, read.state, { sourceAccountKey: null, targetName: 'alice', limits: { importRows: 500, removeEntries: 1000, pageSize: 5000 } });
+    const plan = planExport(target, items, read.state, { sourceAccountKey: null, targetName: 'alice', limits: { ...moxfieldExporter.limits, pageSize: 5000 } });
     change?.();
     const req: StartExportRequest = { target, items, digest: plan.digest, sourceAccountKey: null, source: 'test', estimate: plan.requests };
     const res = await job.start(req);
@@ -291,6 +349,25 @@ describe('Export job', () => {
   }
 
   const TO_EXPORT = [item('Sol Ring', 'c21', '263', 2), item('Llanowar Elves', 'dom', '168', 1, 'foil')];
+
+  it("adds a print in another language by its card id: Moxfield's CSV import would pick the English print", async () => {
+    const { acc, mox, job } = await setup();
+    mox.catalog.set('1MR1a', { name: 'Suspend', set: 'mh2', cn: '68', lang: 'fr' });
+    const french = { ...item('Suspend', 'mh2', '68', 2), cardId: '1MR1a', lang: 'fr', printLang: 'fr' };
+    // Language French on the English print (Moxfield has no French one): the CSV import keeps it as it is.
+    const mantle = { ...item('Mantle of the Ancients', 'woc', '70', 1), lang: 'fr', printLang: 'en' };
+    const { op, details } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'newBinder', name: 'Langs', visibility: 'private' }, [...TO_EXPORT, french, mantle]);
+    expect(op.status).toBe('done');
+    expect(mox.writes.map((w) => w.op)).toEqual(['createBinder', 'importCsv', 'addCard']);
+    expect(mox.writes[2]).toEqual({ site: 'moxfield', op: 'addCard', cardId: '1MR1a', quantity: 2, finish: 'nonFoil', languageId: 'kAVXO', binderId: 'nb1' });
+    const csv = (mox.writes[1] as { csv: string }).csv;
+    expect(csv).toContain('"Mantle of the Ancients","woc","Near Mint","French"');
+    expect(csv).not.toContain('Suspend');
+    expect(details.imported).toMatchObject({ count: 6, failed: 0 });
+    expect(details.verify).toMatchObject({ ok: true, expectedCopies: 6, foundCopies: 6 });
+    expect(mox.entries.find((e) => e.card.name === 'Suspend')).toMatchObject({ lang: 'fr', card: { id: '1MR1a', lang: 'fr' } });
+    expect(op.details).toMatchObject({ add: { prints: 4, copies: 6 } });
+  });
 
   it('creates a new binder, imports the export into it, and checks every copy', async () => {
     const { acc, mox, job } = await setup();
@@ -406,7 +483,7 @@ describe('Export job', () => {
     mox.misprint = { from: 'Sol Ring', to: { set: 'cmr', cn: '472' } };
     const { op, details } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'collection', mode: 'add' }, TO_EXPORT);
     expect(op).toMatchObject({ status: 'done', phase: 'Done, with differences (see below)' });
-    expect(details.verify).toMatchObject({ ok: false, short: [{ key: 'c21|263|nonFoil' }], extra: [{ key: 'cmr|472|nonFoil' }] });
+    expect(details.verify).toMatchObject({ ok: false, short: [{ key: 'c21|263|nonFoil|en' }], extra: [{ key: 'cmr|472|nonFoil|en' }] });
   });
 
   it('changes nothing when the target changed since the preview', async () => {

@@ -3,6 +3,8 @@ import { describeError, F2FClient } from '@/lib/f2f/client';
 import { db } from '@/lib/db';
 import { groupPrints } from '@/lib/cards/prints';
 import type { CollectionEntry } from '@/lib/cards/types';
+import { isEnglish, langLabel } from '@/lib/cards/languages';
+import { docInLanguage, f2fLanguage } from '@/lib/f2f/languages';
 import { getSettings, type Settings } from '@/lib/settings';
 import { batchPageUrl, buildBatch, f2fSetLookup, makeBatches, makeSetBatches, nameFacets, setFacets, type Batch } from './batching';
 import { productJsUrl, SUGGEST_LIMIT, suggestUrl, withProductVariants } from '@/lib/f2f/shopify';
@@ -14,7 +16,7 @@ import { emptyTotals, type BulkRates, type CacheEntry, type Item, type Run, type
 const BULK_RATES_TTL = 24 * 3600_000;
 const SET_LIST_TTL = 24 * 3600_000;
 /** Bump when matching logic changes so older cached lookups are redone. */
-export const CACHE_VERSION = 3;
+export const CACHE_VERSION = 4; // 4: keys and lookups per language
 const MAX_CONSECUTIVE_FAILURES = 3;
 /** Hits per request aimed for when an oversized batch is split (one F2F page holds 100). */
 const SPLIT_TARGET_HITS = 60;
@@ -23,10 +25,15 @@ const MAX_PAGES_SINGLE_PRINT = 10;
 
 /**
  * Result for a print no search found. Oversized cards (schemes, planes…) are "unlisted": F2F
- * never lists them, so there is nothing to review. Anything else is "not found".
+ * never lists them, so there is nothing to review. So is a non-English copy: F2F lists most prints
+ * in English only, and only buys a copy in its language. Anything else is "not found", and so is a
+ * print a search limit kept from being looked up in full (`limited`).
  */
-export const missResult = (item: Pick<Item, 'typeLine'>, note?: string): MatchResult =>
-  isOversized(item.typeLine) ? { match: 'unlisted', doc: null, note: "F2F doesn't list oversized cards" } : { match: 'not_found', doc: null, note };
+export function missResult(item: Pick<Item, 'typeLine' | 'lang'>, note?: string, limited = false): MatchResult {
+  if (isOversized(item.typeLine)) return { match: 'unlisted', doc: null, note: "F2F doesn't list oversized cards" };
+  if (!isEnglish(item.lang) && !limited) return { match: 'unlisted', doc: null, note: `F2F doesn't list this print in ${langLabel(item.lang)}` };
+  return { match: 'not_found', doc: null, note };
+}
 
 /** Splits `items` into `parts` runs of near-equal length, keeping their order. */
 export function splitEvenly<T>(items: T[], parts: number): T[][] {
@@ -79,6 +86,8 @@ export async function createRun(accountKey: string, source: RunSource, entries: 
       setType: g.card.setType,
       cn: g.card.cn,
       finish: g.finish,
+      lang: g.lang,
+      ...(g.mismatchCopies ? { mismatchCopies: g.mismatchCopies, printLang: g.printLang } : {}),
       rarity: g.card.rarity,
       typeLine: g.card.typeLine,
       isToken: g.card.isToken,
@@ -204,8 +213,14 @@ export class Runner {
     await this.applyCache(run, rates, settings);
     await this.emit(runId);
 
-    // Pass 1: batched exact lookups.
-    const pending = await db.items.where('[runId+status]').equals([runId, 'pending']).toArray();
+    // Pass 1: batched exact lookups. Copies in a language F2F lists nothing in (Quenya) aren't looked up.
+    const all = await db.items.where('[runId+status]').equals([runId, 'pending']).toArray();
+    const noLanguage = all.filter((i) => !f2fLanguage(i.lang));
+    if (noLanguage.length) {
+      const note = (i: Item) => `F2F lists no ${langLabel(i.lang)} cards`;
+      await this.commit(run, noLanguage.map((i) => this.finalize(i, { match: 'unlisted', doc: null, note: note(i) }, rates, run.creditBonus)), []);
+    }
+    const pending = all.filter((i) => f2fLanguage(i.lang));
     const byKey = new Map(pending.map((i) => [i.key, i]));
     const batches = makeBatches(pending, { maxPrints: settings.batchSize, maxUrlLength: 6000, pageSize: F2F_MAX_PAGE_SIZE });
     for (const batch of batches) {
@@ -420,7 +435,6 @@ export class Runner {
     const waiting = await db.items.where('[runId+status]').equals([runId, 'fallback']).toArray();
     if (!waiting.length) return;
     let run = await this.assertRunning(runId);
-    const notFound = (items: Item[], note: string) => items.map((i) => this.finalize(i, missResult(i, note), rates, run.creditBonus));
     // Misses wait for pass 3 (Shopify product search), keeping why F2F's index didn't have them.
     const toShopSearch = (items: Item[], note: string): Item[] =>
       items.map((i) => ({ ...i, status: 'shop_search', matchNote: note, updatedAt: Date.now() }));
@@ -439,7 +453,10 @@ export class Runner {
     if (unknownSet.length) await this.commit(run, toShopSearch(unknownSet.map((k) => byKey.get(k)!), "F2F doesn't carry this set"), []);
 
     const overCap = batches.slice(settings.fallbackCap).flatMap((b) => b.keys.map((k) => byKey.get(k)!));
-    if (overCap.length) await this.commit(run, notFound(overCap, 'Fallback search limit reached (see Settings)'), []);
+    if (overCap.length) {
+      const limited = overCap.map((i) => this.finalize(i, missResult(i, 'Fallback search limit reached (see Settings)', true), rates, run.creditBonus));
+      await this.commit(run, limited, []);
+    }
 
     const byNumber = setFacets(setOf);
     for (const batch of batches.slice(0, settings.fallbackCap)) {
@@ -467,15 +484,17 @@ export class Runner {
     const waiting = await db.items.where('[runId+status]').equals([runId, 'shop_search']).toArray();
     if (!waiting.length) return;
     let run = await this.assertRunning(runId);
-    const notFound = (i: Item, note = i.matchNote) => this.finalize(i, missResult(i, note), rates, run.creditBonus);
+    const notFound = (i: Item, note = i.matchNote, limited = false) => this.finalize(i, missResult(i, note, limited), rates, run.creditBonus);
 
-    // F2F doesn't list oversized Archenemy schemes / Planechase planes at all.
-    const oversized = waiting.filter((i) => isOversized(i.typeLine));
-    const candidates = waiting.filter((i) => !isOversized(i.typeLine));
+    // F2F doesn't list oversized Archenemy schemes / Planechase planes at all. Non-English copies
+    // aren't searched here either: F2F lists most prints in English only, so the two searches by
+    // name and by set + number in their language are enough (and this search costs a request each).
+    const skipped = waiting.filter((i) => isOversized(i.typeLine) || !isEnglish(i.lang));
+    const candidates = waiting.filter((i) => !isOversized(i.typeLine) && isEnglish(i.lang));
     const overCap = candidates.slice(settings.fallbackCap);
-    if (oversized.length || overCap.length) {
-      const limit = (i: Item) => notFound(i, `${i.matchNote ?? 'Not listed on F2F'} (search limit reached, see Settings)`);
-      await this.commit(run, [...oversized.map((i) => notFound(i)), ...overCap.map(limit)], []);
+    if (skipped.length || overCap.length) {
+      const limit = (i: Item) => notFound(i, `${i.matchNote ?? 'Not listed on F2F'} (search limit reached, see Settings)`, true);
+      await this.commit(run, [...skipped.map((i) => notFound(i)), ...overCap.map(limit)], []);
     }
 
     // F2F's own set names help when Scryfall's differ ("Midnight Hunt Commander"); optional here.
@@ -508,8 +527,8 @@ export class Runner {
         const product = await this.client.product(productJsUrl(hit.handle));
         if (!product) return null;
         const doc = withProductVariants(hit, product);
-        // The SKU can reveal a non-English print the title didn't.
-        return !doc.language || doc.language.toLowerCase() === 'english' ? doc : null;
+        // The SKU can reveal a print in another language than the title said.
+        return docInLanguage(doc, item.lang) ? doc : null;
       }
       if (total < SUGGEST_LIMIT) return null;
     }

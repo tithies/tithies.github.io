@@ -151,6 +151,11 @@ async function runMoxWrite(op: unknown, doFetch: (url: string, init?: WriteInit)
     }
     return { ok: true, kind: 'mutate', status: res.status, response, ...(imported ? { imported } : {}) };
   }
+  if (kind === 'addCard') {
+    // A 2xx is the card added (the check after the export reads what was made).
+    const count = (op as { quantity: number }).quantity;
+    return { ok: true, kind: 'mutate', status: res.status, response, imported: { ok: true, count, errors: [] } };
+  }
   return { ok: true, kind: 'mutate', status: res.status, response };
 }
 

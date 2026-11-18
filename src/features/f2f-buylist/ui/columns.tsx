@@ -3,6 +3,8 @@ import { IconBan, IconBox, IconCash, IconClock, IconExternalLink, IconRefreshAle
 import type { DataTableColumn } from 'mantine-datatable';
 import { sizedImage } from '@/lib/f2f/api';
 import { CardThumb } from '@/lib/ui/CardThumb';
+import { LangBadge } from '@/lib/ui/LangBadge';
+import { isEnglish, langLabel, langOf, mismatchText } from '@/lib/cards/languages';
 import { f2fLinks, scryfallCardLink, scryfallImage } from '@/lib/f2f/links';
 import { categoryOf, matchOf, type Category, type Item } from '../types';
 import { detailedFinish, isProblem, nameNote, pctOf } from './filtering';
@@ -62,7 +64,7 @@ export function CategoryIcon({ item }: { item: Item }) {
     item.match === 'loose' && `Loose match: ${item.matchNote ?? ''}`,
     item.match === 'price_check' && `Check the price manually: ${item.matchNote ?? ''}`,
     matchOf(item) === 'not_found' && `Exact print not found on F2F${item.matchNote ? ` (${item.matchNote})` : ''}`,
-    matchOf(item) === 'unlisted' && "Not on F2F: F2F doesn't list oversized cards",
+    matchOf(item) === 'unlisted' && `Not on F2F: ${!isEnglish(item.lang) && item.matchNote ? item.matchNote : "F2F doesn't list oversized cards"}`,
     item.match === 'exact' && item.matchNote,
     item.fromCache && 'From cache',
   ].filter(Boolean);
@@ -97,6 +99,10 @@ function NameNoteLine({ item }: { item: Item }) {
     </Text>
   );
 }
+
+/** The copies' language, and a warning when some point to a print in another language. */
+export const itemLangWarning = (item: Item): string | null =>
+  item.printLang ? `${mismatchText(langOf(item), item.printLang, item.mismatchCopies, item.qty)}. Tithies checks F2F in ${langLabel(item.lang)}, as the Language field says.` : null;
 
 function CardImage({ item }: { item: Item }) {
   return (
@@ -203,9 +209,12 @@ export function buildColumns(hidden: ReadonlySet<string> = new Set()): DataTable
       sortable: true,
       render: (i) => (
         <Stack gap={0}>
-          <Text size="sm" fw={500}>
-            {i.name}
-          </Text>
+          <Group gap={6} wrap="nowrap" align="center">
+            <Text size="sm" fw={500}>
+              {i.name}
+            </Text>
+            <LangBadge lang={i.lang} warning={itemLangWarning(i)} />
+          </Group>
           <NameNoteLine item={i} />
         </Stack>
       ),

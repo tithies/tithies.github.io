@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { overallPercent } from '@/lib/progress';
 import type { ChangeOp } from '@/lib/changes/types';
 import { finishLabel } from '@/lib/format';
+import { isEnglish, langBadge } from '@/lib/cards/languages';
 import { renderPagination } from '@/lib/ui/pagination';
 import { MAX_EXPORT_QTY, type ExportList } from '../list';
 import type { ExportItem } from '../types';
@@ -12,7 +13,7 @@ import type { ExportItem } from '../types';
 const n = (v: number) => v.toLocaleString('en-CA');
 const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
 
-const printLabel = (i: ExportItem) => `${i.set.toUpperCase()} #${i.cn} · ${finishLabel(i.finish)}`;
+const printLabel = (i: ExportItem) => `${i.set.toUpperCase()} #${i.cn} · ${finishLabel(i.finish)}${isEnglish(i.lang) ? '' : ` · ${langBadge(i.lang)}`}`;
 
 /** "42 prints · 117 copies" */
 export const exportSummary = (list: Pick<ExportList, 'prints' | 'copies'>) => `${plural(list.prints, 'print')} · ${plural(list.copies, 'copy', 'copies')}`;

@@ -7,7 +7,7 @@ import { normalizeEntry } from './normalize';
 
 
 /** Bump when DeckCard's shape or the normaliser changes, so cached decks are fetched again. */
-export const DECK_CARDS_VERSION = 2; // 2: per-copy finishes/prints from `printingData`
+export const DECK_CARDS_VERSION = 3; // 2: per-copy finishes/prints from `printingData`; 3: the print's language (`card.lang`)
 
 /** Moxfield's deck boards, in display order. Unknown boards are still read (see boardLabel). */
 export const BOARDS: BoardInfo[] = [
@@ -67,7 +67,8 @@ export function normalizeDeckList(raw: any): DeckSummary[] {
  * The copies behind one deck entry. An entry holding copies with different finishes or prints
  * ("3 Adventurer's Airship": 2 non-foil + 1 foil) keeps its first copy's finish at the top level
  * and lists every copy group in `printingData`, each with its own quantity, finish, print and
- * proxy/alter flags. Entries whose copies are all alike have no `printingData`.
+ * proxy/alter flags, and its print's language (`lang`). Entries whose copies are all alike have no
+ * `printingData`. Deck entries have no Language field: a copy's language is its print's.
  */
 function entryCopies(row: any): any[] {
   const groups = Array.isArray(row?.printingData) ? row.printingData.filter((p: any) => p && Number(p.quantity) > 0) : [];
@@ -80,7 +81,11 @@ function entryCopies(row: any): any[] {
     isAlter: p.isAlter ?? row.isAlter,
     isProxy: p.isProxy ?? row.isProxy,
     // The group's own card when given, else the entry's card moved to the group's print.
-    card: p.card && typeof p.card === 'object' ? p.card : { ...row.card, set: p.set ?? row.card?.set, cn: p.cn ?? row.card?.cn, set_name: p.set_name ?? row.card?.set_name, rarity: p.rarity ?? row.card?.rarity },
+    card:
+      p.card && typeof p.card === 'object'
+        ? p.card
+        : // The group's `id` is its print's card id (verified 2026-11-18: same value as its `card.id` when it has one).
+          { ...row.card, id: p.id ?? row.card?.id, set: p.set ?? row.card?.set, cn: p.cn ?? row.card?.cn, set_name: p.set_name ?? row.card?.set_name, rarity: p.rarity ?? row.card?.rarity, lang: p.lang ?? row.card?.lang },
   }));
   // Never lose copies if the groups don't add up to the entry's quantity.
   const rest = (Number(row.quantity) || 0) - groups.reduce((s: number, p: any) => s + Number(p.quantity), 0);

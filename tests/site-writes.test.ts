@@ -56,6 +56,19 @@ describe('Moxfield writes: validation and requests', () => {
     expect(buildMoxMutation({ ...IMPORT, binderId: undefined })!.url).not.toContain('tradeBinderId');
   });
 
+  it("adds one card by its card id with Moxfield's own body", () => {
+    const add = { site: 'moxfield', op: 'addCard', cardId: '1MR1a', quantity: 2, finish: 'nonFoil', languageId: 'kAVXO', binderId: 'Bnd_1' } as const;
+    expect(buildMoxMutation(add)).toEqual({
+      method: 'POST',
+      url: 'https://api2.moxfield.com/v1/collections',
+      json: { cardId: '1MR1a', quantity: 2, condition: 'nearMint', game: 'paper', cardLanguageId: 'kAVXO', finish: 'nonFoil', isAlter: false, isProxy: false, tradeBinderId: 'Bnd_1' },
+    });
+    expect((buildMoxMutation({ ...add, binderId: undefined })!.json as object)).not.toHaveProperty('tradeBinderId');
+    for (const bad of [{ cardId: 'x y' }, { quantity: 0 }, { quantity: 1.5 }, { quantity: 10_001 }, { finish: 'gold' }, { languageId: 'fr' }, { binderId: '../x' }]) {
+      expect(buildMoxMutation({ ...add, ...bad })).toBeNull();
+    }
+  });
+
   it('refuses anything malformed (the page world is not trusted)', () => {
     const bad: unknown[] = [
       null,

@@ -2,7 +2,10 @@ import { ActionIcon, Anchor, Badge, Button, Group, HoverCard, Menu, MultiSelect,
 import { useDebouncedCallback, useLocalStorage } from '@mantine/hooks';
 import { IconDownload, IconExternalLink, IconFileExport, IconListDetails, IconPlus, IconSearch, IconTrash, IconX } from '@tabler/icons-react';
 import { MAX_EXPORT_QTY, type ExportList } from '@/lib/export/list';
-import { exportQty, rowToItem } from '../export';
+import { exportQty, rowItemKeys, rowToItems } from '../export';
+import type { ExportItem } from '@/lib/export/types';
+import { langLabel, langOf, sortLangs } from '@/lib/cards/languages';
+import { LangBadge } from '@/lib/ui/LangBadge';
 import { DataTable, type DataTableColumn, type DataTableSortStatus } from 'mantine-datatable';
 import { useStickyTableHeader } from '@/lib/ui/useStickyTableHeader';
 import { Fragment, useEffect, useMemo, useState } from 'react';
@@ -37,9 +40,9 @@ const num = (children: React.ReactNode, c?: string) => (
   </Text>
 );
 
-/** "Collection has DMU #435 Non-foil ×1 not in a deck" */
-function hintText(o: OtherPrint): string {
-  const print = `${o.set.toUpperCase()} #${o.cn} ${finishLabel(o.finish)}`;
+/** "Collection has DMU #435 Non-foil ×1 not in a deck" ("… Non-foil French …" when only the language differs from the row's). */
+function hintText(o: OtherPrint, row: ComparisonRow): string {
+  const print = `${o.set.toUpperCase()} #${o.cn} ${finishLabel(o.finish)}${langOf(o) !== langOf(row) ? ` ${langLabel(o.lang)}` : ''}`;
   return o.diff > 0 ? `Collection has ${print} ×${o.diff} not in a deck` : `Decks use ${print} ×${-o.diff} not in the collection`;
 }
 
@@ -110,18 +113,43 @@ function HintDecks({ uses, decks, boardLabel }: { uses: DeckUse[]; decks: Readon
   );
 }
 
-/** Add the row to the export, or (once in it) its quantity and remove. */
+/** Collection copies whose Language field isn't the print's language: the warning on the row. */
+function rowLangWarning(r: ComparisonRow): string | null {
+  if (!r.mismatchCopies) return null;
+  const others = sortLangs(Object.keys(r.langs).filter((l) => l !== r.lang && r.langs[l] > 0)).map(langLabel);
+  const part = r.mismatchCopies < r.collectionQty ? ` (${r.mismatchCopies} of ${r.collectionQty} copies)` : '';
+  return `Moxfield's Language says ${others.join(' / ')}${part}, but this print is ${langLabel(r.lang)}. Decks are compared by print; an export keeps the Language field.`;
+}
+
+/** Add the row to the export, or (once in it) its quantity and remove. A row in several languages is edited in the export review. */
 function ExportCell({ row, exportList }: { row: ComparisonRow; exportList: ExportList }) {
-  const item = exportList.get(row.key);
-  if (!item) {
+  const items = rowToItems(row);
+  const inList = items.map((i) => exportList.get(i.key)).filter((i): i is ExportItem => Boolean(i));
+  if (!inList.length) {
     return (
       <Tooltip label={`Add to the export (×${exportQty(row)})`}>
-        <ActionIcon variant="subtle" onClick={() => exportList.add([rowToItem(row)])} aria-label={`Add ${row.name} to the export`}>
+        <ActionIcon variant="subtle" onClick={() => exportList.add(items)} aria-label={`Add ${row.name} to the export`}>
           <IconFileExport size={16} />
         </ActionIcon>
       </Tooltip>
     );
   }
+  if (items.length > 1) {
+    const total = inList.reduce((s, i) => s + i.qty, 0);
+    return (
+      <Group gap={2} wrap="nowrap">
+        <Tooltip label={`${inList.map((i) => `${i.qty} ${langLabel(i.lang)}`).join(', ')}: change the copies in the export review`} multiline w={240}>
+          <Text size="sm" className="ti-num" px={4}>
+            ×{total} · {inList.length} languages
+          </Text>
+        </Tooltip>
+        <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => exportList.remove(items.map((i) => i.key))} aria-label={`Remove ${row.name} from the export`}>
+          <IconX size={14} />
+        </ActionIcon>
+      </Group>
+    );
+  }
+  const item = inList[0];
   return (
     <Group gap={2} wrap="nowrap">
       <NumberInput
@@ -131,10 +159,10 @@ function ExportCell({ row, exportList }: { row: ComparisonRow; exportList: Expor
         max={MAX_EXPORT_QTY}
         allowDecimal={false}
         value={item.qty}
-        onChange={(v) => typeof v === 'number' && exportList.setQty(row.key, v)}
+        onChange={(v) => typeof v === 'number' && exportList.setQty(item.key, v)}
         aria-label={`Copies of ${row.name} to export`}
       />
-      <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => exportList.remove([row.key])} aria-label={`Remove ${row.name} from the export`}>
+      <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => exportList.remove([item.key])} aria-label={`Remove ${row.name} from the export`}>
         <IconX size={14} />
       </ActionIcon>
     </Group>
@@ -195,13 +223,16 @@ function buildColumns(decks: ReadonlyMap<string, DeckRow>, boardLabel: (board: s
       sortable: true,
       render: (r) => (
         <Stack gap={0}>
-          <Text size="sm" fw={500}>
-            {r.name}
-          </Text>
+          <Group gap={6} wrap="nowrap" align="center">
+            <Text size="sm" fw={500}>
+              {r.name}
+            </Text>
+            <LangBadge lang={r.lang} warning={rowLangWarning(r)} />
+          </Group>
           {r.otherPrints.slice(0, 2).map((o) => (
             <Stack key={o.key} gap={0}>
-              <Text size="xs" c="yellow" lineClamp={1} title={hintText(o)}>
-                {hintText(o)}
+              <Text size="xs" c="yellow" lineClamp={1} title={hintText(o, r)}>
+                {hintText(o, r)}
               </Text>
               {/* Decks use the other print: those decks are where to fix it. */}
               {o.diff < 0 && o.decks.length > 0 && <HintDecks uses={o.decks} decks={decks} boardLabel={boardLabel} />}
@@ -312,7 +343,7 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
   const missingRows = useMemo(() => allRows.filter((r) => r.kind === 'missing'), [allRows]);
   const matchedRows = useMemo(() => allRows.filter((r) => r.kind === 'match'), [allRows]);
   const unassignedRows = useMemo(() => allRows.filter((r) => r.kind === 'unassigned'), [allRows]);
-  const shownInExport = exportList ? view.filter((r) => exportList.has(r.key)).length : 0;
+  const shownInExport = exportList ? view.filter((r) => rowItemKeys(r).some((k) => exportList.has(k))).length : 0;
   const sortStatus: DataTableSortStatus<ComparisonRow> = { columnAccessor: sort.key, direction: sort.dir };
 
   // Picked sets show as their code ("M20") so the field stays one line; the list shows (and searches) names too.
@@ -321,7 +352,8 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
     for (const r of rows) m.set(r.set, r.setName);
     return m;
   }, [rows]);
-  const filtered = filters.q.trim() !== '' || filters.sets.length > 0 || filters.finishes.length > 0 || filters.hinted;
+  const languages = useMemo(() => sortLangs(rows.map((r) => r.lang)).map((l) => ({ value: l, label: langLabel(l) })), [rows]);
+  const filtered = filters.q.trim() !== '' || filters.sets.length > 0 || filters.finishes.length > 0 || filters.languages.length > 0 || filters.hinted;
 
   return (
     <Stack gap="xs">
@@ -355,6 +387,18 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
           styles={ONE_LINE_PILLS}
           w={200}
         />
+        {(languages.length > 1 || filters.languages.length > 0) && (
+          <MultiSelect
+            label="Language"
+            placeholder={filters.languages.length ? undefined : 'Any'}
+            data={languages}
+            value={filters.languages}
+            onChange={(v) => update({ ...filters, languages: v }, sort, 1)}
+            clearable
+            styles={ONE_LINE_PILLS}
+            w={200}
+          />
+        )}
         <Switch
           label="Likely wrong print only"
           checked={filters.hinted}
@@ -375,20 +419,20 @@ export function ComparisonTable({ rows, allRows = rows, exportList, decks, board
             </Menu.Target>
             <Menu.Dropdown>
               <Menu.Label>Add to the export (copies = the difference; for a match, its copies)</Menu.Label>
-              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!view.length} onClick={() => exportList.add(view.map(rowToItem))}>
+              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!view.length} onClick={() => exportList.add(view.flatMap(rowToItems))}>
                 Rows shown, every page ({view.length})
               </Menu.Item>
-              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!missingRows.length} onClick={() => exportList.add(missingRows.map(rowToItem))}>
+              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!missingRows.length} onClick={() => exportList.add(missingRows.flatMap(rowToItems))}>
                 Every “Missing from collection” row ({missingRows.length})
               </Menu.Item>
-              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!unassignedRows.length} onClick={() => exportList.add(unassignedRows.map(rowToItem))}>
+              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!unassignedRows.length} onClick={() => exportList.add(unassignedRows.flatMap(rowToItems))}>
                 Every “Not in any deck” row ({unassignedRows.length})
               </Menu.Item>
-              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!matchedRows.length} onClick={() => exportList.add(matchedRows.map(rowToItem))}>
+              <Menu.Item leftSection={<IconPlus size={14} />} disabled={!matchedRows.length} onClick={() => exportList.add(matchedRows.flatMap(rowToItems))}>
                 Every “Matching” row ({matchedRows.length})
               </Menu.Item>
               <Menu.Divider />
-              <Menu.Item leftSection={<IconX size={14} />} disabled={!shownInExport} onClick={() => exportList.remove(view.map((r) => r.key))}>
+              <Menu.Item leftSection={<IconX size={14} />} disabled={!shownInExport} onClick={() => exportList.remove(view.flatMap(rowItemKeys))}>
                 Remove the rows shown from the export ({shownInExport})
               </Menu.Item>
               <Menu.Item color="red" leftSection={<IconTrash size={14} />} disabled={!exportList.prints} onClick={() => exportList.clear()}>

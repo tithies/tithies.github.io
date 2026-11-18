@@ -128,7 +128,7 @@ export function Overlay() {
       }
       const eligible = res.entries.filter(isEligible);
       if (!eligible.length) {
-        setPhase({ kind: 'error', message: `No English, non-proxy cards in this view (${res.entries.length} rows read).` });
+        setPhase({ kind: 'error', message: `No non-proxy cards in this view (${res.entries.length} rows read).` });
         return;
       }
       setPhase({ kind: 'starting' });
@@ -261,7 +261,7 @@ export function Overlay() {
           {phase.kind === 'run' ? 'Open results' : 'Dashboard'}
         </button>
       </div>
-      <div className="ti-line ti-dim">English, non-proxy cards only · NM prices</div>
+      <div className="ti-line ti-dim">Non-proxy cards only · NM prices · each card in its language</div>
     </div>
   );
 }

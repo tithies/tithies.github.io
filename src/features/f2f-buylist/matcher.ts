@@ -1,4 +1,6 @@
 import { isScanListing, nmVariant, type F2FDoc } from '@/lib/f2f/api';
+import { docInLanguage, f2fLanguage } from '@/lib/f2f/languages';
+import { isEnglish, langLabel } from '@/lib/cards/languages';
 import type { Finish } from '@/lib/cards/types';
 import { bulkValue } from './bulk';
 import type { BulkRates, Category, Item, MatchStatus } from './types';
@@ -25,6 +27,8 @@ export interface PrintRef {
   name: string;
   /** Alternate printed name; F2F titles these "Flavor Name - Card Name". */
   flavorName?: string;
+  /** The copy's language (default English): only F2F docs in that language match. */
+  lang?: string;
 }
 
 /** Names to send to F2F's exact "Card Name" filter: the front face, plus F2F's "Flavor - Name" form. */
@@ -37,8 +41,6 @@ export interface MatchResult {
   doc: F2FDoc | null;
   note?: string;
 }
-
-const isEnglish = (d: F2FDoc) => !d.language || d.language.toLowerCase() === 'english';
 
 /** Every normalised name a print may appear under on F2F. */
 function wantedNames(p: PrintRef): Set<string> {
@@ -60,8 +62,19 @@ const nameMatches = (d: F2FDoc, p: PrintRef) => {
   const wanted = wantedNames(p);
   return docNames(d).some((n) => wanted.has(n));
 };
-const setMatches = (d: F2FDoc, p: PrintRef) =>
-  (d.skuSet != null && d.skuSet === p.set.toLowerCase()) || (Boolean(d.setName) && normSet(d.setName) === normSet(p.setName));
+/**
+ * Same set. F2F lists some non-English prints in a set of their own language: "Foreign Black
+ * Border: French" (SKU set "FBBf") for Scryfall's "Foreign Black Border" (fbb), "Renaissance French"
+ * ("RENf") for "Renaissance" (ren). Those count for a print in that language.
+ */
+const setMatches = (d: F2FDoc, p: PrintRef) => {
+  const set = p.set.toLowerCase();
+  if ((d.skuSet != null && d.skuSet === set) || (Boolean(d.setName) && normSet(d.setName) === normSet(p.setName))) return true;
+  const language = isEnglish(p.lang) ? null : f2fLanguage(p.lang);
+  if (!language) return false;
+  const skuSplit = d.skuSet != null && d.skuSet.length === set.length + 1 && d.skuSet.startsWith(set);
+  return skuSplit || (Boolean(d.setName) && normSet(d.setName) === normSet(`${p.setName} ${language}`));
+};
 
 /** Regular listing first, then on the buylist, then with a buy price; one-off scanned copies last. */
 const docRank = (d: F2FDoc) => (isScanListing(d) ? 0 : 4) + (d.publishedF2FSell ? 2 : 0) + ((nmVariant(d)?.buy ?? 0) > 0 ? 1 : 0);
@@ -100,7 +113,7 @@ function pickFinish(docs: F2FDoc[], finish: Finish): { doc: F2FDoc; note?: strin
  * collector number differs (only accepted when unambiguous).
  */
 export function matchPrint(p: PrintRef, docs: F2FDoc[]): MatchResult {
-  const pool = docs.filter((d) => isEnglish(d) && nameMatches(d, p) && setMatches(d, p));
+  const pool = docs.filter((d) => docInLanguage(d, p.lang) && nameMatches(d, p) && setMatches(d, p));
   const sameCn = pool.filter((d) => normCn(d.cn) === normCn(p.cn));
   const exact = pickFinish(sameCn, p.finish);
   if (exact) return { match: 'exact', doc: exact.doc, note: exact.note };
@@ -121,7 +134,7 @@ export function matchPrint(p: PrintRef, docs: F2FDoc[]): MatchResult {
  * same set, number and finish; if F2F's name doesn't match ours it's reported as a loose match.
  */
 export function matchByNumber(p: PrintRef, docs: F2FDoc[]): MatchResult {
-  const sameCn = docs.filter((d) => isEnglish(d) && setMatches(d, p) && normCn(d.cn) === normCn(p.cn));
+  const sameCn = docs.filter((d) => docInLanguage(d, p.lang) && setMatches(d, p) && normCn(d.cn) === normCn(p.cn));
   const named = sameCn.filter((d) => nameMatches(d, p));
   const picked = pickFinish(named, p.finish) ?? pickFinish(sameCn, p.finish);
   if (!picked) return { match: 'not_found', doc: null };
@@ -160,9 +173,12 @@ export interface Evaluation {
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const round4 = (n: number) => Math.round(n * 10000) / 10000;
 
-/** Turns a match into prices. Cards F2F doesn't buy are valued at the wholesale bulk rate. */
+/**
+ * Turns a match into prices. English cards F2F doesn't buy are valued at the wholesale bulk rate.
+ * Other languages are worth only their buylist price: F2F's bulk lots are English.
+ */
 export function evaluate(
-  item: Pick<Item, 'set' | 'setType' | 'finish' | 'rarity' | 'typeLine' | 'isToken'>,
+  item: Pick<Item, 'set' | 'setType' | 'finish' | 'rarity' | 'typeLine' | 'isToken' | 'lang'>,
   result: MatchResult,
   rates: BulkRates,
   creditBonus: number,
@@ -177,6 +193,13 @@ export function evaluate(
   if (buylist) {
     category = 'buylist';
     buyCash = nm!.buy!;
+  } else if (!isEnglish(item.lang)) {
+    category = 'not_bought';
+    buyCash = 0;
+    const language = langLabel(item.lang);
+    if (!result.doc) bulkReason = `F2F doesn't list this print in ${language}, so it doesn't buy it`;
+    else if (result.doc.source === 'shopify') bulkReason = `Buy price unknown (check it on F2F); ${language} cards aren't bought as bulk`;
+    else bulkReason = `F2F lists it in ${language} but doesn't buy it (${language} cards aren't bought as bulk)`;
   } else {
     const b = bulkValue({ ...item, doc: result.doc }, rates);
     category = b.value > 0 ? 'bulk' : 'not_bought';

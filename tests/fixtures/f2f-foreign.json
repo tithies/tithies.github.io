@@ -1,0 +1,1269 @@
+{
+ "hits": {
+  "total": {
+   "value": 29
+  },
+  "hits": [
+   {
+    "_id": "gid://shopify/Product/14642102600052",
+    "_source": {
+     "title": "Swords to Plowshares [41] [Revised Edition] [Non-Foil]",
+     "handle": "swords-to-plowshares-41-revised-edition-non-foil",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Revised Edition",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 1,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51731299434868",
+       "price": 5.2,
+       "sellPrice": 1.5,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-3ED-41-ENG-HP-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "HP"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51731299467636",
+       "price": 12.99,
+       "sellPrice": 6,
+       "inventoryQuantity": 30,
+       "sku": "SIN-MTG-3ED-41-ENG-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51731299500404",
+       "price": 7.79,
+       "sellPrice": 3,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-3ED-41-ENG-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14643240632692",
+    "_source": {
+     "title": "Swords to Plowshares [41] [Collectors Edition] [Non-Foil]",
+     "handle": "swords-to-plowshares-41-collectors-edition-non-foil",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Collectors' Edition",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 1,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51732666941812",
+       "price": 70,
+       "sellPrice": 31.5,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-CED-41-ENG-HP-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "HP"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51732666974580",
+       "price": 139.99,
+       "sellPrice": 70,
+       "inventoryQuantity": 1,
+       "sku": "SIN-MTG-CED-41-ENG-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51732667007348",
+       "price": 97.99,
+       "sellPrice": 49,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-CED-41-ENG-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14654117183860",
+    "_source": {
+     "title": "Swords to Plowshares [41] [Unlimited] [Non-Foil]",
+     "handle": "swords-to-plowshares-41-unlimited-non-foil",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Unlimited Edition",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 1,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51757801210228",
+       "price": 65,
+       "sellPrice": 29.25,
+       "inventoryQuantity": 3,
+       "sku": "SIN-MTG-2ED-41-ENG-HP-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "HP"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51757801242996",
+       "price": 129.99,
+       "sellPrice": 65,
+       "inventoryQuantity": 2,
+       "sku": "SIN-MTG-2ED-41-ENG-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51757801275764",
+       "price": 90.99,
+       "sellPrice": 45.5,
+       "inventoryQuantity": 3,
+       "sku": "SIN-MTG-2ED-41-ENG-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14644397212020",
+    "_source": {
+     "title": "Swords to Plowshares - Italian [41] [Foreign Black Border: Italian] [Non-Foil]",
+     "handle": "swords-to-plowshares-italian-41-foreign-black-border-italian-non-foil",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "Italian",
+     "MTG_Set_Name": "Foreign Black Border: Italian",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 1,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51734053945716",
+       "price": 79.99,
+       "sellPrice": 40,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FBBi-41-ITA-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51734053978484",
+       "price": 59.99,
+       "sellPrice": 30,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FBBi-41-ITA-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51734053912948",
+       "price": 39.99,
+       "sellPrice": 20,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FBBi-41-ITA-HP-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "HP"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14644396753268",
+    "_source": {
+     "title": "Swords to Plowshares - French [41] [Foreign Black Border: French] [Non-Foil]",
+     "handle": "swords-to-plowshares-french-41-foreign-black-border-french-non-foil",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "French",
+     "MTG_Set_Name": "Foreign Black Border: French",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 1,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51734052831604",
+       "price": 39.99,
+       "sellPrice": 20,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FBBf-41-FRA-HP-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "HP"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51734052864372",
+       "price": 79.99,
+       "sellPrice": 40,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FBBf-41-FRA-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51734052897140",
+       "price": 59.99,
+       "sellPrice": 30,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FBBf-41-FRA-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14644396163444",
+    "_source": {
+     "title": "Swords to Plowshares - German [41] [Foreign Black Border: German] [Non-Foil]",
+     "handle": "swords-to-plowshares-german-41-foreign-black-border-german-non-foil",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "German",
+     "MTG_Set_Name": "Foreign Black Border: German",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 1,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51734049816948",
+       "price": 79.99,
+       "sellPrice": 40,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FBBg-41-DEU-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51734049849716",
+       "price": 59.99,
+       "sellPrice": 30,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FBBg-41-DEU-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51734049784180",
+       "price": 39.99,
+       "sellPrice": 20,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-FBBg-41-DEU-HP-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "HP"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14643256787316",
+    "_source": {
+     "title": "Swords to Plowshares [41] [Intl Collectors Edition] [Non-Foil]",
+     "handle": "swords-to-plowshares-41-intl-collectors-edition-non-foil",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Intl. Collectors' Edition",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 1,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51732692861300",
+       "price": 70,
+       "sellPrice": 31.5,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-CEI-41-ENG-HP-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "HP"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51732692894068",
+       "price": 139.99,
+       "sellPrice": 70,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-CEI-41-ENG-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51732692926836",
+       "price": 97.99,
+       "sellPrice": 49,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-CEI-41-ENG-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/15359527649652",
+    "_source": {
+     "title": "Swords to Plowshares — ID 21010",
+     "handle": "swords-to-plowshares-id-21010",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Limited Edition Beta",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/56440162550132",
+       "price": 849.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-SCAN-21010",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/15035794260340",
+    "_source": {
+     "title": "Swords to Plowshares — ID 16220",
+     "handle": "swords-to-plowshares-id-16220",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Limited Edition Beta",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/54528041288052",
+       "price": 1099.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-SCAN-16220",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/15011011625332",
+    "_source": {
+     "title": "Swords to Plowshares - Scan 15843",
+     "handle": "swords-to-plowshares-scan-15843",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Limited Edition Beta",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/54218701570420",
+       "price": 674.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-SCAN-15843",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14952862941556",
+    "_source": {
+     "title": "Swords to Plowshares - Scan 15304",
+     "handle": "swords-to-plowshares-scan-15304",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Limited Edition Beta",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/53932638044532",
+       "price": 999.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-SCAN-15304",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14952863138164",
+    "_source": {
+     "title": "Swords to Plowshares - Scan 15306",
+     "handle": "swords-to-plowshares-scan-15306",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Limited Edition Beta",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/53932638175604",
+       "price": 999.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-SCAN-15306",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14952863007092",
+    "_source": {
+     "title": "Swords to Plowshares - Scan 15305",
+     "handle": "swords-to-plowshares-scan-15305",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Limited Edition Beta",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/53932638110068",
+       "price": 999.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-SCAN-15305",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14820085498228",
+    "_source": {
+     "title": "Swords to Plowshares - Scan 13856",
+     "handle": "swords-to-plowshares-scan-13856",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Limited Edition Beta",
+     "MTG_Collector_Number": 41,
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/53508307517812",
+       "price": 649.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-SCAN-13856",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14820083335540",
+    "_source": {
+     "title": "Swords to Plowshares - Scan 13855",
+     "handle": "swords-to-plowshares-scan-13855",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Limited Edition Beta",
+     "MTG_Collector_Number": 41,
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/53508305486196",
+       "price": 649.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-SCAN-13855",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14700150096244",
+    "_source": {
+     "title": "Swords to Plowshares - Scan 11875",
+     "handle": "swords-to-plowshares-scan-11875",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Limited Edition Beta",
+     "MTG_Collector_Number": 41,
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/52004686102900",
+       "price": 999.99,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-SCAN-11875",
+       "selectedOptions": [
+        {
+         "name": "Title",
+         "value": "Default Title"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14644830437748",
+    "_source": {
+     "title": "Swords to Plowshares [41] [Limited Edition Beta] [Non-Foil]",
+     "handle": "swords-to-plowshares-41-limited-edition-beta-non-foil",
+     "Card Name": "Swords to Plowshares",
+     "General_Card_Name": "Swords to Plowshares",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Limited Edition Beta",
+     "MTG_Collector_Number": 41,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Uncommon",
+     "publishedF2FSell": 1,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51734966042996",
+       "price": 650,
+       "sellPrice": 325,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-LEB-41-ENG-HP-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "HP"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51734966075764",
+       "price": 1299.99,
+       "sellPrice": 650,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-LEB-41-ENG-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51734966108532",
+       "price": 974.99,
+       "sellPrice": 487.5,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-LEB-41-ENG-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14642350326132",
+    "_source": {
+     "title": "Murk Dwellers [180] [Fifth Edition] [Non-Foil]",
+     "handle": "murk-dwellers-180-fifth-edition-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Fifth Edition",
+     "MTG_Collector_Number": 180,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51731534610804",
+       "price": 0.49,
+       "sellPrice": 0,
+       "inventoryQuantity": 19,
+       "sku": "M-5ED-Murk_Dwell-180-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51731534643572",
+       "price": 0.39,
+       "sellPrice": 0,
+       "inventoryQuantity": 9,
+       "sku": "M-5ED-Murk_Dwell-180-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14642287346036",
+    "_source": {
+     "title": "Murk Dwellers [148] [Fourth Edition] [Non-Foil]",
+     "handle": "murk-dwellers-148-fourth-edition-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Fourth Edition",
+     "MTG_Collector_Number": 148,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51731482542452",
+       "price": 0.49,
+       "sellPrice": 0,
+       "inventoryQuantity": 13,
+       "sku": "SIN-MTG-4ED-148-ENG-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51731482575220",
+       "price": 0.39,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-4ED-148-ENG-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14644631208308",
+    "_source": {
+     "title": "Murk Dwellers [21] [Introductory Two Player Set] [Non-Foil]",
+     "handle": "murk-dwellers-21-introductory-two-player-set-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "Introductory Two-Player Set",
+     "MTG_Collector_Number": 21,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51734536880500",
+       "price": 0.25,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "M-ITP-Murk_Dwell-21-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51734536913268",
+       "price": 0.18,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "M-ITP-Murk_Dwell-21-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14646386458996",
+    "_source": {
+     "title": "Murk Dwellers - French [62] [Renaissance French] [Non-Foil]",
+     "handle": "murk-dwellers-french-62-renaissance-french-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "French",
+     "MTG_Set_Name": "Renaissance French",
+     "MTG_Collector_Number": 62,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51738179830132",
+       "price": 0.25,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "M-RENf-Murk_Dwell-62-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51738179862900",
+       "price": 0.19,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "M-RENf-Murk_Dwell-62-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14646384492916",
+    "_source": {
+     "title": "Murk Dwellers - German [62] [Renaissance German] [Non-Foil]",
+     "handle": "murk-dwellers-german-62-renaissance-german-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "German",
+     "MTG_Set_Name": "Renaissance German",
+     "MTG_Collector_Number": 62,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51738175799668",
+       "price": 0.25,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "M-RENg-Murk_Dwell-62-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51738175832436",
+       "price": 0.19,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "M-RENg-Murk_Dwell-62-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14642158141812",
+    "_source": {
+     "title": "Murk Dwellers - Japanese [148] [Fourth Edition Black Border: Japanese] [Non-Foil]",
+     "handle": "murk-dwellers-japanese-148-fourth-edition-black-border-japanese-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "Japanese",
+     "MTG_Set_Name": "Fourth Edition Foreign Black Border: Japanese",
+     "MTG_Collector_Number": 148,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51731357598068",
+       "price": 0.25,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-4BBj-148-JPN-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51731357630836",
+       "price": 0.18,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-4BBj-148-JPN-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14642158174580",
+    "_source": {
+     "title": "Murk Dwellers - Portuguese [148] [Fourth Edition Black Border: Portuguese] [Non-Foil]",
+     "handle": "murk-dwellers-portuguese-148-fourth-edition-black-border-portuguese-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "Portugese",
+     "MTG_Set_Name": "Fourth Edition Foreign Black Border: Portuguese",
+     "MTG_Collector_Number": 148,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51731357532532",
+       "price": 0.25,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-4BBp-148-POR-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51731357565300",
+       "price": 0.18,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-4BBp-148-POR-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14642157453684",
+    "_source": {
+     "title": "Murk Dwellers - Korean [148] [Fourth Edition Black Border: Korean] [Non-Foil]",
+     "handle": "murk-dwellers-korean-148-fourth-edition-black-border-korean-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "Korean",
+     "MTG_Set_Name": "Fourth Edition Foreign Black Border: Korean",
+     "MTG_Collector_Number": 148,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51731356549492",
+       "price": 0.25,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-4BBk-148-KOR-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51731356582260",
+       "price": 0.18,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-4BBk-148-KOR-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14642153423220",
+    "_source": {
+     "title": "Murk Dwellers - Spanish [148] [Fourth Edition Black Border: Spanish] [Non-Foil]",
+     "handle": "murk-dwellers-spanish-148-fourth-edition-black-border-spanish-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "Spanish",
+     "MTG_Set_Name": "Fourth Edition Foreign Black Border: Spanish",
+     "MTG_Collector_Number": 148,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51731354943860",
+       "price": 0.25,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-4BBs-148-SPA-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51731354976628",
+       "price": 0.18,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-4BBs-148-SPA-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14642150179188",
+    "_source": {
+     "title": "Murk Dwellers - Chinese [148] [Fourth Edition Black Border: Chinese] [Non-Foil]",
+     "handle": "murk-dwellers-chinese-148-fourth-edition-black-border-chinese-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "Chinese",
+     "MTG_Set_Name": "Chinese Fourth Edition Foreign Black Border",
+     "MTG_Collector_Number": 148,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51731353731444",
+       "price": 0.25,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-4BBc-148-CHI-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51731353764212",
+       "price": 0.18,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-4BBc-148-CHI-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14644167311732",
+    "_source": {
+     "title": "Murk Dwellers [49] [The Dark] [Non-Foil]",
+     "handle": "murk-dwellers-49-the-dark-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "English",
+     "MTG_Set_Name": "The Dark",
+     "MTG_Collector_Number": 49,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51733661712756",
+       "price": 0.49,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-DRK-49-ENG-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51733661745524",
+       "price": 0.39,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-DRK-49-ENG-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "_id": "gid://shopify/Product/14644161937780",
+    "_source": {
+     "title": "Murk Dwellers - Italian [49] [The Dark: Italian] [Non-Foil]",
+     "handle": "murk-dwellers-italian-49-the-dark-italian-non-foil",
+     "Card Name": "Murk Dwellers",
+     "General_Card_Name": "Murk Dwellers",
+     "General_Card_Language": "Italian",
+     "MTG_Set_Name": "The Dark: Italian",
+     "MTG_Collector_Number": 49,
+     "MTG_Foil_Option": "Non-Foil",
+     "MTG_Rarity": "Common",
+     "publishedF2FSell": 0,
+     "product_type": "Singles",
+     "variants": [
+      {
+       "id": "gid://shopify/ProductVariant/51733654765940",
+       "price": 0.15,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-DRKi-49-ITA-NM-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "NM"
+        }
+       ]
+      },
+      {
+       "id": "gid://shopify/ProductVariant/51733654798708",
+       "price": 0.1,
+       "sellPrice": 0,
+       "inventoryQuantity": 0,
+       "sku": "SIN-MTG-DRKi-49-ITA-PL-NF",
+       "selectedOptions": [
+        {
+         "name": "Condition",
+         "value": "PL"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

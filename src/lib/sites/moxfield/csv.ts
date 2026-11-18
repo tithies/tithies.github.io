@@ -56,26 +56,8 @@ export const MOX_CONDITION_NAMES: Record<string, string> = {
   damaged: 'Damaged',
 };
 
-/** Language codes (Scryfall's, as Moxfield reports them) → Moxfield's CSV names. */
-export const MOX_LANGUAGE_NAMES: Record<string, string> = {
-  en: 'English',
-  fr: 'French',
-  de: 'German',
-  it: 'Italian',
-  es: 'Spanish',
-  pt: 'Portuguese',
-  ja: 'Japanese',
-  ko: 'Korean',
-  ru: 'Russian',
-  zhs: 'Chinese Simplified',
-  zht: 'Chinese Traditional',
-  he: 'Hebrew',
-  la: 'Latin',
-  grc: 'Ancient Greek',
-  ar: 'Arabic',
-  sa: 'Sanskrit',
-  ph: 'Phyrexian',
-};
+/** Language codes (Scryfall's, as Moxfield reports them) → Moxfield's CSV names (its own list). */
+export { MOX_LANGUAGE_NAMES } from './languages';
 
 export function toMoxCsv(rows: readonly MoxCsvRow[]): string {
   const lines = [MOX_CSV_HEADER];

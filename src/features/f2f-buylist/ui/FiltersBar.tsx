@@ -3,6 +3,7 @@ import { useDebouncedCallback, useDisclosure } from '@mantine/hooks';
 import { IconAdjustmentsHorizontal, IconBan, IconBox, IconCards, IconCash, IconSearch, IconX } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { SetMultiSelect } from '@/lib/ui/SetMultiSelect';
+import { langLabel, langOf, sortLangs } from '@/lib/cards/languages';
 import type { Item } from '../types';
 import { activeFilterCount, detailedFinish, EMPTY_FILTERS, type Filters } from './filtering';
 import { FINISH_LABEL, rarityLabel } from './format';
@@ -19,7 +20,7 @@ export const STATUS_OPTIONS = [
   { value: 'loose', label: 'Loose match' },
   { value: 'price_check', label: 'Check price manually' },
   { value: 'not_found', label: 'Not found on F2F' },
-  { value: 'unlisted', label: 'Not sold by F2F (oversized)' },
+  { value: 'unlisted', label: 'Not listed by F2F (oversized, language)' },
   { value: 'error', label: 'Error (lookup failed)' },
   { value: 'pending', label: 'Not checked yet' },
 ];
@@ -49,8 +50,10 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
     const sets = new Map<string, string>();
     const rarities = new Set<string>();
     const finishes = new Set<string>();
+    const languages = new Set<string>();
     for (const i of items) {
       sets.set(i.set, i.setName);
+      languages.add(langOf(i));
       rarities.add(i.rarity);
       finishes.add(detailedFinish(i));
     }
@@ -59,6 +62,7 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
     return {
       finishes: [...finishes].filter((v) => !standard.has(v)).sort((a, b) => a.localeCompare(b)).map((v) => ({ value: v, label: v })),
       sets,
+      languages: sortLangs(languages).map((l) => ({ value: l, label: langLabel(l) })),
       rarities: [...rarities].filter(Boolean).sort().map((r) => ({ value: r, label: rarityLabel(r) })),
     };
   }, [items]);
@@ -133,6 +137,14 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
             value={filters.specialFinishes}
             onChange={(v) => set('specialFinishes', v)}
             searchable
+            clearable
+          />
+          <MultiSelect
+            label="Language"
+            placeholder="Any language"
+            data={options.languages}
+            value={filters.languages}
+            onChange={(v) => set('languages', v)}
             clearable
           />
           <MultiSelect label="Rarity" placeholder="Any rarity" data={options.rarities} value={filters.rarities} onChange={(v) => set('rarities', v)} clearable />

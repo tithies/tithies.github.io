@@ -3,6 +3,7 @@
  * Runs in the Moxfield page (MAIN world) so only trimmed data crosses the message bridge.
  */
 import type { CollectionEntry, Finish } from '@/lib/cards/types';
+import { MOX_LANGUAGE_BY_ID } from './languages';
 
 export interface CollectionPage {
   totalResults: number;
@@ -31,12 +32,15 @@ export function normalizeEntry(raw: any): CollectionEntry | null {
   const faces = faceNames.length ? faceNames : name.split(' // ').map((s) => s.trim()).filter(Boolean);
   const faceFlavor = Array.isArray(c.card_faces) ? str(c.card_faces[0]?.flavor_name) : '';
   const prices = c.prices ?? {};
+  // The print's language (one card object per print and language), and the entry's Language field
+  // (collection rows only; deck rows have none, so a deck copy's language is its print's).
+  const printLang = str(c.lang).toLowerCase();
   return {
     id: str(raw.id),
     qty: num(raw.quantity) ?? 1,
     condition: str(raw.condition) || 'nearMint',
     finish: toFinish(raw.finish, raw.isFoil),
-    lang: str(raw.language?.code ?? c.lang ?? 'en').toLowerCase(),
+    lang: str(raw.language?.code).toLowerCase() || printLang || 'en',
     isProxy: Boolean(raw.isProxy),
     isAlter: Boolean(raw.isAlter),
     game: raw.game == null || raw.game === '' ? undefined : str(raw.game).toLowerCase(),
@@ -53,6 +57,7 @@ export function normalizeEntry(raw: any): CollectionEntry | null {
       faces: faces.length ? faces : [name],
       flavorName: str(c.flavor_name) || faceFlavor,
       cn: str(c.cn),
+      lang: printLang,
       rarity: str(raw.rarity || c.rarity).toLowerCase(),
       typeLine: str(c.type_line),
       isToken: Boolean(c.isToken),
@@ -74,7 +79,7 @@ export function describeQuery(url: string): { query: Record<string, string>; sum
     /* ignore malformed */
   }
   const summary = Object.entries(query)
-    .map(([k, v]) => (k === 'q' ? `"${v}"` : `${k}=${v}`))
+    .map(([k, v]) => (k === 'q' ? `"${v}"` : k === 'cardLanguageId' ? `language=${MOX_LANGUAGE_BY_ID.get(v)?.name ?? v}` : `${k}=${v}`))
     .join(', ');
   return { query, summary: summary || 'Whole collection' };
 }

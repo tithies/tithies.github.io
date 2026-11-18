@@ -130,3 +130,49 @@ describe('matchPrint + evaluate', () => {
     expect(scheme.category).toBe('not_bought');
   });
 });
+
+describe('Languages (real F2F docs, 2026-11-18)', () => {
+  const foreign = docs('f2f-foreign.json');
+  const swords = (lang: string, set = 'fbb', setName = 'Foreign Black Border') =>
+    print({ name: 'Swords to Plowshares', set, setName, cn: '41', finish: 'nonFoil', lang });
+  const murk = (lang: string, set: string, setName: string, cn: string) => print({ name: 'Murk Dwellers', set, setName, cn, finish: 'nonFoil', lang });
+
+  it("finds a print in its language, in F2F's set of that language", () => {
+    const fr = matchPrint(swords('fr'), foreign);
+    expect(fr).toMatchObject({ match: 'exact', doc: { setName: 'Foreign Black Border: French', language: 'French', skuSet: 'fbbf' } });
+    expect(evaluate({ ...swords('fr'), ...meta, rarity: 'uncommon' }, fr, rates, 0.3)).toMatchObject({ category: 'buylist', buyCash: 40 });
+    expect(matchPrint(swords('de'), foreign).doc?.setName).toBe('Foreign Black Border: German');
+    expect(matchPrint(swords('it'), foreign).doc?.setName).toBe('Foreign Black Border: Italian');
+    // Older SKUs ("M-RENf-…"), split sets named "…: Japanese", F2F's "Portugese" and its one Chinese.
+    expect(matchPrint(murk('fr', 'ren', 'Renaissance', '62'), foreign).doc?.title).toMatch(/Renaissance French/);
+    expect(matchPrint(murk('ja', '4bb', 'Fourth Edition Foreign Black Border', '148'), foreign).doc?.title).toMatch(/Japanese/);
+    expect(matchPrint(murk('pt', '4bb', 'Fourth Edition Foreign Black Border', '148'), foreign).doc?.title).toMatch(/Portuguese/);
+    expect(matchPrint(murk('zhs', '4bb', 'Fourth Edition Foreign Black Border', '148'), foreign).doc?.title).toMatch(/Chinese/);
+    expect(matchPrint(murk('it', 'drk', 'The Dark', '49'), foreign).doc?.title).toMatch(/The Dark: Italian/);
+    expect(matchByNumber(murk('it', 'drk', 'The Dark', '49'), foreign).doc?.title).toMatch(/The Dark: Italian/);
+  });
+
+  it('never takes a listing in another language', () => {
+    // No English FBB, and no French Revised #41 among these docs.
+    expect(matchPrint(swords('en'), foreign).match).toBe('not_found');
+    expect(matchPrint(swords('fr', '3ed', 'Revised Edition'), foreign).match).toBe('not_found');
+    expect(matchPrint(swords('en', '3ed', 'Revised Edition'), foreign).doc?.title).toBe('Swords to Plowshares [41] [Revised Edition] [Non-Foil]');
+    // The English Fourth Edition, not its Japanese black-border print of the same number.
+    expect(matchPrint(murk('en', '4ed', 'Fourth Edition', '148'), foreign).doc?.title).toMatch(/\[Fourth Edition\]/);
+    expect(matchPrint(murk('ko', '4ed', 'Fourth Edition', '148'), foreign).match).toBe('not_found');
+  });
+
+  it('values a non-English copy at its buylist price only, never as bulk', () => {
+    const item = { ...swords('fr', '3ed', 'Revised Edition'), ...meta, rarity: 'uncommon' };
+    const none = evaluate(item, { match: 'unlisted', doc: null }, rates, 0.3);
+    expect(none).toMatchObject({ category: 'not_bought', buyCash: 0, buyCredit: 0, pctCash: null });
+    expect(none.bulkReason).toMatch(/doesn't list this print in French/);
+    // Listed in its language but not bought (Renaissance French has no buy price).
+    const ren = murk('fr', 'ren', 'Renaissance', '62');
+    const listed = evaluate({ ...ren, ...meta, rarity: 'common' }, matchPrint(ren, foreign), rates, 0.3);
+    expect(listed).toMatchObject({ category: 'not_bought', buyCash: 0 });
+    expect(listed.bulkReason).toMatch(/lists it in French but doesn't buy it/);
+    // The same English card would be bulk.
+    expect(evaluate({ ...item, lang: 'en' }, { match: 'not_found', doc: null }, rates, 0.3).category).toBe('bulk');
+  });
+});

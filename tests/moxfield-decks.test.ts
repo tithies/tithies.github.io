@@ -57,6 +57,27 @@ describe('Moxfield deck normalisation', () => {
     expect(cards.find((c) => c.card.set === 'fca')!.card.name).toBe("Adventurer's Airship");
   });
 
+  it("keeps each copy's print language (decks have no Language field)", () => {
+    const raw = fixture<any>('moxfield-deck-split.json');
+    const main = Object.values<any>(raw.boards.mainboard.cards)[0];
+    const talisman = { ...main, printingData: undefined, card: { ...main.card, name: 'Talisman of Hierarchy', set: 'mh1', cn: '233', lang: 'fr' } };
+    const groups = {
+      ...main,
+      quantity: 2,
+      card: { ...main.card, lang: 'en' },
+      printingData: [
+        { quantity: 1, finish: 'nonFoil', isFoil: false, set: main.card.set, cn: main.card.cn, lang: 'en' },
+        { quantity: 1, finish: 'nonFoil', isFoil: false, set: main.card.set, cn: main.card.cn, lang: 'ja' },
+      ],
+    };
+    const { cards } = normalizeDeckCards({ boards: { mainboard: { cards: { a: talisman, b: groups } } } });
+    expect(cards.map((c) => [c.card.name, c.card.lang])).toEqual([
+      ['Talisman of Hierarchy', 'fr'],
+      [main.card.name, 'en'],
+      [main.card.name, 'ja'],
+    ]);
+  });
+
   it('labels boards', () => {
     expect(boardLabel('signatureSpells')).toBe('Signature spells');
     expect(boardLabel('someNewBoard')).toBe('Some New Board');

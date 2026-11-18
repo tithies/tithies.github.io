@@ -84,10 +84,37 @@ describe('set + number fallback batches', () => {
     );
     expect(unknownSet).toEqual(['zzz|1|nonFoil']);
     expect(batches.map((b) => b.facets)).toEqual([
-      { Set: ['Duskmourn: House of Horror: Commander'], 'Collector Number': ['329', '340'] },
-      { Set: ['FINAL FANTASY: Through the Ages'], 'Collector Number': ['27'] },
+      { Set: ['Duskmourn: House of Horror: Commander'], 'Collector Number': ['329', '340'], Language: ['English'] },
+      { Set: ['FINAL FANTASY: Through the Ages'], 'Collector Number': ['27'], Language: ['English'] },
     ]);
     expect(batches[0].url).toContain('/Set/');
     expect(batches[0].url).not.toContain('Card%20Name');
+  });
+
+  it("looks each language up in its own requests, in F2F's set of that language when it has one", () => {
+    const sets = ['Foreign Black Border: French', 'Foreign Black Border: German', 'Modern Horizons 2'];
+    const lookup = f2fSetLookup(sets);
+    expect(lookup({ set: 'fbb', setName: 'Foreign Black Border', lang: 'fr' })).toBe('Foreign Black Border: French');
+    expect(lookup({ set: 'fbb', setName: 'Foreign Black Border', lang: 'de' })).toBe('Foreign Black Border: German');
+    expect(lookup({ set: 'mh2', setName: 'Modern Horizons 2', lang: 'fr' })).toBe('Modern Horizons 2');
+
+    const prints = [
+      { key: 'mh2|68|nonFoil|fr', set: 'mh2', setName: 'Modern Horizons 2', cn: '68', lang: 'fr' },
+      { key: 'mh2|69|nonFoil|en', set: 'mh2', setName: 'Modern Horizons 2', cn: '69', lang: 'en' },
+      { key: 'fbb|41|nonFoil|fr', set: 'fbb', setName: 'Foreign Black Border', cn: '41', lang: 'fr' },
+    ];
+    const bySet = makeSetBatches(prints, lookup).batches.map((b) => b.facets);
+    expect(bySet).toEqual([
+      { Set: ['Foreign Black Border: French'], 'Collector Number': ['41'], Language: ['French'] },
+      { Set: ['Modern Horizons 2'], 'Collector Number': ['69'], Language: ['English'] },
+      { Set: ['Modern Horizons 2'], 'Collector Number': ['68'], Language: ['French'] },
+    ]);
+
+    const byName = makeBatches(prints.map((p) => ({ ...p, frontName: p.key, flavorName: undefined })));
+    expect(byName.map((b) => [b.keys, b.facets.Language])).toEqual([
+      [['mh2|69|nonFoil|en'], ['English']],
+      [['fbb|41|nonFoil|fr', 'mh2|68|nonFoil|fr'], ['French']],
+    ]);
+    expect(byName[1].url).toContain(`/Language/${encodeURIComponent(encodeURIComponent('French'))}`);
   });
 });

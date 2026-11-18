@@ -1,4 +1,5 @@
 import { fold } from '@/lib/format';
+import { isEnglish, langLabel } from '@/lib/cards/languages';
 import { compareValues } from '@/lib/sort';
 import type { ComparisonRow } from './compare';
 
@@ -6,11 +7,13 @@ export interface ComparisonFilters {
   q: string;
   sets: string[];
   finishes: string[];
+  /** Language codes (the print's). */
+  languages: string[];
   /** Only rows with an other-print hint ("likely wrong print"). */
   hinted: boolean;
 }
 
-export const EMPTY_COMPARISON_FILTERS: ComparisonFilters = { q: '', sets: [], finishes: [], hinted: false };
+export const EMPTY_COMPARISON_FILTERS: ComparisonFilters = { q: '', sets: [], finishes: [], languages: [], hinted: false };
 
 export const COMPARISON_SORT_KEYS = ['kind', 'name', 'set', 'cn', 'finish', 'deckQty', 'collectionQty', 'diff', 'decks'] as const;
 export type ComparisonSortKey = (typeof COMPARISON_SORT_KEYS)[number];
@@ -23,7 +26,7 @@ export const DEFAULT_COMPARISON_SORT: ComparisonSort = { key: 'name', dir: 'asc'
 const list = (v: string | null) => (v ? v.split(',').filter(Boolean) : []);
 
 export function comparisonFiltersFromParams(p: URLSearchParams): ComparisonFilters {
-  return { q: p.get('q') ?? '', sets: list(p.get('sets')), finishes: list(p.get('fin')), hinted: p.get('hint') === '1' };
+  return { q: p.get('q') ?? '', sets: list(p.get('sets')), finishes: list(p.get('fin')), languages: list(p.get('lang')), hinted: p.get('hint') === '1' };
 }
 
 export function comparisonSortFromParams(p: URLSearchParams): ComparisonSort {
@@ -43,6 +46,7 @@ export function writeComparisonParams(base: URLSearchParams, f: ComparisonFilter
   set('q', f.q.trim());
   set('sets', f.sets.join(','));
   set('fin', f.finishes.join(','));
+  set('lang', f.languages.join(','));
   set('hint', f.hinted ? '1' : null);
   set('sort', isDefault ? null : s.key);
   set('dir', isDefault ? null : s.dir);
@@ -54,12 +58,15 @@ export function applyComparisonFilters(rows: ComparisonRow[], f: ComparisonFilte
   const terms = fold(f.q).split(/\s+/).filter(Boolean);
   const sets = new Set(f.sets);
   const finishes = new Set(f.finishes);
+  const languages = new Set(f.languages);
   return rows.filter((r) => {
     if (sets.size && !sets.has(r.set)) return false;
     if (finishes.size && !finishes.has(r.finish)) return false;
+    if (languages.size && !languages.has(r.lang)) return false;
     if (f.hinted && !r.otherPrints.length) return false;
     if (terms.length) {
-      const hay = fold(`${r.name} ${r.set} ${r.setName} ${r.cn} ${r.decks.map((d) => deckName(d.deckId)).join(' ')}`);
+      const language = isEnglish(r.lang) ? '' : langLabel(r.lang);
+      const hay = fold(`${r.name} ${r.set} ${r.setName} ${r.cn} ${language} ${r.decks.map((d) => deckName(d.deckId)).join(' ')}`);
       if (!terms.every((t) => hay.includes(t))) return false;
     }
     return true;

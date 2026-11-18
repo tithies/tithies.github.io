@@ -3,7 +3,7 @@
  * answers. Requests are made by a logged-in tab of the site itself (see each site's hook content
  * script), so session tokens never leave the page; only trimmed, site-neutral data comes back.
  */
-import type { CollectionEntry } from '@/lib/cards/types';
+import type { CollectionEntry, Finish } from '@/lib/cards/types';
 import type { DeckCard, DeckSummary } from '@/lib/decks/types';
 
 /** Every collection site Tithies supports. */
@@ -56,7 +56,13 @@ export type SiteMutation =
   /** Deletes the whole collection. */
   | { site: 'moxfield'; op: 'deleteCollection' }
   /** Moxfield's own CSV import ("moxfield" format), into a binder when `binderId` is given. */
-  | { site: 'moxfield'; op: 'importCsv'; csv: string; binderId?: string };
+  | { site: 'moxfield'; op: 'importCsv'; csv: string; binderId?: string }
+  /**
+   * One card by its Moxfield card id (an exact print in one language), Near Mint, as Moxfield's
+   * own "add to collection" does; into a binder when `binderId` is given. `languageId`: the
+   * Language field (Moxfield's id).
+   */
+  | { site: 'moxfield'; op: 'addCard'; cardId: string; quantity: number; finish: Finish; languageId: string; binderId?: string };
 
 /** A write as it is sent, for the change log (never any auth header). */
 export interface DescribedRequest {

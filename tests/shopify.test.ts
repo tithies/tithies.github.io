@@ -71,7 +71,8 @@ describe('Shopify product search', () => {
     const japanese = withProductVariants(parseSuggest(suggest).docs[0], {
       variants: [{ option1: 'NM', sku: 'SIN-MTG-M15-3-JPN-NM-NF', price: 500 }],
     });
-    expect(japanese.language).toBe('JPN');
+    // F2F's own name for the SKU's language, as its search index has it.
+    expect(japanese.language).toBe('Japanese');
   });
 
   it('matches only the exact print among fuzzy results', () => {

@@ -105,12 +105,12 @@ describe('Runner', () => {
     const items = await db.items.where('runId').equals(runId).toArray();
     expect(items.every((i) => i.status === 'done')).toBe(true);
     const byKey = Object.fromEntries(items.map((i) => [i.key, i]));
-    expect(byKey['dmu|435|foil']).toMatchObject({ category: 'buylist', buyCash: 210, buyCredit: 273, match: 'exact' });
-    expect(byKey['tmc|59|foil'].doc?.finish).toBe('Surge Foil');
-    expect(byKey['zzz|999|nonFoil']).toMatchObject({ category: 'bulk', match: 'not_found', buyCash: 0.25, matchNote: "F2F doesn't carry this set" });
-    expect(byKey['fca|27|foil']).toMatchObject({ category: 'buylist', match: 'exact', buyCash: 0.1, retail: 0.75 });
-    expect(byKey['fca|27|nonFoil']).toMatchObject({ category: 'bulk', match: 'exact', retail: 0.49 });
-    expect(byKey['sos|170|nonFoil']).toMatchObject({ category: 'bulk', match: 'exact' });
+    expect(byKey['dmu|435|foil|en']).toMatchObject({ category: 'buylist', buyCash: 210, buyCredit: 273, match: 'exact' });
+    expect(byKey['tmc|59|foil|en'].doc?.finish).toBe('Surge Foil');
+    expect(byKey['zzz|999|nonFoil|en']).toMatchObject({ category: 'bulk', match: 'not_found', buyCash: 0.25, matchNote: "F2F doesn't carry this set" });
+    expect(byKey['fca|27|foil|en']).toMatchObject({ category: 'buylist', match: 'exact', buyCash: 0.1, retail: 0.75 });
+    expect(byKey['fca|27|nonFoil|en']).toMatchObject({ category: 'bulk', match: 'exact', retail: 0.49 });
+    expect(byKey['sos|170|nonFoil|en']).toMatchObject({ category: 'bulk', match: 'exact' });
 
     const run = (await db.runs.get(runId))!;
     expect(run.totals.done).toBe(prints);
@@ -176,7 +176,7 @@ describe('Runner', () => {
     expect(await controlRun(runId, 'retryErrors')).toBe(true);
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'completed' && (await db.items.where('[runId+status]').equals([runId, 'error']).count()) === 0);
-    expect((await db.items.get([runId, 'fca|27|nonFoil']))?.match).toBe('exact');
+    expect((await db.items.get([runId, 'fca|27|nonFoil|en']))?.match).toBe('exact');
   });
 
   it('runs and their results carry the account; a run deleted mid-batch leaves no orphan results', async () => {
@@ -199,7 +199,7 @@ describe('Runner', () => {
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
     expect(await db.items.where('[runId+status]').equals([runId, 'error']).count()).toBe(0);
-    expect((await db.items.get([runId, 'fca|27|nonFoil']))?.match).toBe('exact');
+    expect((await db.items.get([runId, 'fca|27|nonFoil|en']))?.match).toBe('exact');
   });
 
   it('"Clear cache" removes every cached F2F answer but keeps runs', async () => {
@@ -283,18 +283,18 @@ describe('Runner', () => {
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
 
-    const avacyn = await db.items.get([runId, 'm15|3|nonFoil']);
+    const avacyn = await db.items.get([runId, 'm15|3|nonFoil|en']);
     expect(avacyn).toMatchObject({ status: 'done', match: 'price_check', matchNote: PRICE_CHECK_NOTE, category: 'bulk', buyCash: 0.07, retail: 2.49, stock: null });
     expect(avacyn?.doc).toMatchObject({ handle: 'avacyn-guardian-angel-3-magic-2015-non-foil', source: 'shopify', skuSet: 'm15' });
-    expect(await db.items.get([runId, 'zzz|999|nonFoil'])).toMatchObject({ status: 'done', match: 'not_found', matchNote: "F2F doesn't carry this set" });
+    expect(await db.items.get([runId, 'zzz|999|nonFoil|en'])).toMatchObject({ status: 'done', match: 'not_found', matchNote: "F2F doesn't carry this set" });
     // F2F never lists oversized schemes: "unlisted", not bought, and not something to review.
-    expect(await db.items.get([runId, 'dsc|329|nonFoil'])).toMatchObject({ status: 'done', match: 'unlisted', category: 'not_bought', buyCash: 0 });
+    expect(await db.items.get([runId, 'dsc|329|nonFoil|en'])).toMatchObject({ status: 'done', match: 'unlisted', category: 'not_bought', buyCash: 0 });
     // Avacyn: name search + product JSON. The made-up card: one search (results not full). The scheme: none.
     expect(shopUrls.filter((u) => u.includes('/search/suggest.json')).length).toBe(2);
     expect(shopUrls.filter((u) => u.endsWith('.js'))).toEqual([productJsUrl('avacyn-guardian-angel-3-magic-2015-non-foil')]);
     expect(shopUrls.some((u) => u.includes('Chaos'))).toBe(false);
     expect((await db.runs.get(runId))!.totals).toMatchObject({ priceCheck: 1, unlisted: 1, notFound: 1 });
-    expect((await db.f2fCache.get('m15|3|nonFoil'))?.match).toBe('price_check');
+    expect((await db.f2fCache.get('m15|3|nonFoil|en'))?.match).toBe('price_check');
   });
 
   it('searches Shopify again with the set name when the name alone fills the results', async () => {
@@ -306,7 +306,52 @@ describe('Runner', () => {
     startRunner();
     await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
     expect(shopUrls.map((u) => decodeURIComponent(new URL(u).searchParams.get('q') ?? ''))).toEqual(['Not A Real Card', 'Not A Real Card Nowhere']);
-    expect((await db.items.get([runId, 'zzz|999|nonFoil']))?.match).toBe('not_found');
+    expect((await db.items.get([runId, 'zzz|999|nonFoil|en']))?.match).toBe('not_found');
+  });
+
+  it('checks each copy in its language: bought when F2F lists it so, else not bought', async () => {
+    const foreign = docs('f2f-foreign.json');
+    const french = encodeURIComponent(encodeURIComponent('French'));
+    vi.spyOn(F2FClient.prototype, 'search').mockImplementation(async (url: string) => {
+      urls.push(url);
+      if (url.includes('/collections/616828141940/')) return { total: bulkDocs.length, docs: bulkDocs };
+      const pool = url.includes(`/Language/${french}/`) ? foreign.filter((d) => d.language === 'French') : cardDocs;
+      return { total: pool.length, docs: pool };
+    });
+    const inLang = (e: CollectionEntry, lang: string, printLang = lang): CollectionEntry => ({ ...e, id: `${e.id}-${lang}`, lang, card: { ...e.card, lang: printLang } });
+    const sheoldred = entry('Sheoldred, the Apocalypse', 'dmu', 'Dominaria United', '435', 'foil', 'mythic');
+    const entries = [
+      inLang(entry('Swords to Plowshares', 'fbb', 'Foreign Black Border', '41', 'nonFoil', 'uncommon'), 'fr'),
+      inLang(sheoldred, 'en'),
+      inLang(sheoldred, 'fr'),
+      // Language French on the English print: checked in French, with the print's language kept to warn about.
+      inLang({ ...sheoldred, id: 'mismatch' }, 'fr', 'en'),
+      inLang(entry('Wall of Omens', 'fca', 'Final Fantasy: Through the Ages', '27', 'nonFoil', 'uncommon'), 'qya'),
+    ];
+    const { runId, prints } = await createRun('moxfield:111111', { url: 'u', pageUrl: 'p', query: {}, summary: '' }, entries, 0.3);
+    expect(prints).toBe(4);
+    startRunner();
+    await waitFor(async () => (await db.runs.get(runId))?.status === 'completed');
+
+    expect(await db.items.get([runId, 'fbb|41|nonFoil|fr'])).toMatchObject({ lang: 'fr', match: 'exact', category: 'buylist', buyCash: 40, doc: { setName: 'Foreign Black Border: French' } });
+    expect(await db.items.get([runId, 'dmu|435|foil|en'])).toMatchObject({ match: 'exact', category: 'buylist', buyCash: 210 });
+    expect(await db.items.get([runId, 'dmu|435|foil|fr'])).toMatchObject({
+      qty: 2,
+      mismatchCopies: 1,
+      printLang: 'en',
+      match: 'unlisted',
+      matchNote: "F2F doesn't list this print in French",
+      category: 'not_bought',
+      buyCash: 0,
+    });
+    expect(await db.items.get([runId, 'fca|27|nonFoil|qya'])).toMatchObject({ match: 'unlisted', matchNote: 'F2F lists no Quenya cards', category: 'not_bought', buyCash: 0 });
+    // One language per request; nothing asked for Quenya; F2F's product search is never used for other languages.
+    const lookups = urls.filter((u) => u.includes('/Collector%20Number/'));
+    expect(lookups.every((u) => (u.match(/\/Language\//g) ?? []).length === 1)).toBe(true);
+    expect(lookups.some((u) => u.includes(`/Language/${french}/`))).toBe(true);
+    expect(lookups.some((u) => u.includes('Wall%2520of%2520Omens'))).toBe(false);
+    expect(shopUrls).toEqual([]);
+    expect((await db.runs.get(runId))!.totals).toMatchObject({ unlisted: 2, notFound: 0 });
   });
 
   it('pauses after three failures in a row and can retry errors', async () => {

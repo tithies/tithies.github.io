@@ -8,15 +8,19 @@
 import type { BinderVisibility, DescribedRequest, ImportAnswer, SiteBinder, SiteMutation } from '@/lib/sites/types';
 import { MOX_API_ORIGIN } from './constants';
 import { MOX_CSV_HEADER } from './csv';
+import { MOX_ENGLISH_ID, MOX_LANGUAGE_BY_ID } from './languages';
 
-/** Moxfield's language id for English (its default everywhere). */
-export const MOX_ENGLISH_ID = 'LD58x';
+export { MOX_ENGLISH_ID };
 /** Most entries removed in one bulk request. */
 export const MAX_BULK_REMOVE = 1000;
 /** Largest CSV sent in one import (characters). */
 export const MAX_IMPORT_CSV = 2_000_000;
 
+/** Most copies added in one addCard. */
+export const MAX_ADD_QUANTITY = 10_000;
+
 const VISIBILITIES: readonly BinderVisibility[] = ['private', 'unlisted', 'public'];
+const FINISHES = new Set(['nonFoil', 'foil', 'etched']);
 const isId = (s: unknown): s is string => typeof s === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(s);
 
 /** What the page sends: a JSON body, a CSV file (multipart form, field "file"), or nothing. */
@@ -61,6 +65,28 @@ export function buildMoxMutation(raw: unknown): BuiltMutation | null {
       if (m.binderId) params.push(['tradeBinderId', m.binderId as string]);
       for (const [k, v] of params) u.searchParams.append(k, v);
       return { method: 'POST', url: u.toString(), file: { field: 'file', name: 'tithies-export.csv', type: 'text/csv', text: csv } };
+    }
+    case 'addCard': {
+      // Moxfield's own ADD_CARD_TO_COLLECTION (read from its web app, 2026-11-18): the same body, nothing else.
+      const q = m.quantity;
+      if (!isId(m.cardId) || !Number.isInteger(q) || (q as number) < 1 || (q as number) > MAX_ADD_QUANTITY) return null;
+      if (!FINISHES.has(m.finish as string) || typeof m.languageId !== 'string' || !MOX_LANGUAGE_BY_ID.has(m.languageId)) return null;
+      if (m.binderId !== undefined && !isId(m.binderId)) return null;
+      return {
+        method: 'POST',
+        url: `${MOX_API_ORIGIN}/v1/collections`,
+        json: {
+          cardId: m.cardId,
+          quantity: q,
+          condition: 'nearMint',
+          game: 'paper',
+          cardLanguageId: m.languageId,
+          finish: m.finish,
+          isAlter: false,
+          isProxy: false,
+          ...(m.binderId ? { tradeBinderId: m.binderId } : {}),
+        },
+      };
     }
     default:
       return null;

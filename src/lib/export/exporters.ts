@@ -10,7 +10,7 @@ export interface SiteExporter {
   /** One write per chunk of entries. */
   removeEntries(entryIds: string[]): SiteMutation[];
   deleteCollection(): SiteMutation;
-  /** One write per chunk of items; into the binder when given. */
+  /** The writes that add `items`: one per chunk of items, plus one per item `limits.oneByOne` picks; into the binder when given. */
   importItems(items: ExportItem[], binderId: string | null): SiteMutation[];
 }
 

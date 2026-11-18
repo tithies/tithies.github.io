@@ -303,7 +303,7 @@ export function ComparisonPage() {
       <Title order={2}>Comparator</Title>
       <Text size="sm" c="dimmed">
         Your decks compared with your collection: deck cards the collection doesn't have, and collection cards no deck uses. Compared by exact print
-        (set, collector number and finish); copies used by several decks add up.
+        (set, collector number, finish and the print's language); copies used by several decks add up.
       </Text>
     </Stack>
   );

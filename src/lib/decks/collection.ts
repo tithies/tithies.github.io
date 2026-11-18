@@ -79,7 +79,7 @@ export type CollectionRead =
  * The collection as it is now, from `base` (a complete earlier read) and the entries changed
  * since: pages read most recently changed first, until entries are older than `base`'s newest
  * change. Null (with why) when that can't be trusted: the totals don't match (something was
- * deleted), too many pages changed, or `base` has no change times.
+ * deleted), too many pages changed, or `base` has no change times (or print languages).
  */
 export async function readCollectionChanges(
   site: Site,
@@ -89,6 +89,8 @@ export async function readCollectionChanges(
 ): Promise<CollectionRead | { mode: 'none'; why: string }> {
   const newest = base.length ? newestChange(base) : -Infinity;
   if (newest === null) return { mode: 'none', why: 'the saved collection has no change times yet' };
+  // Prints read before Tithies kept their language: read every page once to learn them.
+  if (base.some((e) => typeof e.card.lang !== 'string')) return { mode: 'none', why: 'the saved collection has no print languages yet' };
   const cutoff = newest - CHANGE_OVERLAP_MS;
   const changed = new Map<string, CollectionEntry>();
   let totals: { entries: number; copies?: number } | null = null;

@@ -10,13 +10,17 @@ export function comparisonToCsv(rows: ComparisonRow[], deckName: (id: string) =>
       set_name: r.setName,
       collector_number: r.cn,
       finish: r.finish,
+      language: r.lang,
+      collection_languages: Object.entries(r.langs)
+        .map(([l, n]) => `${l} ×${n}`)
+        .join(' | '),
       rarity: r.rarity,
       deck_qty: r.deckQty,
       collection_qty: r.collectionQty,
       copies: r.kind === 'missing' ? -r.copies : r.copies,
       difference: r.diff,
       decks: r.decks.map((d) => `${deckName(d.deckId)}${d.board === 'mainboard' ? '' : ` (${boardLabel(d.board)})`} ×${d.qty}`).join(' | '),
-      other_prints: r.otherPrints.map((o) => `${o.set.toUpperCase()} ${o.cn} ${o.finish} ${o.diff > 0 ? '+' : ''}${o.diff}`).join(' | '),
+      other_prints: r.otherPrints.map((o) => `${o.set.toUpperCase()} ${o.cn} ${o.finish} ${o.lang} ${o.diff > 0 ? '+' : ''}${o.diff}`).join(' | '),
     })),
   );
 }

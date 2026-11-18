@@ -1,4 +1,6 @@
 import { buildSearchUrl, F2F_COLLECTIONS, F2F_MAX_PAGE_SIZE } from '@/lib/f2f/api';
+import { f2fLanguage } from '@/lib/f2f/languages';
+import { isEnglish, langOf } from '@/lib/cards/languages';
 import { f2fSearchNames, normSet } from './matcher';
 import type { Item } from './types';
 
@@ -17,10 +19,14 @@ export interface BatchOptions {
 
 export const DEFAULT_BATCH: BatchOptions = { maxPrints: 20, maxUrlLength: 6000, pageSize: F2F_MAX_PAGE_SIZE };
 
+/** One page of a search over MTG singles; English unless the facets name a language. */
 export const batchPageUrl = (facets: Record<string, string[]>, pageSize: number, page = 1) =>
-  buildSearchUrl({ collection: F2F_COLLECTIONS.mtgSingles, pageSize, page, facets: { ...facets, Language: ['English'] } });
+  buildSearchUrl({ collection: F2F_COLLECTIONS.mtgSingles, pageSize, page, facets: { Language: ['English'], ...facets } });
 
 type Keyed = { key: string; set: string; cn: string };
+
+/** F2F's name for a print's language. Prints in a language F2F lists nothing in are never looked up (see the runner). */
+const facetLanguage = (it: { lang?: string }) => [f2fLanguage(it.lang) ?? 'English'];
 type FacetFn<T> = (it: T) => Record<string, string[]>;
 
 function addFacets(acc: Map<string, Set<string>>, values: Record<string, string[]>) {
@@ -46,7 +52,9 @@ export function buildBatch<T extends Keyed>(items: T[], facetValues: FacetFn<T>,
  * With `groupOf`, prints of different groups never share a request.
  */
 function pack<T extends Keyed>(items: T[], facetValues: FacetFn<T>, opts: BatchOptions, groupOf?: (it: T) => string): Batch[] {
-  const sorted = [...items].sort((a, b) => a.set.localeCompare(b.set) || a.cn.localeCompare(b.cn, undefined, { numeric: true }));
+  const sorted = [...items].sort(
+    (a, b) => (groupOf ? groupOf(a).localeCompare(groupOf(b)) : 0) || a.set.localeCompare(b.set) || a.cn.localeCompare(b.cn, undefined, { numeric: true }),
+  );
   const batches: Batch[] = [];
   let keys: string[] = [];
   let group: string | undefined;
@@ -82,23 +90,24 @@ function pack<T extends Keyed>(items: T[], facetValues: FacetFn<T>, opts: BatchO
   return batches;
 }
 
-type Printish = Pick<Item, 'key' | 'frontName' | 'flavorName' | 'cn' | 'set'>;
+type Printish = Pick<Item, 'key' | 'frontName' | 'flavorName' | 'cn' | 'set' | 'lang'>;
 
-/** Pass-1 facets of one print: its names × its collector number. */
-export const nameFacets = (it: Printish) => ({ 'Card Name': f2fSearchNames(it), 'Collector Number': [it.cn] });
+/** Pass-1 facets of one print: its names × its collector number × its language. */
+export const nameFacets = (it: Printish) => ({ 'Card Name': f2fSearchNames(it), 'Collector Number': [it.cn], Language: facetLanguage(it) });
 
-/** Pass 1: Card Name ∈ names × Collector Number ∈ numbers × English. */
+/** Pass 1: Card Name ∈ names × Collector Number ∈ numbers × one language per request. */
 export function makeBatches(items: Printish[], opts: BatchOptions = DEFAULT_BATCH): Batch[] {
-  return pack(items, nameFacets, opts);
+  return pack(items, nameFacets, opts, (it) => langOf(it));
 }
 
-export type SetPrint = Pick<Item, 'set' | 'setName'>;
+export type SetPrint = Pick<Item, 'set' | 'setName' | 'lang'>;
 
 /**
  * Maps a Moxfield print's set to F2F's set name. Tried in order: the set code learned from F2F
  * docs already matched in this run (F2F SKUs carry the code), the same name up to punctuation
  * ("… Horror Commander" → "… Horror: Commander"), then a unique F2F name ending with it
- * ("Midnight Hunt Commander" → "Innistrad: Midnight Hunt: Commander").
+ * ("Midnight Hunt Commander" → "Innistrad: Midnight Hunt: Commander"). A non-English print first
+ * tries F2F's set of that language ("Foreign Black Border" in French → "Foreign Black Border: French").
  */
 export function f2fSetLookup(f2fSets: string[], byCode: ReadonlyMap<string, string> = new Map()): (p: SetPrint) => string | undefined {
   const byName = new Map<string, string>();
@@ -111,25 +120,29 @@ export function f2fSetLookup(f2fSets: string[], byCode: ReadonlyMap<string, stri
     }
     return suffixes.get(n);
   };
-  return ({ set, setName }) => byCode.get(set.toLowerCase()) ?? byName.get(normSet(setName)) ?? bySuffix(normSet(setName));
+  const inLanguage = (setName: string, lang?: string) => {
+    const language = isEnglish(lang) ? null : f2fLanguage(lang);
+    return language ? byName.get(normSet(`${setName} ${language}`)) : undefined;
+  };
+  return ({ set, setName, lang }) => inLanguage(setName, lang) ?? byCode.get(set.toLowerCase()) ?? byName.get(normSet(setName)) ?? bySuffix(normSet(setName));
 }
 
-/** Fallback facets of one print: its F2F set × its collector number. */
+/** Fallback facets of one print: its F2F set × its collector number × its language. */
 export const setFacets =
   (f2fSetOf: (p: SetPrint) => string | undefined) =>
-  (it: SetPrint & Pick<Item, 'cn'>): Record<string, string[]> => ({ Set: [f2fSetOf(it)!], 'Collector Number': [it.cn] });
+  (it: SetPrint & Pick<Item, 'cn'>): Record<string, string[]> => ({ Set: [f2fSetOf(it)!], 'Collector Number': [it.cn], Language: facetLanguage(it) });
 
 /**
- * Fallback: Set × Collector Number ∈ numbers × English, without any name filter. Finds prints
- * F2F lists under another name. One set per request: several sets would cross every set with
- * every number. Items whose set F2F doesn't have are skipped.
+ * Fallback: Set × Collector Number ∈ numbers × language, without any name filter. Finds prints
+ * F2F lists under another name. One set and one language per request: several sets would cross
+ * every set with every number. Items whose set F2F doesn't have are skipped.
  */
 export function makeSetBatches(
-  items: Pick<Item, 'key' | 'set' | 'setName' | 'cn'>[],
+  items: Pick<Item, 'key' | 'set' | 'setName' | 'cn' | 'lang'>[],
   f2fSetOf: (p: SetPrint) => string | undefined,
   opts: BatchOptions = DEFAULT_BATCH,
 ): { batches: Batch[]; unknownSet: string[] } {
   const known = items.filter((i) => f2fSetOf(i));
   const unknownSet = items.filter((i) => !f2fSetOf(i)).map((i) => i.key);
-  return { batches: pack(known, setFacets(f2fSetOf), opts, (it) => f2fSetOf(it)!), unknownSet };
+  return { batches: pack(known, setFacets(f2fSetOf), opts, (it) => `${f2fSetOf(it)!}|${langOf(it)}`), unknownSet };
 }

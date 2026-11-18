@@ -1,4 +1,5 @@
 import { fold } from '@/lib/format';
+import { isEnglish, langLabel, langOf } from '@/lib/cards/languages';
 import { compareValues } from '@/lib/sort';
 import { OVERSIZED_REASON } from '../bulk';
 import { categoryOf, matchOf, type Category, type Item } from '../types';
@@ -23,6 +24,8 @@ export interface Filters {
   finishes: string[];
   /** Values of `detailedFinish`. */
   specialFinishes: string[];
+  /** Language codes (the copies' Language field). */
+  languages: string[];
   rarities: string[];
   status: string[];
   minBuy: number | null;
@@ -42,6 +45,7 @@ export const EMPTY_FILTERS: Filters = {
   sets: [],
   finishes: [],
   specialFinishes: [],
+  languages: [],
   rarities: [],
   status: [],
   minBuy: null,
@@ -97,6 +101,7 @@ export function filtersFromParams(p: URLSearchParams): Filters {
     sets: list(p.get('sets')),
     finishes: list(p.get('fin')),
     specialFinishes: list(p.get('sfin')),
+    languages: list(p.get('lang')),
     rarities: list(p.get('rar')),
     // `match` is the pre-0.2 name of the status filter.
     status: list(p.get('status') ?? p.get('match')),
@@ -129,6 +134,7 @@ export function writeParams(base: URLSearchParams, f: Filters, s: Sort, page: nu
   set('sets', f.sets.join(','));
   set('fin', f.finishes.join(','));
   set('sfin', f.specialFinishes.join(','));
+  set('lang', f.languages.join(','));
   set('rar', f.rarities.join(','));
   p.delete('match');
   set('status', f.status.join(','));
@@ -152,6 +158,7 @@ export const activeFilterCount = (f: Filters) =>
   (f.sets.length ? 1 : 0) +
   (f.finishes.length ? 1 : 0) +
   (f.specialFinishes.length ? 1 : 0) +
+  (f.languages.length ? 1 : 0) +
   (f.rarities.length ? 1 : 0) +
   (f.status.length ? 1 : 0) +
   (f.minBuy != null || f.maxBuy != null ? 1 : 0) +
@@ -195,20 +202,23 @@ export function applyFilters(items: Item[], f: Filters): Item[] {
   const sets = new Set(f.sets);
   const fins = new Set(f.finishes);
   const sfins = new Set(f.specialFinishes);
+  const langs = new Set(f.languages);
   const rars = new Set(f.rarities);
   const states = new Set(f.status);
   return items.filter((it) => {
     if (terms.length) {
       // Reasons too ("Unfinity is excluded…", "Tokens are not bought…", "Surge Foil"…). Older
       // rows of oversized cards carry a reason without the word "scheme", so add today's.
-      const oversized = matchOf(it) === 'unlisted' ? OVERSIZED_REASON : '';
-      const hay = fold(`${it.name} ${it.set} ${it.setName} ${it.cn} ${it.doc?.title ?? ''} ${it.bulkReason ?? ''} ${it.matchNote ?? ''} ${it.error ?? ''} ${oversized}`);
+      const oversized = matchOf(it) === 'unlisted' && isEnglish(it.lang) ? OVERSIZED_REASON : '';
+      const language = isEnglish(it.lang) ? '' : langLabel(it.lang);
+      const hay = fold(`${it.name} ${it.set} ${it.setName} ${it.cn} ${language} ${it.doc?.title ?? ''} ${it.bulkReason ?? ''} ${it.matchNote ?? ''} ${it.error ?? ''} ${oversized}`);
       if (!terms.every((t) => hay.includes(t))) return false;
     }
     if (f.category !== 'all' && categoryOf(it) !== f.category) return false;
     if (sets.size && !sets.has(it.set)) return false;
     if (fins.size && !fins.has(it.finish)) return false;
     if (sfins.size && !sfins.has(detailedFinish(it))) return false;
+    if (langs.size && !langs.has(langOf(it))) return false;
     if (rars.size && !rars.has(it.rarity)) return false;
     if (states.size && !states.has(itemState(it))) return false;
     const buy = it.buyCash ?? null;

@@ -1,9 +1,13 @@
 /**
- * Decks vs collection, by exact print (set + collector number + finish, like the F2F buylist).
+ * Decks vs collection, by exact print: set + collector number + finish + the print's language
+ * (Moxfield has one card object per print and language, and deck cards point to one: a deck's
+ * French Talisman is the French print). Deck cards have no Language field, so a collection copy is
+ * matched by its print too, even when its Language field says otherwise (that copy gets a warning).
  * Deck copies are summed over every included deck: each physical copy is expected to live in one deck.
  */
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
-import { printKey } from '@/lib/cards/prints';
+import { copyKey } from '@/lib/cards/prints';
+import { langOf } from '@/lib/cards/languages';
 import type { CardPrint, CollectionEntry, Finish } from '@/lib/cards/types';
 
 /**
@@ -25,9 +29,11 @@ export interface OtherPrint {
   setName: string;
   cn: string;
   finish: Finish;
+  /** That print's language. */
+  lang: string;
   /** That print's collection − decks. */
   diff: number;
-  /** Same set and number: only the finish differs. */
+  /** Same set and number: only the finish or the language differs. */
   sameCn: boolean;
   /** The decks that use that print (where to fix it when decks use the wrong one). */
   decks: DeckUse[];
@@ -40,7 +46,7 @@ export interface OtherPrint {
 export interface ComparisonRow {
   /** Unique per row: the print key, with "|match" for the matching part. */
   key: string;
-  /** The print (set|cn|finish), the same for both rows of a print. */
+  /** The print (set|cn|finish|lang), the same for both rows of a print. */
   printKey: string;
   kind: ComparisonKind;
   name: string;
@@ -48,6 +54,12 @@ export interface ComparisonRow {
   setName: string;
   cn: string;
   finish: Finish;
+  /** The print's language (deck and collection copies alike). */
+  lang: string;
+  /** The print's collection copies by their Language field (what an export writes). */
+  langs: Record<string, number>;
+  /** Collection copies of the print whose Language field isn't the print's language (a warning). */
+  mismatchCopies: number;
   rarity: string;
   typeLine: string;
   scryfallId: string;
@@ -94,10 +106,15 @@ export interface CompareSummary {
 
 interface Acc {
   key: string;
+  /** The print's card: a collection copy's when there is one (a deck card read from a group of copies may lack some fields). */
   card: CardPrint;
+  cardFromCollection: boolean;
   finish: Finish;
+  lang: string;
   deckQty: number;
   collectionQty: number;
+  langs: Record<string, number>;
+  mismatchCopies: number;
   decks: Map<string, DeckUse>;
 }
 
@@ -130,11 +147,12 @@ export function compareDecksToCollection(
     nonPaperSkipped: 0,
   };
 
-  const slot = (card: CardPrint, finish: Finish): Acc => {
-    const key = printKey(card.set, card.cn, finish);
+  const slot = (card: CardPrint, finish: Finish, printLang: string): Acc => {
+    const lang = langOf({ lang: printLang });
+    const key = copyKey(card.set, card.cn, finish, lang);
     let a = acc.get(key);
     if (!a) {
-      a = { key, card, finish, deckQty: 0, collectionQty: 0, decks: new Map() };
+      a = { key, card, cardFromCollection: false, finish, lang, deckQty: 0, collectionQty: 0, langs: {}, mismatchCopies: 0, decks: new Map() };
       acc.set(key, a);
     }
     return a;
@@ -154,7 +172,8 @@ export function compareDecksToCollection(
         summary.proxiesSkipped.decks += c.qty;
         continue;
       }
-      const a = slot(c.card, c.finish);
+      // A deck copy's language is its print's (decks read before Tithies kept it: English).
+      const a = slot(c.card, c.finish, langOf(c.card));
       a.deckQty += c.qty;
       summary.deckCopies += c.qty;
       const useKey = `${deck.id}|${c.board}`;
@@ -179,9 +198,17 @@ export function compareDecksToCollection(
       summary.proxiesSkipped.collection += e.qty;
       continue;
     }
-    // Every language and condition of a print counts: decks don't record either.
-    const a = slot(e.card, e.finish);
+    // Every condition counts (decks don't record it). The print's language decides the match;
+    // a snapshot read before Tithies kept it falls back to the Language field.
+    const lang = langOf(e);
+    const a = slot(e.card, e.finish, e.card.lang || lang);
+    if (!a.cardFromCollection) {
+      a.card = e.card;
+      a.cardFromCollection = true;
+    }
     a.collectionQty += e.qty;
+    a.langs[lang] = (a.langs[lang] ?? 0) + e.qty;
+    if (lang !== a.lang) a.mismatchCopies += e.qty;
     summary.collectionCopies += e.qty;
   }
 
@@ -198,6 +225,9 @@ export function compareDecksToCollection(
       setName: a.card.setName,
       cn: a.card.cn,
       finish: a.finish,
+      lang: a.lang,
+      langs: a.langs,
+      mismatchCopies: a.mismatchCopies,
       rarity: a.card.rarity,
       typeLine: a.card.typeLine,
       scryfallId: a.card.scryfallId,
@@ -239,7 +269,7 @@ export function compareDecksToCollection(
   for (const r of differing) {
     const others = byName.get(nameKey(r.name))!.filter((o) => o !== r && Math.sign(o.diff) === -Math.sign(r.diff));
     r.otherPrints = others
-      .map((o) => ({ key: o.printKey, set: o.set, setName: o.setName, cn: o.cn, finish: o.finish, diff: o.diff, sameCn: o.set === r.set && o.cn === r.cn, decks: o.decks }))
+      .map((o) => ({ key: o.printKey, set: o.set, setName: o.setName, cn: o.cn, finish: o.finish, lang: o.lang, diff: o.diff, sameCn: o.set === r.set && o.cn === r.cn, decks: o.decks }))
       .sort((x, y) => Number(y.sameCn) - Number(x.sameCn) || Math.abs(y.diff) - Math.abs(x.diff));
     if (r.otherPrints.length) summary.hinted++;
   }

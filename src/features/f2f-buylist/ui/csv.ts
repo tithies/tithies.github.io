@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import { f2fLinks } from '@/lib/f2f/links';
+import { langLabel } from '@/lib/cards/languages';
 import { categoryOf, matchOf, type Item, type Run } from '../types';
 import { pctOf } from './filtering';
 
@@ -12,6 +13,8 @@ export function itemsToCsv(items: Item[]): string {
       set_name: i.setName,
       collector_number: i.cn,
       finish: i.finish,
+      language: langLabel(i.lang),
+      print_language: i.printLang ? langLabel(i.printLang) : '',
       rarity: i.rarity,
       qty: i.qty,
       f2f_buy_cash: i.buyCash ?? '',

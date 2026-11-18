@@ -9,7 +9,8 @@ export type RunPhase = 'bulk_rates' | 'lookup' | 'fallback' | 'shop_search' | 'd
 export type Category = 'buylist' | 'bulk' | 'not_bought';
 /**
  * price_check: the exact print is on F2F but missing from its search index, so its buy price is unknown.
- * unlisted: not found, and F2F never lists this kind of card (oversized schemes, planes…): nothing to review.
+ * unlisted: not found, and F2F never lists this kind of card: oversized schemes and planes, or this
+ * print in this language (F2F lists most prints in English only). Nothing to review.
  */
 export type MatchStatus = 'exact' | 'loose' | 'price_check' | 'unlisted' | 'not_found';
 /** pending → (pass 1) → fallback? → shop_search? (Shopify product search) → done | error */
@@ -115,6 +116,11 @@ export interface Item {
   setType: string;
   cn: string;
   finish: Finish;
+  /** The copies' language (Moxfield's Language field), looked up on F2F in that language only. Unset: English (older runs). */
+  lang?: string;
+  /** Copies whose print is in another language than their Language field (a warning), and that language. */
+  mismatchCopies?: number;
+  printLang?: string;
   rarity: string;
   typeLine: string;
   isToken: boolean;

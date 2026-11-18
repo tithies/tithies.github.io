@@ -53,8 +53,9 @@ export function RunsPage() {
             </List.Item>
           </List>
           <Text size="sm" c="dimmed">
-            Only English, non-proxy cards are checked, at NM prices. The panel can be minimised to the Tithies medallion; it stays that way until you
-            open it again.
+            Non-proxy cards are checked, at NM prices, each in the language Moxfield says it is: F2F lists most prints in English only, and a card it
+            doesn't list in its language counts as not bought. The panel can be minimised to the Tithies medallion; it stays that way until you open it
+            again.
           </Text>
         </GettingStarted>
       ) : (

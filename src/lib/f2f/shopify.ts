@@ -7,6 +7,7 @@
  * Both endpoints answer without cookies.
  */
 import { F2F_ORIGIN, skuSetCode, type F2FDoc, type F2FVariant } from './api';
+import { F2F_SKU_LANGUAGES, F2F_TITLE_LANGUAGES } from './languages';
 
 /** Results Shopify's predictive search returns at most. */
 export const SUGGEST_LIMIT = 10;
@@ -39,7 +40,7 @@ export interface ProductJs {
 }
 
 /** F2F titles non-English singles "Twitching Doll - Japanese [2026-4] […]". */
-const LANGUAGE_SUFFIX = / - (Japanese|French|German|Italian|Spanish|Portuguese|Korean|Russian|Chinese(?: Simplified| Traditional)?|Phyrexian)$/i;
+const LANGUAGE_SUFFIX = new RegExp(` - (${F2F_TITLE_LANGUAGES.join('|')})$`, 'i');
 
 export interface SinglesTitle {
   name: string;
@@ -119,11 +120,13 @@ export function withProductVariants(doc: F2FDoc, product: ProductJs): F2FDoc {
   }));
   const sku = variants.find((v) => v.sku)?.sku;
   const lang = skuLanguage(sku);
+  // F2F's own name for the SKU's language (an unknown code is kept: it matches no language).
+  const language = lang && lang !== 'ENG' ? (F2F_SKU_LANGUAGES[lang] ?? lang) : doc.language;
   const image = doc.image ?? (product.featured_image ? product.featured_image.replace(/^\/\//, 'https://') : null);
   return {
     ...doc,
     skuSet: skuSetCode(sku),
-    language: lang && lang !== 'ENG' ? lang : doc.language,
+    language,
     image,
     variants,
   };

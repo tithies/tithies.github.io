@@ -24,6 +24,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { accountLabel, type AccountKey, type AccountRow } from '@/lib/accounts/types';
 import { finishLabel } from '@/lib/format';
+import { langLabel } from '@/lib/cards/languages';
 import type { SiteProvider } from '@/lib/sites/provider';
 import type { BinderVisibility } from '@/lib/sites/types';
 import { useSiteSessions } from '@/lib/sites/useSiteSessions';
@@ -148,6 +149,7 @@ function PreviewStep({ site, plan, name }: { site: SiteProvider; plan: ExportPla
                     <Table.Td>
                       {i.set.toUpperCase()} #{i.cn} · {finishLabel(i.finish)}
                     </Table.Td>
+                    <Table.Td c="dimmed">{langLabel(i.lang)}</Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -427,8 +429,8 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
                   </Stack>
                 )}
                 <Text size="xs" c="dimmed">
-                  Cards will be added Near Mint, English, with their exact set, collector number and finish (Moxfield's CSV import). Nothing is changed until you
-                  confirm, two steps from here.
+                  Cards will be added Near Mint, each in its language, with their exact set, collector number and finish (Moxfield's CSV import). Nothing is
+                  changed until you confirm, two steps from here.
                 </Text>
               </>
             )}

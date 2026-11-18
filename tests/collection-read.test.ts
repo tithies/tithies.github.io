@@ -17,7 +17,7 @@ const entry = (id: string, qty: number, at: number): CollectionEntry => ({
   isAlter: false,
   game: 'paper',
   updatedAt: iso(at),
-  card: { id: `c-${id}`, scryfallId: '', set: 'set', setName: 'Set', setType: 'expansion', name: id, faces: [id], flavorName: '', cn: id, rarity: 'common', typeLine: '', isToken: false, usd: { nonFoil: null, foil: null, etched: null } },
+  card: { id: `c-${id}`, scryfallId: '', set: 'set', setName: 'Set', setType: 'expansion', name: id, faces: [id], flavorName: '', cn: id, lang: 'en', rarity: 'common', typeLine: '', isToken: false, usd: { nonFoil: null, foil: null, etched: null } },
 });
 
 /** A fake Moxfield collection: pages by name, or most recently changed first; counts what was asked. */
@@ -83,6 +83,9 @@ describe('Collection reads: only what changed', () => {
 
     const old = base.map(({ updatedAt: _u, ...e }) => e);
     expect(await readCollectionChanges(SITE, fakeMox(base), old)).toMatchObject({ mode: 'none', why: expect.stringMatching(/no change times/) });
+    // Read before Tithies kept the print's language: every page once, to learn it.
+    const noLang = base.map((e) => ({ ...e, card: { ...e.card, lang: undefined } }));
+    expect(await readCollectionChanges(SITE, fakeMox(base), noLang)).toMatchObject({ mode: 'none', why: expect.stringMatching(/no print languages/) });
   });
 
   it('too many changes: every page instead', async () => {

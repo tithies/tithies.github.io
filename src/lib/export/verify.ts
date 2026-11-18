@@ -1,9 +1,12 @@
 /**
  * After an export: compares the target account's collection with what it should be, print by
- * print (copies per print + finish; in the binder for binder targets). Everything the export
- * didn't touch must be unchanged; for the exported prints, after = before − removed + added.
+ * print (copies per print + finish + Language field + the print's own language; in the binder for
+ * binder targets). Everything the export didn't touch must be unchanged; for the exported prints,
+ * after = before − removed + added. A card imported as another print, or in another language,
+ * shows up as short + extra.
  */
-import { printKey } from '@/lib/cards/prints';
+import { copyKey } from '@/lib/cards/prints';
+import { langOf } from '@/lib/cards/languages';
 import type { CollectionEntry } from '@/lib/cards/types';
 import type { ExportPlan, ExportVerification, VerifyDiff } from './types';
 
@@ -13,19 +16,31 @@ interface Slot {
   set: string;
   cn: string;
   finish: VerifyDiff['finish'];
+  lang: string;
+  printLang: string;
   qty: number;
 }
 
-/** Copies per print (+ finish), split by "in scope" (the binder, or the whole collection) vs the rest. */
+/** game|set|cn|finish|Language field, then "|print language" when the print is in another language. */
+const slotKey = (game: string, set: string, cn: string, finish: VerifyDiff['finish'], lang: string, printLang: string) =>
+  `${game}|${copyKey(set, cn, finish, lang)}${printLang !== lang ? `|${printLang}` : ''}`;
+/** An entry's print language (unknown: the Language field's). */
+const entryPrint = (e: CollectionEntry) => langOf({ lang: e.card.lang || e.lang });
+/** The print language an item must arrive in (unknown: the Language field's). */
+const itemPrint = (i: ExportPlan['items'][number]) => langOf({ lang: i.printLang ?? i.lang });
+const entryKey = (e: CollectionEntry) => slotKey(e.game ?? 'paper', e.card.set, e.card.cn, e.finish, langOf(e), entryPrint(e));
+const itemKey = (i: ExportPlan['items'][number]) => slotKey('paper', i.set, i.cn, i.finish, langOf(i), itemPrint(i));
+
+/** Copies per print (+ finish + language), split by "in scope" (the binder, or the whole collection) vs the rest. */
 function tally(entries: readonly CollectionEntry[], inScope: (e: CollectionEntry) => boolean) {
   const scope = new Map<string, Slot>();
   const rest = new Map<string, Slot>();
   for (const e of entries) {
-    const key = `${e.game ?? 'paper'}|${printKey(e.card.set, e.card.cn, e.finish)}`;
+    const key = entryKey(e);
     const m = inScope(e) ? scope : rest;
     const s = m.get(key);
     if (s) s.qty += e.qty;
-    else m.set(key, { key, name: e.card.name, set: e.card.set, cn: e.card.cn, finish: e.finish, qty: e.qty });
+    else m.set(key, { key, name: e.card.name, set: e.card.set, cn: e.card.cn, finish: e.finish, lang: langOf(e), printLang: entryPrint(e), qty: e.qty });
   }
   return { scope, rest };
 }
@@ -45,17 +60,17 @@ export function verifyExport(plan: ExportPlan, before: readonly CollectionEntry[
   const removedIds = new Set(plan.remove.entries.map((r) => r.entryId));
   for (const e of before) {
     if (!removedIds.has(e.id) || !inScope(e)) continue;
-    const key = `${e.game ?? 'paper'}|${printKey(e.card.set, e.card.cn, e.finish)}`;
+    const key = entryKey(e);
     const s = expected.get(key);
     if (s) s.qty -= e.qty;
   }
   const cartKeys = new Set<string>();
   for (const i of plan.items) {
-    const key = `paper|${printKey(i.set, i.cn, i.finish)}`;
+    const key = itemKey(i);
     cartKeys.add(key);
     const s = expected.get(key);
     if (s) s.qty += i.qty;
-    else expected.set(key, { key, name: i.name, set: i.set, cn: i.cn, finish: i.finish, qty: i.qty });
+    else expected.set(key, { key, name: i.name, set: i.set, cn: i.cn, finish: i.finish, lang: langOf(i), printLang: itemPrint(i), qty: i.qty });
   }
   // A collection replace also deletes what is outside binders: "rest" is empty then, in both.
   const expectedRest = plan.remove.wholeCollection ? new Map<string, Slot>() : b.rest;
@@ -69,6 +84,8 @@ export function verifyExport(plan: ExportPlan, before: readonly CollectionEntry[
     set: s.set,
     cn: s.cn,
     finish: s.finish,
+    lang: s.lang,
+    printLang: s.printLang,
     expected: exp,
     found,
     ...(outside ? { outside } : {}),

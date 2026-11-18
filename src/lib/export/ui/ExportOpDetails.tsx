@@ -4,13 +4,17 @@ import type { ChangeOp } from '@/lib/changes/types';
 import { finishLabel } from '@/lib/format';
 import { siteOf } from '@/lib/sites/registry';
 import { MOX_CONDITION_NAMES, MOX_LANGUAGE_NAMES, toMoxCsv } from '@/lib/sites/moxfield/csv';
+import { isEnglish, langBadge, langLabel } from '@/lib/cards/languages';
 import { downloadText } from '@/lib/ui/download';
 import { Stat } from '@/lib/ui/Stat';
 import type { ExportDetails, RemovedEntry, VerifyDiff } from '../types';
 
 const n = (v: number) => v.toLocaleString('en-CA');
 const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
-const print = (d: { set: string; cn: string; finish: VerifyDiff['finish'] }) => `${d.set.toUpperCase()} #${d.cn} ${finishLabel(d.finish)}`;
+const print = (d: { set: string; cn: string; finish: VerifyDiff['finish']; lang?: string; printLang?: string }) =>
+  `${d.set.toUpperCase()} #${d.cn} ${finishLabel(d.finish)}${isEnglish(d.lang) ? '' : ` · ${langBadge(d.lang)}`}${
+    d.printLang && d.printLang !== (d.lang || 'en') ? ` (${langLabel(d.printLang)} print)` : ''
+  }`;
 
 /** The removed entries as a Moxfield CSV, to import them back by hand (condition and language kept). */
 export function removedAsCsv(removed: readonly RemovedEntry[]): string {

@@ -90,6 +90,10 @@ export function validItems(items: unknown): items is ExportItem[] {
         str(i.cn, 20) &&
         i.cn !== '' &&
         FINISHES.has(i.finish) &&
+        (i.lang === undefined || (str(i.lang, 8) && /^[a-z]{2,4}$/.test(i.lang))) &&
+        (i.printLang === undefined || (str(i.printLang, 8) && /^[a-z]{0,4}$/.test(i.printLang))) &&
+        typeof i.cardId === 'string' &&
+        i.cardId.length <= 64 &&
         Number.isInteger(i.qty) &&
         i.qty >= 1 &&
         i.qty <= 10_000,
