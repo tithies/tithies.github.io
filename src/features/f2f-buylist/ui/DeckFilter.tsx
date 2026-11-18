@@ -1,5 +1,5 @@
 /** The run page's "Cards in decks" filter: decks, boards and proxies, and the deck sync it needs. */
-import { Anchor, Button, Checkbox, Divider, Group, SimpleGrid, Stack, Switch, Text } from '@mantine/core';
+import { Anchor, Button, Divider, Group, SimpleGrid, Stack, Switch, Text } from '@mantine/core';
 import { IconPlayerStop, IconRefresh } from '@tabler/icons-react';
 import { accountData } from '@/lib/accounts/data';
 import type { AccountKey } from '@/lib/accounts/types';
@@ -99,7 +99,7 @@ export function DeckFilter({
       <Divider label="Cards in decks" labelPosition="left" />
       <Switch
         label="Hide copies used in decks"
-        description="Keeps the copies no included deck uses: a print whose copies are all in decks is left out, others keep their free copies (and the totals above count only those). Compared by exact print like the Comparator, against your whole collection."
+        description="Keeps the copies no included deck uses: a print whose copies are all in decks is left out, others keep their free copies (and the totals above count only those). Compared by exact print like the Comparator, against your whole collection. Deck proxies don't count: they use no copy of your collection."
         checked={config.enabled}
         onChange={(e) => update({ enabled: e.currentTarget.checked })}
       />
@@ -153,12 +153,6 @@ export function DeckFilter({
               </Stack>
               <Stack gap="sm">
                 <BoardCheckboxes boards={boards} ignoredBoards={config.ignoredBoards} onChange={(ignoredBoards) => update({ ignoredBoards })} site={site} />
-                <Checkbox
-                  label="Ignore deck proxies"
-                  description="A proxy in a deck doesn't use a copy of your collection"
-                  checked={config.ignoreProxies}
-                  onChange={(e) => update({ ignoreProxies: e.currentTarget.checked })}
-                />
                 <Text size="xs" c="dimmed">
                   Decks synced {decksMeta.lastSuccessAt ? timeAgo(decksMeta.lastSuccessAt) : 'never'} · Collection read {collection ? timeAgo(collection.fetchedAt) : 'never'}
                 </Text>

@@ -15,8 +15,6 @@ export const sellingDeckFilterSchema = z.object({
   ignoredBoards: z.array(z.string()).default(['maybeboard']).catch(['maybeboard']),
   /** Decks left out. Stored as exclusions so newly detected decks are included by default. */
   excludedDeckIds: z.array(z.string()).default([]).catch([]),
-  /** Deck proxies don't use a collection copy (runs never hold proxies). */
-  ignoreProxies: z.boolean().default(true).catch(true),
 });
 
 export type SellingDeckFilter = z.infer<typeof sellingDeckFilterSchema>;

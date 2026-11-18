@@ -6,6 +6,7 @@
  * condition) holds only those copies, while a deck's copy may be another one (the site doesn't say
  * which copy a deck uses). So a print's free copies are its copies (in the collection snapshot, or
  * the run's when it has more, e.g. no snapshot yet) − the copies decks use, capped at the run's.
+ * Deck proxies never count: they use no copy of the collection (and runs hold no proxies).
  */
 import { compareDecksToCollection, type CompareOptions, type DeckUse } from '@/features/collection-comparison/compare';
 import { langOf } from '@/lib/cards/languages';
@@ -60,10 +61,14 @@ export function freeCopies(
   decks: readonly DeckRow[],
   deckCards: readonly DeckCardsRow[],
   collection: readonly CollectionEntry[],
-  opts: CompareOptions,
+  opts: Pick<CompareOptions, 'excludedDeckIds' | 'ignoredBoards'>,
 ): FreeCopies {
   const sellable = collection.filter(isSellable);
-  const { rows, summary: compared } = compareDecksToCollection(decks, deckCards, sellable, opts);
+  const { rows, summary: compared } = compareDecksToCollection(decks, deckCards, sellable, {
+    excludedDeckIds: opts.excludedDeckIds,
+    ignoredBoards: opts.ignoredBoards,
+    ignoreProxies: true,
+  });
   // Both rows of a print carry its totals: one is enough.
   const prints = new Map<string, { deckQty: number; collectionQty: number; decks: DeckUse[] }>();
   for (const r of rows) if (r.deckQty > 0 && !prints.has(r.printKey)) prints.set(r.printKey, r);

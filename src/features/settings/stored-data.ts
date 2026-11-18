@@ -79,7 +79,7 @@ export const PREFERENCE_LABELS: Record<string, string> = {
 /** Labels of per-account preference keys ("collectionComparison:moxfield:123"), by prefix. */
 const ACCOUNT_PREFERENCE_PREFIXES: Record<string, string> = {
   'collectionComparison:': 'Comparator options of one account: decks and folders left out, boards, proxies, what to show',
-  'sellingDeckFilter:': 'Selling runs “Cards in decks” filter of one account: on or off, decks and folders left out, boards, proxies',
+  'sellingDeckFilter:': 'Selling runs “Cards in decks” filter of one account: on or off, decks and folders left out, boards',
   'deckMismatchConfig:': 'Mismatches page options of one account, from an older version',
 };
 

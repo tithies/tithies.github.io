@@ -92,7 +92,7 @@ const item = (c: CardPrint, qty: number, p: Partial<Item> = {}): Item =>
     ...p,
   }) as Item;
 
-const OPTS: CompareOptions = { excludedDeckIds: [], ignoredBoards: ['maybeboard'], ignoreProxies: true };
+const OPTS: Pick<CompareOptions, 'excludedDeckIds' | 'ignoredBoards'> = { excludedDeckIds: [], ignoredBoards: ['maybeboard'] };
 const DECKS = [deckRow('a'), deckRow('b')];
 const qtyOf = (items: Item[], c: CardPrint) => items.find((i) => i.name === c.name)?.qty ?? 0;
 
@@ -119,7 +119,7 @@ describe('freeCopies', () => {
     expect(r.summary).toMatchObject({ hiddenPrints: 1, reducedPrints: 1, hiddenCopies: 3, decksIncluded: 2, decksWithoutCards: 0, withCollection: true });
   });
 
-  it('applies the deck, board and proxy options', () => {
+  it('applies the deck and board options, and never counts deck proxies', () => {
     const items = [item(BOLT, 4)];
     const collection = [entry(BOLT, 4)];
     const cards = [cardsRow('a', [dc(BOLT, 1), dc(BOLT, 1, 'maybeboard'), dc(BOLT, 1, 'mainboard', 'nonFoil', true)]), cardsRow('b', [dc(BOLT, 1)])];
@@ -127,7 +127,6 @@ describe('freeCopies', () => {
     expect(qtyOf(freeCopies(items, DECKS, cards, collection, OPTS).items, BOLT)).toBe(2);
     expect(qtyOf(freeCopies(items, DECKS, cards, collection, { ...OPTS, excludedDeckIds: ['b'] }).items, BOLT)).toBe(3);
     expect(qtyOf(freeCopies(items, DECKS, cards, collection, { ...OPTS, ignoredBoards: [] }).items, BOLT)).toBe(1);
-    expect(qtyOf(freeCopies(items, DECKS, cards, collection, { ...OPTS, ignoreProxies: false }).items, BOLT)).toBe(1);
   });
 
   it('compares exact prints: another finish or language is not the same card', () => {
@@ -183,13 +182,13 @@ describe('freeCopies', () => {
 
 describe('Selling "Cards in decks" options', () => {
   it('defaults to off, and repairs stored options field by field', () => {
-    expect(DEFAULT_SELLING_DECK_FILTER).toEqual({ enabled: false, ignoredBoards: ['maybeboard'], excludedDeckIds: [], ignoreProxies: true });
+    expect(DEFAULT_SELLING_DECK_FILTER).toEqual({ enabled: false, ignoredBoards: ['maybeboard'], excludedDeckIds: [] });
     expect(parseSellingDeckFilter(null)).toEqual(DEFAULT_SELLING_DECK_FILTER);
-    expect(parseSellingDeckFilter({ enabled: true, ignoredBoards: 'x', excludedDeckIds: ['d1'], ignoreProxies: 3 })).toEqual({
+    // Options of before are dropped (deck proxies never count now).
+    expect(parseSellingDeckFilter({ enabled: true, ignoredBoards: 'x', excludedDeckIds: ['d1'], ignoreProxies: false })).toEqual({
       enabled: true,
       ignoredBoards: ['maybeboard'],
       excludedDeckIds: ['d1'],
-      ignoreProxies: true,
     });
   });
 });
