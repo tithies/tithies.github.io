@@ -10,19 +10,19 @@ import { ExportDialog } from '@/lib/export/ui/ExportDialog';
 import { ExportProgressModal, RecentExportsModal } from '@/lib/export/ui/ExportProgress';
 import { accountLabel } from '@/lib/accounts/types';
 import { DeckTreePicker } from '@/lib/decks/DeckTreePicker';
-import { cancelSync, useCollectionMeta, useDeckData, useDecks, useDecksMeta, useSyncState } from '@/lib/decks/hooks';
+import { BoardCheckboxes, boardCopies } from '@/lib/decks/BoardCheckboxes';
+import { cancelSync, useCollectionMeta, useDeckData, useDecks, useDecksMeta, useFolderUrl, useSyncState } from '@/lib/decks/hooks';
 import { StartError, useStartSync } from '@/lib/decks/StartSync';
 import { SyncProgress } from '@/lib/decks/SyncProgress';
 import { GettingStarted } from '@/lib/ui/GettingStarted';
 import { useInitialSync } from '@/lib/ui/InitialSync';
 import { markDecksSeen } from '@/lib/decks/sync';
-import { folderIdsByPath } from '@/lib/decks/tree';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { accountData } from '@/lib/accounts/data';
 import { AccountHint } from '@/lib/ui/AccountHint';
 import type { AccountKey } from '@/lib/accounts/types';
 import type { SiteProvider } from '@/lib/sites/provider';
-import type { CollectionMeta, DeckCardsRow, DeckRow } from '@/lib/decks/types';
+import type { CollectionMeta, DeckRow } from '@/lib/decks/types';
 import { timeAgo } from '@/lib/format';
 import { siteOf } from '@/lib/sites/registry';
 import { Stat } from '@/lib/ui/Stat';
@@ -36,9 +36,6 @@ function usePageAccount(): { key: AccountKey | null; site: SiteProvider } {
   const { key, account } = useCurrentAccount();
   return { key, site: siteOf(account?.type ?? 'moxfield') };
 }
-
-/** Boards always offered, even before any deck uses them. */
-const BASE_BOARDS = ['commanders', 'mainboard', 'sideboard', 'maybeboard'];
 
 /** After a sync stopped because the site is logged in as someone else: switch to that account (or offer its initial sync when new). */
 function useSwitchTo(site: SiteProvider) {
@@ -85,13 +82,6 @@ function FirstSync({ decks }: { decks: DeckRow[] }) {
   );
 }
 
-/** Copies per board across every cached deck (to list only boards that exist). */
-function boardCopies(deckCards: DeckCardsRow[]): Map<string, number> {
-  const m = new Map<string, number>(BASE_BOARDS.map((b) => [b, 0]));
-  for (const row of deckCards) for (const c of row.cards) m.set(c.board, (m.get(c.board) ?? 0) + c.qty);
-  return m;
-}
-
 function OptionsCard({
   config,
   update,
@@ -110,37 +100,12 @@ function OptionsCard({
   const { start, error, starting, clearError } = useStartSync(site.type, key);
   const switchTo = useSwitchTo(site);
   const running = sync?.status === 'running' || starting;
-  const ignored = new Set(config.ignoredBoards);
-  const boardKeys = [...boards.keys()].filter((b) => BASE_BOARDS.includes(b) || (boards.get(b) ?? 0) > 0).sort((a, b) => site.boardOrder(a) - site.boardOrder(b));
-  const toggleBoard = (b: string, count: boolean) => update({ ignoredBoards: count ? config.ignoredBoards.filter((x) => x !== b) : [...ignored, b] });
 
   return (
     <Paper withBorder p="md" radius="md">
       <Stack gap="sm">
         <Title order={4}>Options</Title>
-        <Stack gap={6}>
-          <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-            Deck boards counted
-          </Text>
-          <Group gap="md">
-            {boardKeys.map((b) => (
-              <Checkbox
-                key={b}
-                size="sm"
-                label={
-                  <>
-                    {site.boardLabel(b)}{' '}
-                    <Text span size="xs" c="dimmed" className="ti-num">
-                      {boards.get(b) ?? 0}
-                    </Text>
-                  </>
-                }
-                checked={!ignored.has(b)}
-                onChange={(e) => toggleBoard(b, e.currentTarget.checked)}
-              />
-            ))}
-          </Group>
-        </Stack>
+        <BoardCheckboxes boards={boards} ignoredBoards={config.ignoredBoards} onChange={(ignoredBoards) => update({ ignoredBoards })} site={site} />
         <Checkbox
           label="Ignore proxies"
           description="Proxy copies are left out on both sides"
@@ -184,9 +149,6 @@ function OptionsCard({
           {/* During a decks-only sync this joins it: the collection is read right after the decks. */}
           <Button leftSection={<IconArrowsDiff size={16} />} loading={running && sync?.withCollection} onClick={() => void start(true)}>
             Compare
-          </Button>
-          <Button variant="default" leftSection={<IconRefresh size={16} />} disabled={running} onClick={() => void start(false)}>
-            Sync decks only
           </Button>
           {running && (
             <Button variant="subtle" color="gray" leftSection={<IconPlayerStop size={16} />} onClick={() => void cancelSync(site.type)}>
@@ -269,13 +231,7 @@ export function ComparisonPage() {
   const { deckCards, collection, loaded } = useDeckData(key, version);
 
   const deckById = useMemo(() => new Map((decks ?? []).map((d) => [d.id, d])), [decks]);
-  const folderUrl = useMemo(() => {
-    const ids = folderIdsByPath(decks ?? [], decksMeta?.folders);
-    return (path: string) => {
-      const id = ids.get(path);
-      return id ? site.deckFolderUrl(id) : undefined;
-    };
-  }, [decks, decksMeta?.folders, site]);
+  const folderUrl = useFolderUrl(decks, decksMeta?.folders, site);
   // The comparison only needs deck ids; names are looked up at render time.
   const deckIdsKey = (decks ?? []).map((d) => d.id).join(',');
   const stableDecks = useMemo(() => decks ?? [], [deckIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps

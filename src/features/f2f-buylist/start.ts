@@ -1,7 +1,7 @@
 /** Background handlers of Selling runs started from a site page or the dashboard (kept apart so they can be tested). */
 import { accountData, addAccountFromAction, findRun } from '@/lib/accounts/data';
 import type { AccountKey } from '@/lib/accounts/types';
-import { isEligible } from '@/lib/cards/prints';
+import { isSellable } from '@/lib/cards/prints';
 import type { CollectionEntry } from '@/lib/cards/types';
 import { initialSyncStateOf } from '@/lib/decks/initial-sync';
 import type { AccountSyncJob } from '@/lib/decks/job';
@@ -47,9 +47,6 @@ export async function progressFor(q: { runId?: number; accountKey?: AccountKey }
   if (!run || (q.accountKey && run.accountKey !== q.accountKey)) return null;
   return toProgress(run);
 }
-
-/** Copies a check of the whole collection covers: paper (not MTGO or Arena), non-proxy, with a known print. */
-export const isSellable = (e: CollectionEntry): boolean => isEligible(e) && (!e.game || e.game === 'paper');
 
 export const WHOLE_COLLECTION_SUMMARY = 'Whole collection';
 

@@ -199,7 +199,40 @@ export const COLUMN_META: ColumnMeta[] = [
 /** Shrinks a column to its content (the Card column takes the remaining width). */
 const tight = { noWrap: true, width: '1%' } as const;
 
-export function buildColumns(hidden: ReadonlySet<string> = new Set()): DataTableColumn<Item>[] {
+/** A row that lost copies to the "Cards in decks" filter: the run's copies, and which decks use the print. */
+export interface QtyNote {
+  of: number;
+  /** Tooltip lines. */
+  lines: string[];
+}
+
+function QtyCell({ item, note }: { item: Item; note: QtyNote | null | undefined }) {
+  if (!note) return num(item.qty);
+  return (
+    <Tooltip
+      label={
+        <Stack gap={0}>
+          {note.lines.map((l, k) => (
+            <Text key={k} size="xs">
+              {l}
+            </Text>
+          ))}
+        </Stack>
+      }
+      multiline
+      maw={320}
+    >
+      <Text size="sm" className="ti-num" ta="right" style={{ whiteSpace: 'nowrap' }}>
+        {item.qty}{' '}
+        <Text span size="xs" c="dimmed">
+          of {note.of}
+        </Text>
+      </Text>
+    </Tooltip>
+  );
+}
+
+export function buildColumns(hidden: ReadonlySet<string> = new Set(), qtyNote?: (item: Item) => QtyNote | null | undefined): DataTableColumn<Item>[] {
   const columns: DataTableColumn<Item>[] = [
     { accessor: 'category', title: '', ...tight, sortable: true, render: (i) => <CategoryIcon item={i} /> },
     { accessor: 'image', title: '', ...tight, render: (i) => <CardImage item={i} /> },
@@ -260,7 +293,14 @@ export function buildColumns(hidden: ReadonlySet<string> = new Set()): DataTable
         </Text>
       ),
     },
-    { accessor: 'qty', title: head('Qty', 'Copies you own (all conditions)'), ...tight, sortable: true, textAlign: 'right', render: (i) => num(i.qty) },
+    {
+      accessor: 'qty',
+      title: head('Qty', qtyNote ? 'Copies you own (all conditions) that no included deck uses' : 'Copies you own (all conditions)'),
+      ...tight,
+      sortable: true,
+      textAlign: 'right',
+      render: (i) => <QtyCell item={i} note={qtyNote?.(i)} />,
+    },
     {
       accessor: 'buyCash',
       title: head('Cash', "What F2F pays you per card, in cash (NM). Bulk cards use the wholesale bulk rate; cards F2F doesn't buy are $0."),

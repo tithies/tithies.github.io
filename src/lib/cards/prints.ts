@@ -6,6 +6,9 @@ export function isEligible(e: CollectionEntry): boolean {
   return !e.isProxy && e.qty > 0 && Boolean(e.card.set) && Boolean(e.card.cn);
 }
 
+/** Copies a check of the whole collection covers: paper (not MTGO or Arena), non-proxy, with a known print. */
+export const isSellable = (e: CollectionEntry): boolean => isEligible(e) && (!e.game || e.game === 'paper');
+
 export function printKey(set: string, cn: string, finish: Finish): string {
   return `${set.toLowerCase()}|${cn.toLowerCase()}|${finish}`;
 }

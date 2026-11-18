@@ -5,6 +5,8 @@
 export const ACCOUNT_STORAGE_PREFIXES = {
   /** Comparator: its options. */
   collectionComparison: 'local:collectionComparison:',
+  /** Selling runs: the "Cards in decks" filter's options. */
+  sellingDeckFilter: 'local:sellingDeckFilter:',
   /** The Mismatches options, from before the Comparator (moved by migrateStorage); still removed by Forget in case one is left. */
   legacyDeckMismatchConfig: 'local:deckMismatchConfig:',
 } as const;

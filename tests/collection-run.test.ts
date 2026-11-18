@@ -12,7 +12,8 @@ import { moxfieldSite } from '@/lib/sites/moxfield/provider';
 import { TabTransport } from '@/lib/sites/tab-transport';
 import type { SiteResult } from '@/lib/sites/types';
 import { controlRun, endInterruptedCollectionRuns } from '@/features/f2f-buylist/runner';
-import { isSellable, startCollectionRun } from '@/features/f2f-buylist/start';
+import { startCollectionRun } from '@/features/f2f-buylist/start';
+import { isSellable } from '@/lib/cards/prints';
 import { ALICE, BOB, FakeTabs } from './fake-tabs';
 import { newAccount, resetDb } from './helpers';
 

@@ -13,6 +13,12 @@ interface Props {
   onChange: (f: Filters) => void;
   items: Item[];
   counts: { all: number; buylist: number; bulk: number; notBought: number };
+  /** Filters kept outside `filters` that are on (counted on the Filters button, like the others). */
+  extraActive?: number;
+  /** Reset also turns those off. */
+  onReset?: () => void;
+  /** More filters, full width under the others. */
+  children?: React.ReactNode;
 }
 
 export const STATUS_OPTIONS = [
@@ -35,8 +41,8 @@ function CategoryLabel({ icon, text }: { icon: React.ReactNode; text: string }) 
   );
 }
 
-export function FiltersBar({ filters, onChange, items, counts }: Props) {
-  const advanced = activeFilterCount({ ...filters, q: '', category: 'all' });
+export function FiltersBar({ filters, onChange, items, counts, extraActive = 0, onReset, children }: Props) {
+  const advanced = activeFilterCount({ ...filters, q: '', category: 'all' }) + extraActive;
   const [opened, { toggle, open }] = useDisclosure(advanced > 0);
   // Filters set from elsewhere (e.g. clicking "Needs review") should be visible.
   useEffect(() => {
@@ -123,8 +129,16 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
         >
           Filters
         </Button>
-        {activeFilterCount(filters) > 0 && (
-          <Button variant="subtle" color="gray" leftSection={<IconX size={14} />} onClick={() => onChange(EMPTY_FILTERS)}>
+        {activeFilterCount(filters) + extraActive > 0 && (
+          <Button
+            variant="subtle"
+            color="gray"
+            leftSection={<IconX size={14} />}
+            onClick={() => {
+              onChange(EMPTY_FILTERS);
+              onReset?.();
+            }}
+          >
             Reset
           </Button>
         )}
@@ -188,6 +202,7 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
             <Switch label="Has a note under the name" checked={filters.noted} onChange={(e) => set('noted', e.currentTarget.checked)} />
           </Group>
         </SimpleGrid>
+        {children}
       </Collapse>
     </Paper>
   );

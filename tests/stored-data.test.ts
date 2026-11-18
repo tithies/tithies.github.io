@@ -5,6 +5,7 @@ import type { AccountKey } from '@/lib/accounts/types';
 import { db, getMeta, putMeta } from '@/lib/db';
 import { getSettings, overlayCollapsedItem, saveSettings } from '@/lib/settings';
 import { comparisonConfigKey } from '@/features/collection-comparison/config';
+import { sellingDeckFilterKey } from '@/features/f2f-buylist/deck-filter';
 import { clearStoredData, listStoredPreferences, measureStoredData, resetAllSettings } from '@/features/settings/stored-data';
 import { listOps, startOp, writeLogger } from '@/lib/changes/log';
 import { newAccount, resetDb } from './helpers';
@@ -99,9 +100,11 @@ describe('Settings → Reset settings', () => {
     await saveSettings({ requestIntervalMs: 5000 });
     await overlayCollapsedItem.setValue(true);
     await storage.setItem(comparisonConfigKey(A.key), { current: { showMissing: false, excludedDeckIds: ['d1'] } });
+    await storage.setItem(sellingDeckFilterKey(A.key), { enabled: true });
     const prefs = await listStoredPreferences();
-    expect(prefs.map((p) => p.key).sort()).toEqual([`collectionComparison:${A.key}`, 'overlayCollapsed', 'settings']);
+    expect(prefs.map((p) => p.key).sort()).toEqual([`collectionComparison:${A.key}`, 'overlayCollapsed', `sellingDeckFilter:${A.key}`, 'settings']);
     expect(prefs.find((p) => p.key.startsWith('collectionComparison:'))!.label).toMatch(/^Comparator options of one account/);
+    expect(prefs.find((p) => p.key.startsWith('sellingDeckFilter:'))!.label).toMatch(/“Cards in decks” filter of one account/);
 
     await resetAllSettings();
 

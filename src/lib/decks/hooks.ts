@@ -1,12 +1,14 @@
 /** Dashboard-side access to an account's deck cache and the background sync job. */
 import { liveQuery } from 'dexie';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { accountData } from '@/lib/accounts/data';
 import { useAccountLive } from '@/lib/accounts/hooks';
 import type { AccountKey } from '@/lib/accounts/types';
 import type { CollectionEntry } from '@/lib/cards/types';
 import { sendMessage } from '@/lib/messaging';
+import type { SiteProvider } from '@/lib/sites/provider';
 import type { SiteType } from '@/lib/sites/types';
+import { folderIdsByPath } from './tree';
 import type { CollectionMeta, DeckCardsRow, DeckRow, DecksMeta, SyncState } from './types';
 
 /**
@@ -65,6 +67,17 @@ export function useDeckData(key: AccountKey | null, version: string): { deckCard
   // collection would show wrong numbers (the previous data stays meanwhile).
   const mine = state.key === key;
   return { deckCards: mine ? state.deckCards : [], collection: mine ? state.collection : [], loaded: mine && state.version === version };
+}
+
+/** A deck folder's page on the site, by its "/"-separated path (undefined when its id isn't known). */
+export function useFolderUrl(decks: readonly DeckRow[] | undefined, folders: DecksMeta['folders'], site: Pick<SiteProvider, 'deckFolderUrl'>) {
+  return useMemo(() => {
+    const ids = folderIdsByPath(decks ?? [], folders);
+    return (path: string) => {
+      const id = ids.get(path);
+      return id ? site.deckFolderUrl(id) : undefined;
+    };
+  }, [decks, folders, site]);
 }
 
 export type { DeckRow };

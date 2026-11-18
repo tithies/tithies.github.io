@@ -1,7 +1,7 @@
-import { storage } from '#imports';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback } from 'react';
 import { z } from 'zod';
 import { ACCOUNT_STORAGE_PREFIXES } from '@/lib/accounts/storage-keys';
+import { useStoredOptions } from '@/lib/ui/useStoredOptions';
 
 /** Every field falls back to its default on its own, so one bad stored value never resets the rest. */
 export const comparisonConfigSchema = z.object({
@@ -44,41 +44,12 @@ export const comparisonConfigKey = (accountKey: string) => `${ACCOUNT_STORAGE_PR
 
 /** One account's options; every change is saved at once. `config` is null while loading (or without account). */
 export function useComparisonConfig(accountKey: string | null) {
-  const [state, setState] = useState<ComparisonState | null>(null);
-  const latest = useRef<ComparisonState | null>(null);
-
-  useEffect(() => {
-    latest.current = null;
-    setState(null);
-    if (!accountKey) return;
-    const key = comparisonConfigKey(accountKey);
-    let alive = true;
-    void storage.getItem<ComparisonState>(key).then((v) => {
-      if (!alive) return;
-      latest.current = parseComparisonState(v);
-      setState(latest.current);
-    });
-    const unwatch = storage.watch<ComparisonState>(key, (v) => {
-      latest.current = parseComparisonState(v);
-      setState(latest.current);
-    });
-    return () => {
-      alive = false;
-      unwatch();
-    };
-  }, [accountKey]);
+  const { state, save } = useStoredOptions(accountKey ? comparisonConfigKey(accountKey) : null, parseComparisonState);
 
   /** Changes some options of the newest state, and saves it. */
   const update = useCallback(
-    (patch: Partial<ComparisonConfig>) => {
-      if (!accountKey) return;
-      const s = latest.current ?? DEFAULT_COMPARISON_STATE;
-      const next: ComparisonState = { current: parseComparisonConfig({ ...s.current, ...patch }) };
-      latest.current = next;
-      setState(next);
-      void storage.setItem(comparisonConfigKey(accountKey), next);
-    },
-    [accountKey],
+    (patch: Partial<ComparisonConfig>) => save((s) => ({ current: parseComparisonConfig({ ...s.current, ...patch }) })),
+    [save],
   );
 
   return { config: state?.current ?? null, update };
