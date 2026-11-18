@@ -10,7 +10,7 @@
 import type { AccountData } from '@/lib/accounts/data';
 import { CancelledError, describeSiteError, SiteAuthError, SiteError, SiteNotFoundError, SiteRateLimitError, type DeckSource } from '@/lib/sites/client';
 import type { SiteProvider } from '@/lib/sites/provider';
-import type { DeckRow, DeckSyncSummary, DecksMeta } from './types';
+import type { DeckFolder, DeckRow, DeckSyncSummary, DecksMeta } from './types';
 
 export interface DeckSyncProgress {
   phase: 'deckList' | 'decks';
@@ -54,6 +54,16 @@ export async function syncDecks(
   await progress({ phase: 'deckList', done: 0, total: 0 });
   const list = await client.deckList();
   checkCancelled();
+  // Folders only serve links to them: a failed read keeps the ones known (unless it stops the sync anyway).
+  let folders: DeckFolder[] | undefined;
+  if (client.deckFolders) {
+    try {
+      folders = await client.deckFolders();
+    } catch (e) {
+      if (isFatal(e)) throw e;
+    }
+    checkCancelled();
+  }
 
   const meta = (await data.meta.get('decks')) ?? {};
   const firstSync = !meta.lastSuccessAt;
@@ -75,6 +85,7 @@ export async function syncDecks(
   await data.write(async (w) => {
     await w.decks.remove(removed);
     await w.decks.putMany(rows);
+    if (folders) await w.meta.put('decks', { ...meta, folders } satisfies DecksMeta);
   });
 
   // New decks first, then changed ones (list order within each group).
@@ -125,7 +136,9 @@ export async function syncDecks(
   await progress({ phase: 'decks', done: stale.length, total: stale.length });
 
   const finishedAt = Date.now();
-  await data.write((w) => w.meta.put('decks', { lastSuccessAt: finishedAt, initialSyncAt: meta.initialSyncAt ?? finishedAt } satisfies DecksMeta));
+  await data.write((w) =>
+    w.meta.put('decks', { ...meta, ...(folders ? { folders } : {}), lastSuccessAt: finishedAt, initialSyncAt: meta.initialSyncAt ?? finishedAt } satisfies DecksMeta),
+  );
   return { total: rows.length - gone, added, changed, removed: removed.length + gone, fetched, failed };
 }
 

@@ -1,6 +1,6 @@
 import PQueue from 'p-queue';
 import type { CollectionEntry } from '@/lib/cards/types';
-import type { DeckCard, DeckSummary } from '@/lib/decks/types';
+import type { DeckCard, DeckFolder, DeckSummary } from '@/lib/decks/types';
 import {
   siteFail,
   type DescribedRequest,
@@ -290,6 +290,14 @@ export class SiteClient {
     return (await this.request({ kind: 'deckList' })).decks;
   }
 
+  /** Every deck folder (a folder holding only folders too), every page. */
+  async deckFolders(): Promise<DeckFolder[]> {
+    const first = await this.request({ kind: 'deckFolders', pageNumber: 1 });
+    const folders = [...first.folders];
+    for (let page = 2; page <= Math.min(first.totalPages, MAX_FOLDER_PAGES); page++) folders.push(...(await this.request({ kind: 'deckFolders', pageNumber: page })).folders);
+    return folders;
+  }
+
   async deck(publicId: string): Promise<{ lastUpdatedAt: string; cards: DeckCard[] }> {
     const { lastUpdatedAt, cards } = await this.request({ kind: 'deck', publicId });
     return { lastUpdatedAt, cards };
@@ -322,8 +330,11 @@ export interface CollectionPageResult {
   totalCopies?: number;
 }
 
-/** What the deck sync needs from a client (lets tests use a fake). */
-export type DeckSource = Pick<SiteClient, 'deckList' | 'deck'>;
+/** Deck folder pages read at most (100 folders each). */
+const MAX_FOLDER_PAGES = 20;
+
+/** What the deck sync needs from a client (lets tests use a fake). Without `deckFolders`, only decks' own folders are known. */
+export type DeckSource = Pick<SiteClient, 'deckList' | 'deck'> & Partial<Pick<SiteClient, 'deckFolders'>>;
 export type CollectionSource = Pick<SiteClient, 'collectionPage'>;
 
 export function describeSiteError(e: unknown): string {

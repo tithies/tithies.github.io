@@ -1,6 +1,6 @@
 import { requestUrl, runMoxRequest, wholeCollectionUrl } from '@/lib/sites/moxfield/api';
 import { MOX_COLLECTION_PAGE_SIZE } from '@/lib/sites/moxfield/constants';
-import { boardLabel, normalizeDeckCards, normalizeDeckList } from '@/lib/sites/moxfield/decks';
+import { boardLabel, moxfieldFolderUrl, normalizeDeckCards, normalizeDeckFolders, normalizeDeckList } from '@/lib/sites/moxfield/decks';
 import { printKey } from '@/lib/cards/prints';
 import { normalizeEntry } from '@/lib/sites/moxfield/normalize';
 import { fixture } from './helpers';
@@ -18,8 +18,10 @@ describe('Moxfield deck normalisation', () => {
     const ff = decks.find((d) => d.folderPath === 'Collection/Final Fantasy')!;
     expect(ff).toMatchObject({ id: 'deck01', publicId: 'TestDeck01Public_BBBBBB', visibility: 'private', format: 'none' });
     expect(ff.lastUpdatedAt).toBe(list.decks[1].lastUpdatedAtUtc);
-    // No folder → ''.
+    expect(ff.folderId).toBe('fold01');
+    // No folder → '' (and no id).
     expect(decks.find((d) => d.id === 'deck04')!.folderPath).toBe('');
+    expect(decks.find((d) => d.id === 'deck04')!.folderId).toBeUndefined();
     expect(decks.find((d) => d.id === 'deck06')!.commanders.length).toBeGreaterThan(0);
     expect(normalizeDeckList({ decks: [{ name: 'no ids' }] })).toEqual([]);
   });
@@ -83,6 +85,29 @@ describe('Moxfield deck normalisation', () => {
     expect(boardLabel('someNewBoard')).toBe('Some New Board');
   });
 
+  it('reads the deck folder list (full paths) and links a folder', () => {
+    const raw = {
+      pageNumber: 1,
+      pageSize: 100,
+      totalResults: 3,
+      totalPages: 1,
+      data: [
+        { id: 'rng9V', name: 'Collection', createdAtUtc: '2024-05-14T17:30:24.507Z', lastUpdatedAtUtc: '2024-05-14T17:30:24.507Z' },
+        { id: 'KwBwz', name: 'Collection/Dominaria' },
+        { name: 'no id' },
+      ],
+    };
+    expect(normalizeDeckFolders(raw)).toEqual([
+      { id: 'rng9V', path: 'Collection' },
+      { id: 'KwBwz', path: 'Collection/Dominaria' },
+    ]);
+    expect(normalizeDeckFolders(null)).toEqual([]);
+    // Moxfield's own deck page state: {"view":"personal","selectedFolderId":"rng9V"} in base64.
+    const url = new URL(moxfieldFolderUrl('rng9V'));
+    expect(url.origin + url.pathname).toBe('https://moxfield.com/decks/personal');
+    expect(JSON.parse(atob(url.searchParams.get('q')!))).toEqual({ view: 'personal', selectedFolderId: 'rng9V' });
+  });
+
   it('reads the game of collection rows', () => {
     expect(normalizeEntry({ ...page.data[0], game: 'paper' })!.game).toBe('paper');
     expect(normalizeEntry(page.data[0])!.game).toBeUndefined();
@@ -92,6 +117,8 @@ describe('Moxfield deck normalisation', () => {
 describe('Moxfield requests', () => {
   it('validates requests before building URLs', () => {
     expect(requestUrl({ kind: 'deckList' })).toBe('https://api2.moxfield.com/v3/decks');
+    expect(requestUrl({ kind: 'deckFolders', pageNumber: 2 })).toBe('https://api2.moxfield.com/v1/deck-folders?pageNumber=2&pageSize=1000');
+    expect(requestUrl({ kind: 'deckFolders', pageNumber: 0 })).toBeNull();
     expect(requestUrl({ kind: 'deck', publicId: 'SQiW9NErJ0WEfI6NYMzCSw' })).toBe('https://api2.moxfield.com/v3/decks/all/SQiW9NErJ0WEfI6NYMzCSw');
     expect(requestUrl({ kind: 'deck', publicId: '../v1/account' })).toBeNull();
     expect(requestUrl({ kind: 'nope' })).toBeNull();

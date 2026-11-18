@@ -4,7 +4,7 @@
  * script), so session tokens never leave the page; only trimmed, site-neutral data comes back.
  */
 import type { CollectionEntry, Finish } from '@/lib/cards/types';
-import type { DeckCard, DeckSummary } from '@/lib/decks/types';
+import type { DeckCard, DeckFolder, DeckSummary } from '@/lib/decks/types';
 
 /** Every collection site Tithies supports. */
 export type SiteType = 'moxfield';
@@ -17,6 +17,8 @@ export interface SiteIdentity {
 
 export type SiteRequest =
   | { kind: 'deckList' }
+  /** Every deck folder of the account (folders holding only folders too). */
+  | { kind: 'deckFolders'; pageNumber: number }
   | { kind: 'deck'; publicId: string }
   /** `newestFirst`: most recently changed entries first (else by card name). */
   | { kind: 'collection'; pageNumber: number; pageSize: number; newestFirst?: boolean }
@@ -89,6 +91,7 @@ export interface SiteFailure {
 
 export type SiteSuccess = (
   | { ok: true; kind: 'deckList'; decks: DeckSummary[] }
+  | { ok: true; kind: 'deckFolders'; folders: DeckFolder[]; totalPages: number }
   | { ok: true; kind: 'deck'; lastUpdatedAt: string; cards: DeckCard[] }
   /** `totalCopies`: copies in what is searched (every page), when the site says. */
   | { ok: true; kind: 'collection'; entries: CollectionEntry[]; totalResults: number; totalPages: number; pageSize: number; totalCopies?: number }

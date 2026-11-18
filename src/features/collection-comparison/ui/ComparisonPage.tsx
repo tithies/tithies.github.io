@@ -16,6 +16,7 @@ import { SyncProgress } from '@/lib/decks/SyncProgress';
 import { GettingStarted } from '@/lib/ui/GettingStarted';
 import { useInitialSync } from '@/lib/ui/InitialSync';
 import { markDecksSeen } from '@/lib/decks/sync';
+import { folderIdsByPath } from '@/lib/decks/tree';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { accountData } from '@/lib/accounts/data';
 import { AccountHint } from '@/lib/ui/AccountHint';
@@ -268,6 +269,13 @@ export function ComparisonPage() {
   const { deckCards, collection, loaded } = useDeckData(key, version);
 
   const deckById = useMemo(() => new Map((decks ?? []).map((d) => [d.id, d])), [decks]);
+  const folderUrl = useMemo(() => {
+    const ids = folderIdsByPath(decks ?? [], decksMeta?.folders);
+    return (path: string) => {
+      const id = ids.get(path);
+      return id ? site.deckFolderUrl(id) : undefined;
+    };
+  }, [decks, decksMeta?.folders, site]);
   // The comparison only needs deck ids; names are looked up at render time.
   const deckIdsKey = (decks ?? []).map((d) => d.id).join(',');
   const stableDecks = useMemo(() => decks ?? [], [deckIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -358,6 +366,7 @@ export function ComparisonPage() {
               excluded={excluded}
               onChange={(next) => update({ excludedDeckIds: [...next].filter((id) => deckById.has(id)) })}
               siteLabel={site.label}
+              folderUrl={folderUrl}
             />
           </Stack>
         </Paper>

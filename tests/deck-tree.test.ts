@@ -1,4 +1,4 @@
-import { buildDeckTree, filterTree, folderState, folderValues, NO_FOLDER_LABEL, setIncluded, type DeckTreeNode } from '@/lib/decks/tree';
+import { buildDeckTree, filterTree, folderCardCount, folderIdsByPath, folderState, folderValues, NO_FOLDER_LABEL, setIncluded, type DeckTreeNode } from '@/lib/decks/tree';
 import type { DeckRow } from '@/lib/decks/types';
 
 const deck = (id: string, name: string, folderPath: string, extra: Partial<DeckRow> = {}): DeckRow => ({
@@ -70,5 +70,28 @@ describe('Deck tree', () => {
     expect(filterTree(tree, 'utils')[0].deckIds).toEqual(['d']);
     expect(filterTree(tree, 'nothing like this')).toEqual([]);
     expect(filterTree(tree, '  ')).toBe(tree);
+  });
+
+  it("counts a folder's cards over its decks, below it too", () => {
+    const counted = [deck('a', 'A', 'Collection', { cardCount: 100 }), deck('b', 'B', 'Collection/Final Fantasy', { cardCount: 60 }), deck('c', 'C', 'Collection/Final Fantasy')];
+    const byId = new Map(counted.map((d) => [d.id, d]));
+    const [collection] = buildDeckTree(counted);
+    // c isn't read yet: it counts for nothing.
+    expect(folderCardCount(collection.deckIds, byId)).toBe(160);
+    expect(folderCardCount(collection.children![0].deckIds, byId)).toBe(60);
+    expect(folderCardCount(['c'], byId)).toBeUndefined();
+  });
+
+  it('finds folder ids by path: the folder list first (folders of folders too), then decks', () => {
+    const ids = folderIdsByPath(
+      [deck('a', 'A', 'Collection/Final Fantasy', { folderId: 'ff' }), deck('b', 'B', ' Utils / Copy ', { folderId: 'copy' }), deck('c', 'C', '')],
+      [{ id: 'col', path: 'Collection' }, { id: 'ff2', path: 'Collection/Final Fantasy' }],
+    );
+    expect([...ids]).toEqual([
+      ['Collection', 'col'],
+      ['Collection/Final Fantasy', 'ff2'],
+      // Paths as the tree writes them.
+      ['Utils/Copy', 'copy'],
+    ]);
   });
 });

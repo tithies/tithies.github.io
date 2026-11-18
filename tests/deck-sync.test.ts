@@ -17,6 +17,10 @@ import { fixture, newAccount, resetDb } from './helpers';
 const deckJson = fixture<any>('moxfield-deck.json');
 const CARDS: DeckCard[] = normalizeDeckCards(deckJson).cards;
 const page = fixture<{ data: any[] }>('moxfield-page.json');
+const FOLDERS = [
+  { id: 'f0', path: 'Collection' },
+  { id: 'f1', path: 'Collection/Final Fantasy' },
+];
 
 const summary = (id: string, updated = '2026-01-01T00:00:00Z', folderPath = 'Collection'): DeckSummary => ({
   id,
@@ -190,6 +194,7 @@ describe('AccountSyncJob', () => {
           await opts.gate;
           return { ok: true, kind: 'deckList', decks: opts.list, as: as() };
         }
+        if (req.kind === 'deckFolders') return { ok: true, kind: 'deckFolders', folders: FOLDERS, totalPages: 1, as: as() };
         if (req.kind === 'deck') return opts.deckAnswer ? { ...opts.deckAnswer, as: as() } : { ok: true, kind: 'deck', lastUpdatedAt: '', cards: CARDS, as: as() };
         const entries = page.data.map(normalizeEntry).filter((e): e is CollectionEntry => e !== null);
         return { ok: true, kind: 'collection', entries, totalResults: entries.length, totalPages: 1, pageSize: 5000, as: as() };
@@ -224,9 +229,11 @@ describe('AccountSyncJob', () => {
     await job.finished;
 
     const state = (await A.meta.get('sync'))!;
-    expect(state).toMatchObject({ jobId: first.jobId, status: 'done', phase: 'done', withCollection: true, requests: 4 });
+    expect(state).toMatchObject({ jobId: first.jobId, status: 'done', phase: 'done', withCollection: true, requests: 5 });
     expect(state.decks).toMatchObject({ total: 2, fetched: 2 });
-    expect(t.calls.map((c) => c.kind)).toEqual(['deckList', 'deck', 'deck', 'collection']);
+    expect(t.calls.map((c) => c.kind)).toEqual(['deckList', 'deckFolders', 'deck', 'deck', 'collection']);
+    // Every folder is kept, the ones holding only folders too.
+    expect((await A.meta.get('decks'))!.folders).toEqual(FOLDERS);
     expect(await A.collection.count()).toBeGreaterThan(0);
     expect(t.released()).toBe(1);
     expect(active).toEqual([true, false]);

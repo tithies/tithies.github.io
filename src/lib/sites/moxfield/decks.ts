@@ -2,7 +2,8 @@
  * Moxfield deck API (`/v3/decks` list and `/v3/decks/all/{publicId}`) → compact deck data.
  * Pure functions: they run inside the Moxfield page (MAIN world), so only trimmed data crosses the bridge.
  */
-import type { BoardInfo, DeckCard, DeckSummary } from '@/lib/decks/types';
+import type { BoardInfo, DeckCard, DeckFolder, DeckSummary } from '@/lib/decks/types';
+import { MOX_SITE_URL } from './constants';
 import { normalizeEntry } from './normalize';
 
 
@@ -40,13 +41,16 @@ export function normalizeDeckSummary(raw: any): DeckSummary | null {
   const id = str(raw.id);
   const publicId = str(raw.publicId);
   if (!id || !publicId) return null;
+  const folderPath = str(raw.folder?.name).trim();
+  const folderId = folderPath ? str(raw.folder?.id) : '';
   return {
     id,
     publicId,
     name: str(raw.name) || '(unnamed deck)',
     format: str(raw.format),
     visibility: str(raw.visibility),
-    folderPath: str(raw.folder?.name).trim(),
+    folderPath,
+    ...(folderId ? { folderId } : {}),
     lastUpdatedAt: str(raw.lastUpdatedAtUtc),
     createdAt: str(raw.createdAtUtc),
     mainboardCount: int(raw.mainboardCount),
@@ -56,6 +60,26 @@ export function normalizeDeckSummary(raw: any): DeckSummary | null {
     publicUrl: str(raw.publicUrl) || `https://moxfield.com/decks/${publicId}`,
   };
 }
+
+/**
+ * `GET /v1/deck-folders` → every deck folder of the logged-in user (verified 2026-11-18: one page
+ * `{ pageNumber, pageSize, totalResults, totalPages, data: [{ id, name, createdAtUtc,
+ * lastUpdatedAtUtc }] }`, `name` being the full path "Collection/Dominaria", as decks' `folder.name`).
+ */
+export function normalizeDeckFolders(raw: any): DeckFolder[] {
+  const rows = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
+  const out: DeckFolder[] = [];
+  for (const r of rows) {
+    const id = str(r?.id);
+    const path = str(r?.name).trim();
+    if (id && path) out.push({ id, path });
+  }
+  return out;
+}
+
+/** A folder's page on Moxfield: the deck list opened on it (its own `?q=` state, base64 JSON; verified 2026-11-18). */
+export const moxfieldFolderUrl = (folderId: string) =>
+  `${MOX_SITE_URL}/decks/personal?q=${encodeURIComponent(btoa(JSON.stringify({ view: 'personal', selectedFolderId: folderId })))}`;
 
 /** `GET /v3/decks` → every deck of the logged-in user. */
 export function normalizeDeckList(raw: any): DeckSummary[] {

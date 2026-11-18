@@ -1,6 +1,6 @@
 import type { SiteProvider } from '@/lib/sites/provider';
 import { MOX_COLLECTION_PAGE_SIZE, MOX_PACING, MOX_SITE_URL, MOX_SYNC_TAB_URL, MOX_TAB_PATTERNS } from './constants';
-import { BOARDS, boardLabel, boardOrder, DECK_CARDS_VERSION } from './decks';
+import { BOARDS, boardLabel, boardOrder, DECK_CARDS_VERSION, moxfieldFolderUrl } from './decks';
 import { describeMoxMutation } from './mutations';
 
 export const moxfieldSite: SiteProvider = {
@@ -13,6 +13,7 @@ export const moxfieldSite: SiteProvider = {
   capabilities: { decks: true, collection: true, collectionCapture: true, exportTo: { binders: true, collection: true } },
   describeMutation: (op) => (op.site === 'moxfield' ? describeMoxMutation(op) : null),
   binderUrl: (publicId) => `${MOX_SITE_URL}/binders/${encodeURIComponent(publicId)}`,
+  deckFolderUrl: moxfieldFolderUrl,
   boards: BOARDS,
   boardLabel,
   boardOrder,

@@ -5,11 +5,13 @@
 import type { CollectionEntry } from '@/lib/cards/types';
 import { siteFail, type SiteRequest, type SiteResult } from '@/lib/sites/types';
 import { MOX_API_ORIGIN, MOX_COLLECTION_PAGE_SIZE } from './constants';
-import { normalizeDeckCards, normalizeDeckList } from './decks';
+import { normalizeDeckCards, normalizeDeckFolders, normalizeDeckList } from './decks';
 import { binderFromAnswer, buildMoxMutation, importAnswer, normalizeBinderList, type BuiltMutation } from './mutations';
 import { COLLECTION_SEARCH_PATH, normalizeEntry, type CollectionPage } from './normalize';
 
 export const DECK_LIST_URL = `${MOX_API_ORIGIN}/v3/decks`;
+/** Every deck folder, as Moxfield's own deck page asks for them (one page of up to 1000; it answers 100 per page). */
+export const deckFoldersUrl = (pageNumber = 1) => `${MOX_API_ORIGIN}/v1/deck-folders?pageNumber=${pageNumber}&pageSize=1000`;
 export const BINDER_LIST_URL = `${MOX_API_ORIGIN}/v1/trade-binders`;
 /** Longest answer kept for the change log (characters). */
 export const MAX_LOGGED_RESPONSE = 32_000;
@@ -68,6 +70,10 @@ export function requestUrl(req: unknown): string | null {
   switch (r.kind) {
     case 'deckList':
       return DECK_LIST_URL;
+    case 'deckFolders': {
+      const page = Math.floor(Number(r.pageNumber));
+      return page >= 1 ? deckFoldersUrl(page) : null;
+    }
     case 'binders':
       return BINDER_LIST_URL;
     case 'deck':
@@ -184,6 +190,8 @@ export async function runMoxRequest(req: SiteRequest, doFetch: (url: string, ini
   switch (req.kind) {
     case 'deckList':
       return { ok: true, kind: 'deckList', decks: normalizeDeckList(body) };
+    case 'deckFolders':
+      return { ok: true, kind: 'deckFolders', folders: normalizeDeckFolders(body), totalPages: Math.max(1, Math.floor(Number(body?.totalPages)) || 1) };
     case 'binders':
       return { ok: true, kind: 'binders', binders: normalizeBinderList(body) };
     case 'deck': {

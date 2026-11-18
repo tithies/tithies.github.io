@@ -30,6 +30,8 @@ export interface SiteProvider {
   describeMutation(op: SiteMutation): DescribedRequest | null;
   /** A binder's page on the site. */
   binderUrl(publicId: string): string;
+  /** A deck folder's page on the site (the deck list opened on it). */
+  deckFolderUrl(folderId: string): string;
   /** The site's deck boards, in display order. */
   boards: BoardInfo[];
   boardLabel(key: string): string;

@@ -1,5 +1,5 @@
 /** Deck folder hierarchy built from "/"-separated folder paths ("Collection/Final Fantasy"). */
-import type { DeckRow } from './types';
+import type { DeckFolder, DeckRow } from './types';
 
 export const NO_FOLDER_LABEL = '(No folder)';
 /** Value of the "(No folder)" group; real folder paths never start with "/". */
@@ -82,6 +82,31 @@ export function buildDeckTree(decks: DeckRow[]): DeckTreeNode[] {
     nodes.push({ value: `folder:${NO_FOLDER_PATH}`, label: NO_FOLDER_LABEL, kind: 'folder', path: NO_FOLDER_PATH, deckIds: children.flatMap((c) => c.deckIds), children });
   }
   return nodes;
+}
+
+/**
+ * Folder ids by the tree's folder paths: from the account's folder list (folders holding only
+ * folders included), else from the decks' own folders.
+ */
+export function folderIdsByPath(decks: readonly Pick<DeckRow, 'folderPath' | 'folderId'>[], folders: readonly DeckFolder[] = []): Map<string, string> {
+  const ids = new Map<string, string>();
+  const add = (path: string, id: string | undefined) => {
+    const key = folderParts(path).join('/');
+    if (key && id && !ids.has(key)) ids.set(key, id);
+  };
+  for (const f of folders) add(f.path, f.id);
+  for (const d of decks) add(d.folderPath, d.folderId);
+  return ids;
+}
+
+/** Cards in a folder's decks (every board), counting the decks read so far; undefined when none was read. */
+export function folderCardCount(deckIds: readonly string[], decks: ReadonlyMap<string, Pick<DeckRow, 'cardCount'>>): number | undefined {
+  let total: number | undefined;
+  for (const id of deckIds) {
+    const n = decks.get(id)?.cardCount;
+    if (n != null) total = (total ?? 0) + n;
+  }
+  return total;
 }
 
 export type CheckState = 'all' | 'some' | 'none';

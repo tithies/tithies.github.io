@@ -13,6 +13,8 @@ export interface DeckSummary {
   visibility: string;
   /** Full folder path, "/"-separated (e.g. "Collection/Final Fantasy"); '' when the deck has no folder. */
   folderPath: string;
+  /** The site's id of that folder, when it says. */
+  folderId?: string;
   /** The list's `lastUpdatedAtUtc`, kept verbatim: it's what change detection compares. */
   lastUpdatedAt: string;
   createdAt: string;
@@ -65,11 +67,19 @@ export interface DeckCardsRow {
   cards: DeckCard[];
 }
 
+/** A deck folder of the account: its id on the site and its full "/"-separated path (as DeckSummary.folderPath). */
+export interface DeckFolder {
+  id: string;
+  path: string;
+}
+
 /** Account meta 'decks'. */
 export interface DecksMeta {
   /** Last deck sync that went through to the end. Unset = decks were never synced. */
   lastSuccessAt?: number;
   initialSyncAt?: number;
+  /** Every deck folder, empty ones and folders holding only folders included (read with the deck list). */
+  folders?: DeckFolder[];
 }
 
 /** Account meta 'collection'. */

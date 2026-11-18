@@ -50,6 +50,7 @@ function moxTabs(account: SiteIdentity | null = ALICE) {
   port.tabs = [{ id: 1, active: true, account }];
   port.answer = (as, { req }): SiteResult => {
     if (req.kind === 'deckList') return { ok: true, kind: 'deckList', decks: DECKS[as.userId] ?? [] };
+    if (req.kind === 'deckFolders') return { ok: true, kind: 'deckFolders', folders: [], totalPages: 1 };
     if (req.kind === 'deck') return { ok: true, kind: 'deck', lastUpdatedAt: '', cards: CARDS };
     if (req.kind !== 'collection') throw new Error(`unexpected ${req.kind}`);
     const half = Math.ceil(ENTRIES.length / 2);
@@ -126,7 +127,7 @@ describe('Sync as an account, with the site logged in as another', () => {
     port.onCall = () => {};
     port.calls = [];
     await sync(port, A.key);
-    expect(port.calls.map((c) => publicIdOf(c.call) ?? c.call.req.kind)).toEqual(['deckList', 'Public_c_xxxx', 'Public_d_xxxx', 'Public_e_xxxx']);
+    expect(port.calls.map((c) => publicIdOf(c.call) ?? c.call.req.kind)).toEqual(['deckList', 'deckFolders', 'Public_c_xxxx', 'Public_d_xxxx', 'Public_e_xxxx']);
     expect(await cardIds(A.data)).toEqual(['a', 'b', 'c', 'd', 'e']);
   });
 
