@@ -1,4 +1,4 @@
-import { Badge, Button, Checkbox, Divider, Group, Popover, ScrollArea, Stack } from '@mantine/core';
+import { Badge, Button, Checkbox, Divider, Popover, ScrollArea, Stack } from '@mantine/core';
 import { IconColumns } from '@tabler/icons-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DEFAULT_HIDDEN_COLUMNS, hiddenColumnsItem } from '@/lib/settings';
@@ -49,14 +49,9 @@ export function ColumnsMenu({ hidden, onChange }: { hidden: ReadonlySet<string>;
           </Stack>
         </ScrollArea.Autosize>
         <Divider my="xs" />
-        <Group gap="xs" justify="space-between">
-          <Button size="compact-xs" variant="subtle" onClick={() => onChange([])}>
-            Show all
-          </Button>
-          <Button size="compact-xs" variant="subtle" color="gray" onClick={() => onChange(DEFAULT_HIDDEN_COLUMNS)}>
-            Reset to default
-          </Button>
-        </Group>
+        <Button size="compact-xs" variant="subtle" disabled={!hiddenCount} onClick={() => onChange(DEFAULT_HIDDEN_COLUMNS)}>
+          Show all
+        </Button>
       </Popover.Dropdown>
     </Popover>
   );

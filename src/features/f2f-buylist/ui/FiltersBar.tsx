@@ -1,6 +1,6 @@
 import { Badge, Button, Collapse, Group, MultiSelect, NumberInput, Paper, SegmentedControl, SimpleGrid, Stack, Switch, Text, TextInput } from '@mantine/core';
 import { useDebouncedCallback, useDisclosure } from '@mantine/hooks';
-import { IconAdjustmentsHorizontal, IconBan, IconBox, IconCards, IconCash, IconSearch, IconX } from '@tabler/icons-react';
+import { IconAdjustmentsHorizontal, IconBan, IconBox, IconCards, IconCash, IconChevronDown, IconSearch, IconX } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { SetMultiSelect } from '@/lib/ui/SetMultiSelect';
 import { langLabel, langOf, sortLangs } from '@/lib/cards/languages';
@@ -108,8 +108,18 @@ export function FiltersBar({ filters, onChange, items, counts }: Props) {
         <Button
           variant={advanced ? 'light' : 'default'}
           leftSection={<IconAdjustmentsHorizontal size={16} />}
-          rightSection={advanced ? <Badge size="xs" circle>{advanced}</Badge> : null}
+          rightSection={
+            <Group gap={6} wrap="nowrap">
+              {advanced ? (
+                <Badge size="xs" circle>
+                  {advanced}
+                </Badge>
+              ) : null}
+              <IconChevronDown size={14} style={{ transform: opened ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+            </Group>
+          }
           onClick={toggle}
+          aria-expanded={opened}
         >
           Filters
         </Button>
