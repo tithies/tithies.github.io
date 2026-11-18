@@ -79,6 +79,8 @@ export interface RunSource {
   query: Record<string, string>;
   summary: string;
   tabId?: number;
+  /** Started from the dashboard: the account's whole collection (paper, non-proxy), read in the background. `url` is then ''. */
+  wholeCollection?: boolean;
 }
 
 export interface Run {
@@ -97,6 +99,8 @@ export interface Run {
   requests: number;
   consecutiveFailures: number;
   error?: string;
+  /** A whole-collection run: the background collection read (sync job id) it waits for while 'fetching_collection'. */
+  collectionJobId?: string;
 }
 
 export interface Item {

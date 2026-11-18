@@ -9,6 +9,7 @@ import { useRuns } from '@/lib/accounts/hooks';
 import { f2fLinks } from '@/lib/f2f/links';
 import type { Run } from '../types';
 import { RunActions } from './RunActions';
+import { CheckCollectionButton, CollectionReadProgress } from './CollectionRun';
 import { dateTime, money, PHASE_LABEL, STATUS_COLOR, STATUS_LABEL } from './format';
 
 export function RunsPage() {
@@ -17,12 +18,13 @@ export function RunsPage() {
   // Only the current account's runs.
   const runs = useRuns(key);
   const navigate = useNavigate();
+  const reading = (runs ?? []).some((r) => r.status === 'fetching_collection');
 
   return (
     <Stack>
-      <Group justify="space-between">
+      <Group justify="space-between" align="flex-start">
         <Title order={2}>Selling runs</Title>
-        <Group gap="xs">
+        <Group gap="xs" align="flex-start">
           <Button component="a" href={f2fLinks.sellHome} target="_blank" variant="light" size="xs">
             F2F sell page
           </Button>
@@ -32,6 +34,7 @@ export function RunsPage() {
           <Button component="a" href={f2fLinks.shopHome} target="_blank" variant="default" size="xs">
             F2F shop
           </Button>
+          <CheckCollectionButton waiting={reading} />
         </Group>
       </Group>
 
@@ -52,6 +55,10 @@ export function RunsPage() {
               The check shows up here and keeps running in the background. Open it to see what F2F pays for each card, in cash and store credit.
             </List.Item>
           </List>
+          <Text size="sm">
+            Or check your <b>whole collection</b> from here with <b>Check whole collection</b> (top right): Tithies reads it from Moxfield in the
+            background (only what changed since its last read, when it can), then checks every paper, non-proxy card.
+          </Text>
           <Text size="sm" c="dimmed">
             Non-proxy cards are checked, at NM prices, each in the language Moxfield says it is: F2F lists most prints in English only, and a card it
             doesn't list in its language counts as not bought. The panel can be minimised to the Tithies medallion; it stays that way until you open it
@@ -81,7 +88,7 @@ export function RunsPage() {
                 accessor: 'source',
                 title: 'Moxfield filters',
                 render: (r) => (
-                  <Text size="sm" lineClamp={2} title={r.source.url}>
+                  <Text size="sm" lineClamp={2} title={r.source.wholeCollection ? 'Every paper, non-proxy card, read from the dashboard' : r.source.url}>
                     {r.source.summary}
                   </Text>
                 ),
@@ -158,8 +165,12 @@ export function RunsPage() {
                           </Badge>
                         )}
                       </Group>
-                      {r.status !== 'completed' && (
-                        <JobProgress size="sm" done={r.totals.done} total={r.totals.prints} color={STATUS_COLOR[r.status]} active={r.status === 'running'} />
+                      {r.status === 'fetching_collection' ? (
+                        <CollectionReadProgress run={r} />
+                      ) : (
+                        r.status !== 'completed' && (
+                          <JobProgress size="sm" done={r.totals.done} total={r.totals.prints} color={STATUS_COLOR[r.status]} active={r.status === 'running'} />
+                        )
                       )}
                     </Stack>
                   );

@@ -17,8 +17,8 @@ import { chromeTabPort, TabTransport } from '@/lib/sites/tab-transport';
 import { parseIdentity } from '@/lib/sites/validate';
 import type { SiteType } from '@/lib/sites/types';
 import { getSettings } from '@/lib/settings';
-import { controlRun, Runner, toProgress } from '@/features/f2f-buylist/runner';
-import { progressFor, startRunFromSite } from '@/features/f2f-buylist/start';
+import { controlRun, endInterruptedCollectionRuns, Runner, toProgress } from '@/features/f2f-buylist/runner';
+import { progressFor, startCollectionRun, startRunFromSite } from '@/features/f2f-buylist/start';
 import type { Run } from '@/features/f2f-buylist/types';
 
 const WATCHDOG = 'tithies-watchdog';
@@ -78,6 +78,8 @@ export default defineBackground(() => {
     }),
   ) as Record<SiteType, ExportJob>;
   for (const job of Object.values(syncJobs)) void job.markStale();
+  // A whole-collection check waiting for its read lost it with the previous worker.
+  void endInterruptedCollectionRuns().catch(() => {});
 
   const stopRuns = async (runIds: number[]) => {
     for (const runId of runIds) await controlRun(runId, 'cancel');
@@ -117,8 +119,28 @@ export default defineBackground(() => {
     return res;
   });
 
+  onMessage('startCollectionRun', async ({ data }) => {
+    const settings = await getSettings();
+    const accountKey = data?.accountKey == null ? null : parseAccountKey(data.accountKey) ? (data.accountKey as AccountKey) : undefined;
+    if (accountKey === undefined || !isSiteType(data?.type)) return { ok: false, error: 'Unknown account.' } as const;
+    const { result } = await startCollectionRun(data.type, accountKey, {
+      sync: syncJobs[data.type],
+      creditBonus: settings.creditBonus,
+      onQueued: () => runner.kick(),
+    });
+    return result;
+  });
+
   onMessage('controlRun', async ({ data }) => {
+    const before = await findRun(data.runId);
     const ok = await controlRun(data.runId, data.action);
+    // A check cancelled while its collection is read: stop the read too, unless it also syncs decks (a Compare joined it).
+    if (ok && data.action === 'cancel' && before?.status === 'fetching_collection') {
+      for (const job of Object.values(syncJobs)) {
+        const s = job.activeState;
+        if (s && s.jobId === before.collectionJobId && s.withDecks === false) job.cancel();
+      }
+    }
     if (ok && (data.action === 'resume' || data.action === 'retryErrors')) runner.kick();
     const run = await findRun(data.runId);
     if (run) notify(run);

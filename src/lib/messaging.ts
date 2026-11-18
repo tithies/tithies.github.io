@@ -7,6 +7,7 @@ import type { ReadTargetResult, StartExportRequest, StartExportResult } from '@/
 import type { ReadProgress, TargetRead } from '@/lib/export/types';
 import type { SiteApiCall, SiteIdentity, SiteResult, SiteTabStatus, SiteType } from '@/lib/sites/types';
 import type { RunProgress, RunSource } from '@/features/f2f-buylist/types';
+import type { StartCollectionRunResult } from '@/features/f2f-buylist/start';
 
 export type RunAction = 'pause' | 'resume' | 'cancel' | 'retryErrors';
 
@@ -22,6 +23,11 @@ interface ProtocolMap {
     accountKey: AccountKey;
     needsInitialSync: boolean;
   };
+  /**
+   * dashboard → background: a Selling run of `accountKey`'s whole collection (null: whoever is
+   * logged in on the site). Answers once the collection read has started; the run waits for it.
+   */
+  startCollectionRun(data: { type: SiteType; accountKey: AccountKey | null }): StartCollectionRunResult;
   controlRun(data: { runId: number; action: RunAction }): { ok: boolean; error?: string };
   /** Opens the dashboard: on a run, or on the initial-sync prompt of an account (`userName` names it when it isn't in Tithies yet). */
   openDashboard(data: { runId?: number; initialSync?: { accountKey: AccountKey; userName: string } }): void;

@@ -264,13 +264,25 @@ describe('Sync progress', () => {
 
   it('one progress over the deck list, the decks and the collection: it only grows, and ends at the requests made', async () => {
     const { seen, state } = await syncSeen(true);
-    // 1 deck list + 5 decks + 2 collection pages.
-    expect(state?.overall).toEqual({ done: 8, total: 8, step: 3, steps: 3 });
+    // 1 deck list + 1 page of folders + 5 decks + 2 collection pages.
+    expect(state?.overall).toEqual({ done: 9, total: 9, step: 3, steps: 3 });
     expect(seen.map((o) => o.step)).toEqual(expect.arrayContaining([1, 2, 3]));
   });
 
   it('a sync of the decks only has two steps', async () => {
     const { state } = await syncSeen(false);
-    expect(state?.overall).toEqual({ done: 6, total: 6, step: 2, steps: 2 });
+    expect(state?.overall).toEqual({ done: 7, total: 7, step: 2, steps: 2 });
+  });
+
+  it('a read of the collection alone has one step, and reads nothing else', async () => {
+    const port = moxTabs();
+    const job = newJob(port);
+    await job.start({ accountKey: A.key, collection: true, decks: false });
+    await job.finished;
+    const state = await A.data.meta.get('sync');
+    expect(state).toMatchObject({ status: 'done', withDecks: false, withCollection: true });
+    expect(state?.overall).toEqual({ done: 2, total: 2, step: 1, steps: 1 });
+    expect(port.calls.map((c) => c.call.req.kind)).toEqual(['collection', 'collection']);
+    expect(await A.data.decks.list()).toEqual([]);
   });
 });

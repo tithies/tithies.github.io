@@ -64,16 +64,22 @@ export async function readActivity(): Promise<ActivityItem[]> {
     });
   }
 
+  // Collection reads a Selling check waits for: shown as the check, not as a sync of their own.
+  const readFor = new Map<string, SyncState>();
   for (const run of await unfinishedRuns()) {
-    if (!names.has(run.accountKey as AccountKey)) continue;
+    const key = run.accountKey as AccountKey;
+    if (!names.has(key)) continue;
+    const read = run.status === 'fetching_collection' ? await accountData(key).meta.get('sync') : undefined;
+    const reading = read?.status === 'running' && read.jobId === run.collectionJobId ? read : undefined;
+    if (reading) readFor.set(reading.jobId, reading);
     items.push({
       id: `run:${run.id}`,
       kind: 'run',
-      accountKey: run.accountKey as AccountKey,
-      userName: names.get(run.accountKey as AccountKey)!,
+      accountKey: key,
+      userName: names.get(key)!,
       title: `Selling check · ${run.source.summary || 'Whole collection'}`,
-      detail: RUN_DETAIL[run.status] ?? run.status,
-      progress: run.totals.prints > 0 ? { done: run.totals.done, total: run.totals.prints } : undefined,
+      detail: reading ? syncDetail(reading) : (RUN_DETAIL[run.status] ?? run.status),
+      progress: reading?.overall ?? (run.totals.prints > 0 ? { done: run.totals.done, total: run.totals.prints } : undefined),
       to: `/f2f/runs/${run.id}`,
     });
   }
@@ -82,6 +88,7 @@ export async function readActivity(): Promise<ActivityItem[]> {
     const data = accountData(a.key);
     const s = await data.meta.get('sync');
     if (s?.status !== 'running') continue;
+    if (s.withDecks === false && readFor.has(s.jobId)) continue;
     // The account's decks were never synced to the end: this is its initial sync.
     const initial = !(await data.meta.get('decks'))?.lastSuccessAt;
     items.push({
@@ -89,7 +96,16 @@ export async function readActivity(): Promise<ActivityItem[]> {
       kind: 'sync',
       accountKey: a.key,
       userName: names.get(a.key)!,
-      title: initial ? (s.withCollection ? 'Initial sync (decks and collection)' : 'First deck sync') : s.withCollection ? 'Deck and collection sync' : 'Deck sync',
+      title:
+        s.withDecks === false
+          ? 'Collection read'
+          : initial
+            ? s.withCollection
+              ? 'Initial sync (decks and collection)'
+              : 'First deck sync'
+            : s.withCollection
+              ? 'Deck and collection sync'
+              : 'Deck sync',
       detail: syncDetail(s),
       progress: s.overall ?? (s.phase === 'decks' && s.total > 0 ? { done: s.done, total: s.total } : undefined),
       to: '/collection/comparator',

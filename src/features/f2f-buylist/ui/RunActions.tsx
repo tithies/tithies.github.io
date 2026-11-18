@@ -19,12 +19,14 @@ export function RunActions({ run, compact, viewItems }: Props) {
   const navigate = useNavigate();
   const [confirm, setConfirm] = useState(false);
   const act = (action: RunAction) => void sendMessage('controlRun', { runId: run.id!, action });
-  const active = run.status === 'running' || run.status === 'queued';
-  const resumable = run.status === 'paused' || run.status === 'failed' || run.status === 'cancelled';
+  const reading = run.status === 'fetching_collection';
+  const active = run.status === 'running' || run.status === 'queued' || reading;
+  // A whole-collection run whose read failed has no cards to resume with: check the collection again instead.
+  const resumable = (run.status === 'paused' || run.status === 'failed' || run.status === 'cancelled') && !(run.source.wholeCollection && !run.totals.prints);
   const exportAll = async () => downloadCsv(run, await itemsOfRun(run.id!));
 
   const actions = [
-    active && { key: 'pause', label: 'Pause', icon: IconPlayerPause, color: 'yellow', onClick: () => act('pause') },
+    active && !reading && { key: 'pause', label: 'Pause', icon: IconPlayerPause, color: 'yellow', onClick: () => act('pause') },
     resumable && { key: 'resume', label: 'Resume', icon: IconPlayerPlay, color: 'blue', onClick: () => act('resume') },
     active && { key: 'cancel', label: 'Cancel', icon: IconPlayerStop, color: 'gray', onClick: () => act('cancel') },
     run.totals.errors > 0 && !active && { key: 'retry', label: `Retry ${run.totals.errors} errors`, icon: IconRefresh, color: 'red', onClick: () => act('retryErrors') },

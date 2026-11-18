@@ -17,6 +17,7 @@ import { categoryOf, type Item } from '../types';
 import { summarize } from '../summary';
 import { Stat } from '@/lib/ui/Stat';
 import { RunActions } from './RunActions';
+import { CollectionReadProgress } from './CollectionRun';
 import { ColumnsMenu, useHiddenColumns } from './ColumnsMenu';
 import { buildColumns, reviewRowClass } from './columns';
 import { applyFilters, applySort, filtersFromParams, sortFromParams, writeParams, type Filters, type Sort, type SortKey } from './filtering';
@@ -164,7 +165,16 @@ export function RunDetailPage() {
           </Group>
           <Text size="sm" c="dimmed">
             {dateTime(run.createdAt)} · {runAccount ? `${accountLabel(runAccount)} · ` : ''}
-            {site.label} filters: <b>{run.source.summary}</b> · {t.entries} rows → {t.prints} prints · {run.requests} F2F requests
+            {run.source.wholeCollection ? (
+              <>
+                <b>Whole {site.label} collection</b> (paper, non-proxy)
+              </>
+            ) : (
+              <>
+                {site.label} filters: <b>{run.source.summary}</b>
+              </>
+            )}{' '}
+            · {t.entries} rows → {t.prints} prints · {run.requests} F2F requests
           </Text>
         </Stack>
         <Group gap="xs">
@@ -180,7 +190,12 @@ export function RunDetailPage() {
         </Group>
       </Group>
 
-      {run.status !== 'completed' && (
+      {run.status === 'fetching_collection' && (
+        <Paper withBorder p="sm" radius="md">
+          <CollectionReadProgress run={run} size="lg" />
+        </Paper>
+      )}
+      {run.status !== 'completed' && run.status !== 'fetching_collection' && (run.totals.prints > 0 || !run.source.wholeCollection) && (
         <Paper withBorder p="sm" radius="md">
           <Text size="sm" mb={6}>
             {PHASE_LABEL[run.phase]} — {t.done}/{t.prints} prints checked
@@ -314,7 +329,7 @@ export function RunDetailPage() {
           columns={columns}
           fetching={items === undefined}
           minHeight={records.length ? undefined : 200}
-          noRecordsText={all.length ? 'No cards match these filters' : 'No cards'}
+          noRecordsText={all.length ? 'No cards match these filters' : run.status === 'fetching_collection' ? 'The cards show up here once the collection is read' : 'No cards'}
           striped
           highlightOnHover
           rowClassName={reviewRowClass}

@@ -113,6 +113,8 @@ export interface SyncState {
   accountKey: string;
   status: SyncStatus;
   phase: SyncPhase;
+  /** Read the deck list and the changed decks; false: only the collection (a Selling check of the whole collection). Unset: true. */
+  withDecks?: boolean;
   /** Also read the collection after the decks. */
   withCollection: boolean;
   /** Read every page of it (else only what changed since the snapshot, when that can be trusted). */

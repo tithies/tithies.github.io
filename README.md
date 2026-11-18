@@ -31,11 +31,13 @@ The code is ready for other sites like Moxfield (account types): each lives in `
    - filters (name, category, set, finish, rarity, match, price / % ranges, stock), sorting on every column, a page-size selector (default 100) and CSV export; every column is shown until you hide some (**Columns**);
    - the history of every run of the current account.
 
+**The whole collection, from the dashboard.** **Check whole collection** (top right of *Selling → Runs*) checks every paper, non-proxy card of the current account (MTGO and Arena rows are left out), without opening Moxfield's collection page. The run shows up at once and first reads the collection in the background, like the Comparator does (only what changed since Tithies' last read when that can be trusted, else every page; the decks aren't read), into the same collection snapshot; it then checks its cards like any other run. Moxfield must be logged in as that account in this browser; with no account in Tithies yet, the logged-in one is added. A run whose read fails or is cancelled ends without cards (check again); one whose read was cut by a browser restart ends too.
+
 **Languages.** Each card is checked in the language its Moxfield entry's *Language* field says, and only in that language: F2F buys a copy as listed in its language. F2F lists almost every print in English only. It lists other languages mostly for prints that exist in one language, often in sets of their own ("Foreign Black Border: French", "Renaissance German", "Fourth Edition Black Border: Japanese"), which Tithies matches to Moxfield's set ("Foreign Black Border"). A card F2F doesn't list in its language is **not bought** ($0, "F2F doesn't list this print in French"), and so is one F2F lists but doesn't buy: F2F's bulk lots are English, so other languages are never valued at bulk rates. Non-English cards have a language badge (FR, JA…), and there's a Language filter.
 
 Moxfield keeps two languages per collection card: the print's (Moxfield has one card for each print *and* language, image and printed name included, e.g. a French MH2 #68 Suspend) and the entry's *Language* field, which defaults to English and is never checked against the print. Tithies trusts the Language field and shows a yellow warning when the print is in another language, e.g. an FBB #41 Swords to Plowshares (a French print) left on "English" is checked in English.
 
-Runs are stored in IndexedDB and survive browser restarts. A run interrupted by a crash, a restart or F2F rate limiting resumes from the next unfinished batch.
+Runs are stored in IndexedDB and survive browser restarts. A run interrupted by a crash, a restart or F2F rate limiting resumes from the next unfinished batch (once it has its cards).
 
 ### How it talks to the sites
 

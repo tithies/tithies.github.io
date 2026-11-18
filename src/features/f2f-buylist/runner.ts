@@ -51,14 +51,19 @@ export const splitParts = (prints: number, total: number) =>
 // ---------------------------------------------------------------------------------------------
 // Run creation
 
-/** A new run of `accountKey`'s collection entries (the account must exist: see src/lib/accounts). */
-export async function createRun(accountKey: string, source: RunSource, entries: CollectionEntry[], creditBonus: number): Promise<{ runId: number; prints: number }> {
-  const groups = groupPrints(entries);
-  const now = Date.now();
+/** A run's totals before any lookup: rows, prints and copies. */
+function startTotals(entries: CollectionEntry[], groups: ReturnType<typeof groupPrints>) {
   const totals = emptyTotals();
   totals.entries = entries.length;
   totals.prints = groups.length;
   totals.copies = groups.reduce((s, g) => s + g.qty, 0);
+  return totals;
+}
+
+/** A new run of `accountKey`'s collection entries (the account must exist: see src/lib/accounts). */
+export async function createRun(accountKey: string, source: RunSource, entries: CollectionEntry[], creditBonus: number): Promise<{ runId: number; prints: number }> {
+  const groups = groupPrints(entries);
+  const now = Date.now();
   return db.transaction('rw', db.runs, db.items, async () => {
     const runId = (await db.runs.add({
       accountKey,
@@ -67,40 +72,100 @@ export async function createRun(accountKey: string, source: RunSource, entries: 
       status: 'queued',
       phase: 'bulk_rates',
       source,
-      totals,
+      totals: startTotals(entries, groups),
       creditBonus,
       requests: 0,
       consecutiveFailures: 0,
     })) as number;
-    const items: Item[] = groups.map((g) => ({
-      runId,
-      accountKey,
-      key: g.key,
-      status: 'pending',
-      name: g.card.name,
-      frontName: g.card.faces[0] ?? g.card.name,
-      faces: g.card.faces,
-      flavorName: g.card.flavorName || undefined,
-      set: g.card.set,
-      setName: g.card.setName,
-      setType: g.card.setType,
-      cn: g.card.cn,
-      finish: g.finish,
-      lang: g.lang,
-      ...(g.mismatchCopies ? { mismatchCopies: g.mismatchCopies, printLang: g.printLang } : {}),
-      rarity: g.card.rarity,
-      typeLine: g.card.typeLine,
-      isToken: g.card.isToken,
-      qty: g.qty,
-      conditions: g.conditions,
-      alters: g.alters,
-      scryfallId: g.card.scryfallId,
-      marketUsd: g.card.usd[g.finish] ?? null,
-      updatedAt: now,
-    }));
+    const items = itemsOf(runId, accountKey, groups, now);
     await db.items.bulkAdd(items);
     return { runId, prints: items.length };
   });
+}
+
+/**
+ * A run of `accountKey`'s whole collection, waiting for the collection to be read (status
+ * 'fetching_collection', no cards yet): `fillCollectionRun` gives it its cards, `endCollectionRun`
+ * ends it when the read didn't make it. `jobId`: the background read it waits for.
+ */
+export async function createCollectionRun(accountKey: string, source: RunSource, creditBonus: number, jobId: string): Promise<number> {
+  const now = Date.now();
+  return (await db.runs.add({
+    accountKey,
+    createdAt: now,
+    updatedAt: now,
+    status: 'fetching_collection',
+    phase: 'bulk_rates',
+    source,
+    totals: emptyTotals(),
+    creditBonus,
+    requests: 0,
+    consecutiveFailures: 0,
+    collectionJobId: jobId,
+  })) as number;
+}
+
+/**
+ * The collection was read: the run gets its cards (`entries`, already filtered) and waits for its
+ * turn. Null when the run no longer waits for them (cancelled or deleted meanwhile): nothing is written.
+ */
+export async function fillCollectionRun(runId: number, entries: CollectionEntry[]): Promise<{ prints: number } | null> {
+  const groups = groupPrints(entries);
+  const now = Date.now();
+  return db.transaction('rw', db.runs, db.items, async () => {
+    const run = await db.runs.get(runId);
+    if (run?.status !== 'fetching_collection') return null;
+    const items = itemsOf(runId, run.accountKey, groups, now);
+    await db.items.bulkAdd(items);
+    await db.runs.update(runId, { status: 'queued', totals: startTotals(entries, groups), updatedAt: now });
+    return { prints: items.length };
+  });
+}
+
+/** A run whose collection read didn't make it: it ends without cards (unless it ended already). */
+export async function endCollectionRun(runId: number, status: 'failed' | 'cancelled', error?: string): Promise<void> {
+  await db.transaction('rw', db.runs, async () => {
+    const run = await db.runs.get(runId);
+    if (run?.status !== 'fetching_collection') return;
+    await db.runs.update(runId, { status, error, finishedAt: Date.now(), updatedAt: Date.now() });
+  });
+}
+
+/** On worker start: runs still waiting for a collection read lost it with the previous worker (it is never resumed). */
+export async function endInterruptedCollectionRuns(): Promise<void> {
+  const waiting = await db.runs.where('status').equals('fetching_collection').toArray();
+  for (const run of waiting) {
+    await endCollectionRun(run.id!, 'failed', 'The collection read was interrupted (browser closed or extension reloaded). Check the collection again.');
+  }
+}
+
+function itemsOf(runId: number, accountKey: string, groups: ReturnType<typeof groupPrints>, now: number): Item[] {
+  return groups.map((g) => ({
+    runId,
+    accountKey,
+    key: g.key,
+    status: 'pending',
+    name: g.card.name,
+    frontName: g.card.faces[0] ?? g.card.name,
+    faces: g.card.faces,
+    flavorName: g.card.flavorName || undefined,
+    set: g.card.set,
+    setName: g.card.setName,
+    setType: g.card.setType,
+    cn: g.card.cn,
+    finish: g.finish,
+    lang: g.lang,
+    ...(g.mismatchCopies ? { mismatchCopies: g.mismatchCopies, printLang: g.printLang } : {}),
+    rarity: g.card.rarity,
+    typeLine: g.card.typeLine,
+    isToken: g.card.isToken,
+    qty: g.qty,
+    conditions: g.conditions,
+    alters: g.alters,
+    scryfallId: g.card.scryfallId,
+    marketUsd: g.card.usd[g.finish] ?? null,
+    updatedAt: now,
+  }));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -550,6 +615,8 @@ export async function controlRun(runId: number, action: 'pause' | 'resume' | 'ca
       return true;
     case 'resume':
       if (!['paused', 'failed', 'cancelled'].includes(run.status)) return false;
+      // A whole-collection run that never got its cards (its read failed): nothing to resume.
+      if (run.source.wholeCollection && !run.totals.prints) return false;
       await db.runs.update(runId, { status: 'queued', consecutiveFailures: 0, error: undefined, finishedAt: undefined, updatedAt: now });
       return true;
     case 'cancel':

@@ -1,6 +1,6 @@
 /**
  * Background sync job of one site: deck list + changed decks, then (optionally) the whole
- * collection, for one account. `start` answers once a tab of the account is found; progress
+ * collection, for one account (or the collection alone: `decks: false`). `start` answers once a tab of the account is found; progress
  * lives in the account's meta 'sync', which pages read with useLiveQuery. One job per site at a
  * time: starting while one runs for the same account joins it (and can ask it to read the
  * collection too); another account must wait.
@@ -85,12 +85,28 @@ export class AccountSyncJob {
     return (this.active?.state.accountKey as AccountKey) ?? null;
   }
 
+  /** The running job's state (null when none runs). */
+  get activeState(): SyncState | null {
+    return this.active?.state ?? null;
+  }
+
   /** Resolves when the current job (if any) has finished. */
   get finished(): Promise<void> {
     return this.active?.done ?? Promise.resolve();
   }
 
-  async start({ accountKey, collection, fullCollection = false }: { accountKey: AccountKey | null; collection: boolean; fullCollection?: boolean }): Promise<StartSyncResult> {
+  async start({
+    accountKey,
+    collection,
+    fullCollection = false,
+    decks = true,
+  }: {
+    accountKey: AccountKey | null;
+    collection: boolean;
+    fullCollection?: boolean;
+    /** false: only the collection (with `collection`). Joining a running job adds what it doesn't do yet. */
+    decks?: boolean;
+  }): Promise<StartSyncResult> {
     for (;;) {
       if (this.starting) {
         await this.starting.promise.catch(() => undefined);
@@ -102,8 +118,13 @@ export class AccountSyncJob {
         if (accountKey !== null && accountKey !== key) {
           return { ok: false, code: 'busy', busyWith: key, error: `Tithies is already syncing another ${this.site.label} account. Wait for it to finish, or cancel it.` };
         }
-        if (collection && (!running.state.withCollection || (fullCollection && !running.state.fullCollection))) {
-          await this.patch(running, { withCollection: true, fullCollection: fullCollection || running.state.fullCollection });
+        const addDecks = decks && running.state.withDecks === false;
+        const addCollection = collection && (!running.state.withCollection || (fullCollection && !running.state.fullCollection));
+        if (addDecks || addCollection) {
+          await this.patch(running, {
+            ...(addDecks ? { withDecks: true } : {}),
+            ...(addCollection ? { withCollection: true, fullCollection: fullCollection || running.state.fullCollection } : {}),
+          });
         }
         return { ok: true, jobId: running.state.jobId, accountKey: key, alreadyRunning: true };
       }
@@ -111,7 +132,7 @@ export class AccountSyncJob {
         return { ok: false, code: 'exporting', error: `Tithies is exporting cards to ${this.site.label}: wait for it to finish (see the Change log), then sync.` };
       }
       const abort = new AbortController();
-      const promise = this.begin(accountKey, collection, abort, fullCollection);
+      const promise = this.begin(accountKey, collection || !decks, abort, fullCollection, decks);
       this.starting = { promise, abort };
       try {
         return await promise;
@@ -160,7 +181,7 @@ export class AccountSyncJob {
     return typeof o === 'function' ? o() : (o ?? {});
   }
 
-  private async begin(accountKey: AccountKey | null, collection: boolean, abort: AbortController, fullCollection = false): Promise<StartSyncResult> {
+  private async begin(accountKey: AccountKey | null, collection: boolean, abort: AbortController, fullCollection = false, decks = true): Promise<StartSyncResult> {
     const { label } = this.site;
     let data: AccountData | null = null;
     let expect: SiteIdentity | 'first' = 'first';
@@ -178,6 +199,7 @@ export class AccountSyncJob {
       accountKey: accountKey ?? '',
       status: 'running',
       phase: 'connecting',
+      ...(decks ? {} : { withDecks: false }),
       withCollection: collection,
       ...(fullCollection ? { fullCollection: true } : {}),
       done: 0,
@@ -281,37 +303,58 @@ export class AccountSyncJob {
       expectedUserId: () => transport.identity?.userId,
     });
     let keepOwnTab = false;
-    // One progress over the steps: the deck list (1 request), the decks to read again, then the collection's pages.
+    const withDecks = () => job.state.withDecks !== false;
+    // One progress over the steps: the deck list (and its folders), the decks to read again, then the collection's pages.
     const savedCollection = await job.data.meta.get('collection');
     const collectionPages = () => {
       const full = job.state.fullCollection === true || !savedCollection?.fullReadAt || Date.now() - savedCollection.fullReadAt > FULL_READ_EVERY_MS;
       // Only the changes: about a page; every page: as many as last time.
       return full ? Math.max(1, Math.ceil((savedCollection?.entries ?? 0) / this.site.collectionPageSize)) : 1;
     };
-    const tally = new StepTally([1, 0, job.state.withCollection ? collectionPages() : 0]);
-    const steps = () => (job.state.withCollection ? 3 : 2);
-    const step = (i: number, done: number, total: number) => ({ ...tally.report(i, done, total), steps: steps() });
+    const tally = new StepTally([withDecks() ? 2 : 0, 0, job.state.withCollection ? collectionPages() : 0]);
+    // Steps this job makes, and which of them runs (the collection alone is one step).
+    const steps = () => (withDecks() ? 2 : 0) + (job.state.withCollection ? 1 : 0);
+    const step = (i: number, done: number, total: number) => ({ ...tally.report(i, done, total), step: withDecks() ? i + 1 : 1, steps: steps() });
     try {
-      const decks = await syncDecks(this.site, job.data, client, {
-        signal,
-        onProgress: (p) => {
-          if (p.phase === 'decks') tally.report(0, 1, 1); // the deck list was read
-          const overall = p.phase === 'deckList' ? step(0, 0, 1) : step(1, p.done, p.total);
-          return this.patch(job, { phase: p.phase, done: p.done, total: p.total, overall, current: p.current, message: undefined, requests: client.requests });
-        },
-      });
-      await this.patch(job, { decks, current: undefined, requests: client.requests });
-      // Read at this point: a "Compare" may have joined a decks-only sync meanwhile.
-      if (job.state.withCollection) {
-        tally.expect(2, collectionPages());
-        await this.patch(job, { phase: 'collection', done: 0, total: 1, overall: step(2, 0, 0), message: undefined });
-        await refreshCollection(this.site, job.data, client, {
-          full: job.state.fullCollection === true,
-          signal,
-          onProgress: (p) => this.patch(job, { done: p.done, total: p.total, overall: step(2, p.done, p.total), message: undefined, requests: client.requests }),
-        });
+      // Decks first, then the collection; work joined meanwhile (a "Compare" during a collection read) is done after.
+      let decksDone = false;
+      let collectionDone = false;
+      for (;;) {
+        if (withDecks() && !decksDone) {
+          const before = client.requests;
+          let listRequests: number | null = null;
+          const decks = await syncDecks(this.site, job.data, client, {
+            signal,
+            onProgress: (p) => {
+              if (p.phase === 'decks' && listRequests === null) {
+                // The deck list (and its folders) was read.
+                listRequests = Math.max(1, client.requests - before);
+                tally.report(0, listRequests, listRequests);
+              }
+              const overall = p.phase === 'deckList' ? step(0, 0, 2) : step(1, p.done, p.total);
+              return this.patch(job, { phase: p.phase, done: p.done, total: p.total, overall, current: p.current, message: undefined, requests: client.requests });
+            },
+          });
+          decksDone = true;
+          await this.patch(job, { decks, current: undefined, requests: client.requests });
+          continue;
+        }
+        // Read at this point: a "Compare" may have joined a decks-only sync meanwhile.
+        if (job.state.withCollection && !collectionDone) {
+          tally.expect(2, collectionPages());
+          await this.patch(job, { phase: 'collection', done: 0, total: 1, overall: step(2, 0, 0), message: undefined });
+          await refreshCollection(this.site, job.data, client, {
+            full: job.state.fullCollection === true,
+            signal,
+            onProgress: (p) => this.patch(job, { done: p.done, total: p.total, overall: step(2, p.done, p.total), message: undefined, requests: client.requests }),
+          });
+          collectionDone = true;
+          continue;
+        }
+        break;
       }
-      await this.patch(job, { status: 'done', phase: 'done', overall: { ...tally.finish(), steps: steps() }, finishedAt: Date.now(), message: undefined, requests: client.requests });
+      const last = job.state.overall?.step ?? 1;
+      await this.patch(job, { status: 'done', phase: 'done', overall: { ...tally.finish(), step: Math.min(last, steps()), steps: steps() }, finishedAt: Date.now(), message: undefined, requests: client.requests });
     } catch (e) {
       // Forgotten meanwhile: nothing left to write to.
       if (e instanceof AccountGoneError) return;
