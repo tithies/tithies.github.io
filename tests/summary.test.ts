@@ -1,4 +1,4 @@
-import { summarize } from '@/features/f2f-buylist/summary';
+import { buySellStats, summarize } from '@/features/f2f-buylist/summary';
 import type { Item } from '@/features/f2f-buylist/types';
 
 const item = (p: Partial<Item>): Item =>
@@ -42,5 +42,24 @@ describe('summarize', () => {
     expect(t.meanPctCash).toBeCloseTo(36.667, 3);
     expect(t.medianPctCredit).toBe(52);
     expect(t.meanPctCredit).toBeCloseTo(47.667, 3);
+  });
+
+  it('gives per-card buy ÷ sell % for F2F buys, bulk and both', () => {
+    const withBulk = [
+      ...items,
+      item({ category: 'bulk', qty: 3, buyCash: 0.05, buyCredit: 0.065, retail: 0.25, pctCash: 20, pctCredit: 26 }),
+      item({ category: 'bulk', qty: 1, buyCash: 0.05, buyCredit: 0.065, retail: 0.5, pctCash: 10, pctCredit: 13 }),
+      // Not counted: not checked yet, F2F doesn't buy it, or a bulk row of before with $0.
+      item({ status: 'pending', category: 'bulk', buyCash: 0.05, pctCash: 99, pctCredit: 99 }),
+      item({ category: 'not_bought', buyCash: 0, pctCash: 0, pctCredit: 0 }),
+      item({ category: 'bulk', buyCash: 0, pctCash: 0, pctCredit: 0 }),
+    ];
+    const s = buySellStats(withBulk);
+    expect(s.buylist).toMatchObject({ cards: 3, medianCash: 40, medianCredit: 52 });
+    expect(s.buylist.meanCash).toBeCloseTo(36.667, 3);
+    expect(s.bulk).toEqual({ cards: 2, medianCash: 15, meanCash: 15, medianCredit: 19.5, meanCredit: 19.5 });
+    // 40, 60, 10, 20, 10
+    expect(s.all).toMatchObject({ cards: 5, medianCash: 20, meanCash: 28, medianCredit: 26 });
+    expect(buySellStats([]).all).toEqual({ cards: 0, medianCash: null, meanCash: null, medianCredit: null, meanCredit: null });
   });
 });

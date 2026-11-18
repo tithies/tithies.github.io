@@ -1,4 +1,4 @@
-import { Alert, Anchor, Badge, Button, Group, Paper, SimpleGrid, Stack, Table, Text, Title, Tooltip } from '@mantine/core';
+import { Alert, Anchor, Badge, Button, Grid, Group, Paper, Stack, Table, Text, Title, Tooltip } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { IconAlertTriangle, IconArrowLeft, IconBox, IconBuildingStore, IconCash } from '@tabler/icons-react';
 import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
@@ -16,7 +16,7 @@ import { renderPagination } from '@/lib/ui/pagination';
 import { SiteIcon } from '@/lib/ui/SiteIcon';
 import { f2fLinks } from '@/lib/f2f/links';
 import { categoryOf, type Item } from '../types';
-import { summarize } from '../summary';
+import { buySellStats, summarize, type BuySellStats, type PctStats } from '../summary';
 import { useSellingDeckFilter } from '../deck-filter';
 import { freeCopies, type FreeCopies } from '../in-decks';
 import { Stat } from '@/lib/ui/Stat';
@@ -59,6 +59,81 @@ function CashCreditTable({ rows }: { rows: { label: React.ReactNode; cash: strin
             </Table.Td>
             <Table.Td ta="right" fw={700} fz={r.strong ? 'md' : undefined}>
               {r.credit}
+            </Table.Td>
+          </Table.Tr>
+        ))}
+      </Table.Tbody>
+    </Table>
+  );
+}
+
+/** `part` ÷ `whole` in %, or "—" without a whole. */
+const ratio = (part: number, whole: number) => pct(whole ? (part / whole) * 100 : null);
+
+function Copies({ n }: { n: number }) {
+  return (
+    <Text size="xs" c="dimmed" className="ti-num">
+      {n.toLocaleString('en-CA')} {n === 1 ? 'copy' : 'copies'}
+    </Text>
+  );
+}
+
+/** Per-card buy ÷ sell %: median and average, cash and credit, for F2F buys, bulk and both. */
+function PctTable({ stats }: { stats: BuySellStats }) {
+  const rows: { label: string; s: PctStats; color?: string }[] = [
+    { label: 'F2F buys', s: stats.buylist, color: 'teal' },
+    { label: 'Bulk', s: stats.bulk, color: 'orange' },
+    { label: 'All', s: stats.all },
+  ];
+  const th = (text: string) => (
+    <Table.Th ta="right" c="teal">
+      {text}
+    </Table.Th>
+  );
+  return (
+    <Table withRowBorders={false} withTableBorder={false} verticalSpacing={0} horizontalSpacing={8} fz="sm" className="ti-num" w="auto">
+      <Table.Thead>
+        <Table.Tr>
+          <Table.Th />
+          <Table.Th colSpan={2} ta="center" c="dimmed" fw={600}>
+            Median
+          </Table.Th>
+          <Table.Th colSpan={2} ta="center" c="dimmed" fw={600}>
+            Average
+          </Table.Th>
+          <Table.Th />
+        </Table.Tr>
+        <Table.Tr>
+          <Table.Th />
+          {th('Cash')}
+          {th('Credit')}
+          {th('Cash')}
+          {th('Credit')}
+          <Table.Th ta="right" c="dimmed" fw={400}>
+            Prints
+          </Table.Th>
+        </Table.Tr>
+      </Table.Thead>
+      <Table.Tbody>
+        {rows.map(({ label, s, color }) => (
+          <Table.Tr key={label}>
+            <Table.Td c={color ?? 'dimmed'} style={{ whiteSpace: 'nowrap' }}>
+              {label}
+            </Table.Td>
+            <Table.Td ta="right" fw={700}>
+              {pct(s.medianCash)}
+            </Table.Td>
+            <Table.Td ta="right" fw={700}>
+              {pct(s.medianCredit)}
+            </Table.Td>
+            <Table.Td ta="right" fw={700}>
+              {pct(s.meanCash)}
+            </Table.Td>
+            <Table.Td ta="right" fw={700}>
+              {pct(s.meanCredit)}
+            </Table.Td>
+            <Table.Td ta="right" c="dimmed">
+              {s.cards.toLocaleString('en-CA')}
             </Table.Td>
           </Table.Tr>
         ))}
@@ -174,6 +249,15 @@ export function RunDetailPage() {
   // counts every card; the totals only those the "Cards in decks" filter keeps.
   const runTotals = useMemo(() => summarize(all, run?.totals.entries ?? 0), [all, run?.totals.entries]);
   const t = useMemo(() => (inDecks ? summarize(shown, run?.totals.entries ?? 0) : runTotals), [inDecks, shown, run?.totals.entries, runTotals]);
+  const pctStats = useMemo(() => buySellStats(shown), [shown]);
+  /** F2F buys and bulk together. */
+  const total = {
+    cash: t.buylistCash + t.bulkCash,
+    credit: t.buylistCredit + t.bulkCredit,
+    retail: t.buylistRetail + t.bulkRetail,
+    cashWithRetail: t.buylistCashWithRetail + t.bulkCashWithRetail,
+    creditWithRetail: t.buylistCreditWithRetail + t.bulkCreditWithRetail,
+  };
 
   if (run === undefined) return <Text c="dimmed">Loading…</Text>;
   if (run === null) {
@@ -263,98 +347,117 @@ export function RunDetailPage() {
         </Alert>
       )}
 
-      <SimpleGrid cols={{ base: 2, md: 3 }} spacing="sm">
-        <Stat
-          label="F2F buys"
-          value={`${t.buylistPrints}`}
-          lines={[`${t.buylistCopies} copies`]}
-          color="teal"
-          icon={<IconCash color="var(--mantine-color-teal-5)" />}
-          active={filters.category === 'buylist'}
-          action={filters.category === 'buylist' ? 'Show all cards again' : 'Show only cards F2F buys'}
-          onClick={() => update({ ...filters, category: filters.category === 'buylist' ? 'all' : 'buylist' }, sort, 1)}
-        />
-        <Stat
-          label="Value of cards F2F buys"
-          lines={[
-            <Tooltip
-              key="retail"
-              multiline
-              w={280}
-              label={`Total of F2F's own NM prices for these cards. "% of F2F" = your total ÷ that total${t.buylistNoRetail ? `; ${t.buylistNoRetail} cards without an F2F price are left out` : ''}.`}
-            >
-              <span>
-                F2F sells them for <b>{money(t.buylistRetail)}</b>
-              </span>
-            </Tooltip>,
-          ]}
-        >
-          <CashCreditTable
-            rows={[
-              { label: 'You get', cash: money(t.buylistCash), credit: money(t.buylistCredit), strong: true },
-              {
-                label: '% of F2F',
-                cash: pct(t.buylistRetail ? (t.buylistCashWithRetail / t.buylistRetail) * 100 : null),
-                credit: pct(t.buylistRetail ? (t.buylistCreditWithRetail / t.buylistRetail) * 100 : null),
-              },
+      <Grid gap="sm">
+        <Grid.Col span={{ base: 12, sm: 6, lg: 4 }}>
+          <Stat
+            label="F2F buys"
+            value={t.buylistPrints.toLocaleString('en-CA')}
+            color="teal"
+            icon={<IconCash color="var(--mantine-color-teal-5)" />}
+            active={filters.category === 'buylist'}
+            action={filters.category === 'buylist' ? 'Show all cards again' : 'Show only cards F2F buys'}
+            onClick={() => update({ ...filters, category: filters.category === 'buylist' ? 'all' : 'buylist' }, sort, 1)}
+            lines={[
+              <Tooltip
+                key="retail"
+                multiline
+                w={280}
+                label={`Total of F2F's own NM prices for these cards. "% of F2F" = your total ÷ that total${t.buylistNoRetail ? `; ${t.buylistNoRetail} cards without an F2F price are left out` : ''}.`}
+              >
+                <span>
+                  F2F sells them for <b>{money(t.buylistRetail)}</b>
+                </span>
+              </Tooltip>,
             ]}
-          />
-        </Stat>
-        <Stat label="Buy / sell %" lines={['per card, cards F2F buys']}>
-          <CashCreditTable
-            rows={[
-              { label: 'Median', cash: pct(t.medianPctCash), credit: pct(t.medianPctCredit) },
-              { label: 'Average', cash: pct(t.meanPctCash), credit: pct(t.meanPctCredit) },
+          >
+            <Copies n={t.buylistCopies} />
+            <CashCreditTable
+              rows={[
+                { label: 'You get', cash: money(t.buylistCash), credit: money(t.buylistCredit), strong: true },
+                { label: '% of F2F', cash: ratio(t.buylistCashWithRetail, t.buylistRetail), credit: ratio(t.buylistCreditWithRetail, t.buylistRetail) },
+              ]}
+            />
+          </Stat>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, lg: 4 }}>
+          <Stat
+            label="Bulk"
+            value={t.bulkPrints.toLocaleString('en-CA')}
+            color="orange"
+            icon={<IconBox color="var(--mantine-color-orange-5)" />}
+            active={filters.category === 'bulk'}
+            action={filters.category === 'bulk' ? 'Show all cards again' : 'Show only bulk cards'}
+            onClick={() => update({ ...filters, category: filters.category === 'bulk' ? 'all' : 'bulk' }, sort, 1)}
+            lines={[
+              <Tooltip
+                key="retail"
+                multiline
+                w={280}
+                label={`Total of F2F's own NM prices for your bulk cards (when F2F lists them). "% of F2F" = your bulk payout ÷ that total.`}
+              >
+                <span>
+                  F2F sells them for <b>{money(t.bulkRetail)}</b>
+                </span>
+              </Tooltip>,
             ]}
+          >
+            <Copies n={t.bulkCopies} />
+            <CashCreditTable
+              rows={[
+                { label: 'You get', cash: money(t.bulkCash), credit: money(t.bulkCredit), strong: true },
+                { label: '% of F2F', cash: ratio(t.bulkCashWithRetail, t.bulkRetail), credit: ratio(t.bulkCreditWithRetail, t.bulkRetail) },
+              ]}
+            />
+          </Stat>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, lg: 4 }}>
+          <Stat
+            label="Total: F2F buys + bulk"
+            value={(t.buylistPrints + t.bulkPrints).toLocaleString('en-CA')}
+            lines={[
+              <Tooltip
+                key="retail"
+                multiline
+                w={280}
+                label={`Total of F2F's own NM prices for the cards F2F buys and your bulk cards (when F2F lists them). "% of F2F" = what you get ÷ that total.`}
+              >
+                <span>
+                  F2F sells them for <b>{money(total.retail)}</b>
+                </span>
+              </Tooltip>,
+              total.cash > 0 && `From F2F buys ${pct((t.buylistCash / total.cash) * 100)} · bulk ${pct((t.bulkCash / total.cash) * 100)} of what you get`,
+            ].filter(Boolean)}
+          >
+            <Copies n={t.buylistCopies + t.bulkCopies} />
+            <CashCreditTable
+              rows={[
+                { label: 'You get', cash: money(total.cash), credit: money(total.credit), strong: true },
+                { label: '% of F2F', cash: ratio(total.cashWithRetail, total.retail), credit: ratio(total.creditWithRetail, total.retail) },
+              ]}
+            />
+          </Stat>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, lg: 8 }}>
+          <Stat
+            label="Buy / sell % per card"
+            lines={['Each print counts once; prints without an F2F price are left out. "% of F2F" above is the ratio of the totals.']}
+          >
+            <PctTable stats={pctStats} />
+          </Stat>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, lg: 4 }}>
+          <Stat
+            label="Needs review"
+            value={`${reviewCount}`}
+            color={reviewCount ? 'red' : undefined}
+            icon={<IconAlertTriangle color="var(--mantine-color-red-6)" />}
+            active={filters.problems}
+            action={filters.problems ? 'Show all cards again' : 'Show only cards that need review'}
+            onClick={() => update({ ...filters, problems: !filters.problems, status: [] }, sort, 1)}
+            lines={[`${t.notFound} not found · ${t.loose} loose · ${t.errors} errors`, ...(t.priceCheck ? [`${t.priceCheck} to price-check on F2F`] : [])]}
           />
-        </Stat>
-        <Stat
-          label="Bulk"
-          value={`${t.bulkPrints}`}
-          lines={[`${t.bulkCopies} copies`]}
-          color="orange"
-          icon={<IconBox color="var(--mantine-color-orange-5)" />}
-          active={filters.category === 'bulk'}
-          action={filters.category === 'bulk' ? 'Show all cards again' : 'Show only bulk cards'}
-          onClick={() => update({ ...filters, category: filters.category === 'bulk' ? 'all' : 'bulk' }, sort, 1)}
-        />
-        <Stat
-          label="Bulk value"
-          lines={[
-            <Tooltip
-              key="retail"
-              multiline
-              w={280}
-              label={`Total of F2F's own NM prices for your bulk cards (when F2F lists them). "% of F2F" = your bulk payout ÷ that total.`}
-            >
-              <span>
-                F2F sells them for <b>{money(t.bulkRetail)}</b>
-              </span>
-            </Tooltip>,
-          ]}
-        >
-          <CashCreditTable
-            rows={[
-              { label: 'You get', cash: money(t.bulkCash), credit: money(t.bulkCredit), strong: true },
-              {
-                label: '% of F2F',
-                cash: pct(t.bulkRetail ? (t.bulkCashWithRetail / t.bulkRetail) * 100 : null),
-                credit: pct(t.bulkRetail ? (t.bulkCreditWithRetail / t.bulkRetail) * 100 : null),
-              },
-            ]}
-          />
-        </Stat>
-        <Stat
-          label="Needs review"
-          value={`${reviewCount}`}
-          color={reviewCount ? 'red' : undefined}
-          icon={<IconAlertTriangle color="var(--mantine-color-red-6)" />}
-          active={filters.problems}
-          action={filters.problems ? 'Show all cards again' : 'Show only cards that need review'}
-          onClick={() => update({ ...filters, problems: !filters.problems, status: [] }, sort, 1)}
-          lines={[`${t.notFound} not found · ${t.loose} loose · ${t.errors} errors`, ...(t.priceCheck ? [`${t.priceCheck} to price-check on F2F`] : [])]}
-        />
-      </SimpleGrid>
+        </Grid.Col>
+      </Grid>
 
       <FiltersBar
         filters={filters}
