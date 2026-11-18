@@ -16,7 +16,7 @@ import { renderPagination } from '@/lib/ui/pagination';
 import { SiteIcon } from '@/lib/ui/SiteIcon';
 import { f2fLinks } from '@/lib/f2f/links';
 import { categoryOf, type Item } from '../types';
-import { buySellStats, summarize, type BuySellStats, type PctStats } from '../summary';
+import { buySellStats, summarize, type PctStats } from '../summary';
 import { useSellingDeckFilter } from '../deck-filter';
 import { freeCopies, type FreeCopies } from '../in-decks';
 import { Stat } from '@/lib/ui/Stat';
@@ -78,69 +78,11 @@ function Copies({ n }: { n: number }) {
   );
 }
 
-/** Per-card buy ÷ sell %: median and average, cash and credit, for F2F buys, bulk and both. */
-function PctTable({ stats }: { stats: BuySellStats }) {
-  const rows: { label: string; s: PctStats; color?: string }[] = [
-    { label: 'F2F buys', s: stats.buylist, color: 'teal' },
-    { label: 'Bulk', s: stats.bulk, color: 'orange' },
-    { label: 'All', s: stats.all },
-  ];
-  const th = (text: string) => (
-    <Table.Th ta="right" c="teal">
-      {text}
-    </Table.Th>
-  );
-  return (
-    <Table withRowBorders={false} withTableBorder={false} verticalSpacing={0} horizontalSpacing={8} fz="sm" className="ti-num" w="auto">
-      <Table.Thead>
-        <Table.Tr>
-          <Table.Th />
-          <Table.Th colSpan={2} ta="center" c="dimmed" fw={600}>
-            Median
-          </Table.Th>
-          <Table.Th colSpan={2} ta="center" c="dimmed" fw={600}>
-            Average
-          </Table.Th>
-          <Table.Th />
-        </Table.Tr>
-        <Table.Tr>
-          <Table.Th />
-          {th('Cash')}
-          {th('Credit')}
-          {th('Cash')}
-          {th('Credit')}
-          <Table.Th ta="right" c="dimmed" fw={400}>
-            Prints
-          </Table.Th>
-        </Table.Tr>
-      </Table.Thead>
-      <Table.Tbody>
-        {rows.map(({ label, s, color }) => (
-          <Table.Tr key={label}>
-            <Table.Td c={color ?? 'dimmed'} style={{ whiteSpace: 'nowrap' }}>
-              {label}
-            </Table.Td>
-            <Table.Td ta="right" fw={700}>
-              {pct(s.medianCash)}
-            </Table.Td>
-            <Table.Td ta="right" fw={700}>
-              {pct(s.medianCredit)}
-            </Table.Td>
-            <Table.Td ta="right" fw={700}>
-              {pct(s.meanCash)}
-            </Table.Td>
-            <Table.Td ta="right" fw={700}>
-              {pct(s.meanCredit)}
-            </Table.Td>
-            <Table.Td ta="right" c="dimmed">
-              {s.cards.toLocaleString('en-CA')}
-            </Table.Td>
-          </Table.Tr>
-        ))}
-      </Table.Tbody>
-    </Table>
-  );
-}
+/** The per-card rows of a money panel: median and average buy ÷ sell % (see `buySellStats`). */
+const perCardRows = (st: PctStats) => [
+  { label: 'Median per card', cash: pct(st.medianCash), credit: pct(st.medianCredit) },
+  { label: 'Average per card', cash: pct(st.meanCash), credit: pct(st.meanCredit) },
+];
 
 /**
  * Runs this dashboard tab already switched the current account for. Opening a run of another
@@ -250,6 +192,8 @@ export function RunDetailPage() {
   const runTotals = useMemo(() => summarize(all, run?.totals.entries ?? 0), [all, run?.totals.entries]);
   const t = useMemo(() => (inDecks ? summarize(shown, run?.totals.entries ?? 0) : runTotals), [inDecks, shown, run?.totals.entries, runTotals]);
   const pctStats = useMemo(() => buySellStats(shown), [shown]);
+  /** Prints F2F buys or takes as bulk, but with no F2F price: they have no buy ÷ sell %. */
+  const noPrice = t.buylistPrints + t.bulkPrints - pctStats.all.cards;
   /** F2F buys and bulk together. */
   const total = {
     cash: t.buylistCash + t.bulkCash,
@@ -348,7 +292,7 @@ export function RunDetailPage() {
       )}
 
       <Grid gap="sm">
-        <Grid.Col span={{ base: 12, sm: 6, lg: 4 }}>
+        <Grid.Col span={{ base: 12, sm: 6, xl: 3 }}>
           <Stat
             label="F2F buys"
             value={t.buylistPrints.toLocaleString('en-CA')}
@@ -375,11 +319,12 @@ export function RunDetailPage() {
               rows={[
                 { label: 'You get', cash: money(t.buylistCash), credit: money(t.buylistCredit), strong: true },
                 { label: '% of F2F', cash: ratio(t.buylistCashWithRetail, t.buylistRetail), credit: ratio(t.buylistCreditWithRetail, t.buylistRetail) },
+                ...perCardRows(pctStats.buylist),
               ]}
             />
           </Stat>
         </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 6, lg: 4 }}>
+        <Grid.Col span={{ base: 12, sm: 6, xl: 3 }}>
           <Stat
             label="Bulk"
             value={t.bulkPrints.toLocaleString('en-CA')}
@@ -406,11 +351,12 @@ export function RunDetailPage() {
               rows={[
                 { label: 'You get', cash: money(t.bulkCash), credit: money(t.bulkCredit), strong: true },
                 { label: '% of F2F', cash: ratio(t.bulkCashWithRetail, t.bulkRetail), credit: ratio(t.bulkCreditWithRetail, t.bulkRetail) },
+                ...perCardRows(pctStats.bulk),
               ]}
             />
           </Stat>
         </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 6, lg: 4 }}>
+        <Grid.Col span={{ base: 12, sm: 6, xl: 3 }}>
           <Stat
             label="Total: F2F buys + bulk"
             value={(t.buylistPrints + t.bulkPrints).toLocaleString('en-CA')}
@@ -433,19 +379,12 @@ export function RunDetailPage() {
               rows={[
                 { label: 'You get', cash: money(total.cash), credit: money(total.credit), strong: true },
                 { label: '% of F2F', cash: ratio(total.cashWithRetail, total.retail), credit: ratio(total.creditWithRetail, total.retail) },
+                ...perCardRows(pctStats.all),
               ]}
             />
           </Stat>
         </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 6, lg: 8 }}>
-          <Stat
-            label="Buy / sell % per card"
-            lines={['Each print counts once; prints without an F2F price are left out. "% of F2F" above is the ratio of the totals.']}
-          >
-            <PctTable stats={pctStats} />
-          </Stat>
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 6, lg: 4 }}>
+        <Grid.Col span={{ base: 12, sm: 6, xl: 3 }}>
           <Stat
             label="Needs review"
             value={`${reviewCount}`}
@@ -458,6 +397,10 @@ export function RunDetailPage() {
           />
         </Grid.Col>
       </Grid>
+      <Text size="xs" c="dimmed" mt={-8}>
+        “% of F2F” = what you get ÷ what F2F sells those cards for. “Per card”: each print's own buy ÷ sell %, each print counting once whatever its
+        copies{noPrice > 0 ? `; ${noPrice.toLocaleString('en-CA')} ${noPrice === 1 ? 'print' : 'prints'} without an F2F price ${noPrice === 1 ? 'is' : 'are'} left out` : ''}.
+      </Text>
 
       <FiltersBar
         filters={filters}
