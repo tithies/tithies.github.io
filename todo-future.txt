@@ -6,13 +6,6 @@ support french
 
 New feature: move cards from deck to deck and submit, summarize what should be moved
 
-feature: collection mismatches => rename to collection comparisons instead
-- the "show" options can be removed. Their helper text can be put in the panels directly
-- possibility to save all the configuration under a name. We could have multiple, and switch between them easily. This way the user doesnt have to reconfigure everything every time.
-- we should be able to export the result to an account which has to be different than the one we are using here. All those are risky operations, so confirmations are necessary. Logging every mutation call globally and have a log page to show them all in detail is necessary to be able to roll back. Preview of what will be updated/added/delete/mutated is necessary as well.
-
-in "runs" page: same as the new page: should have options in filters to exclude cards already in decks. Algorithm is same as the comparison page basically. Settings are not shared with comparison page. We can't have multiple configs like in comparison page, juste one
-
 New page: a page where we can paste a deck list and find best prices across multiple vendors. We will start by having just f2f shop for now. There should be a checkbox per shop to search in. Checkboxes are disabled by default. Settings saved like usual. Multiple decklist formats are accepted. We should also be able to run this process directly from a deck in moxfield. There should be also a checkbox to exclude cards that are in collection and still unused. If not exact same print, let the user know, and he will select which ones to include/exclude manually. If exact print, ignore fetching but let user know in the results that it's already in collection unused. Have also a checkbox to exclude basic lands. For each card, search for all prints even if the list has details about that. Although, the result should focus on both the cheapest found and the cheapest for the exact print (if specified). Put this page menu in a "Buying" parent menu.
 
 Support Archidekt
@@ -23,16 +16,8 @@ new feature: same as selling page, buying page should also have a system to add 
 
 Add exporting to buying page and other pages where we get a list
 
-feature: have a button to remove all data: settings, every storage, everything. It's a full reset
-
 new feature Scanner cards: upload list of images, it scans all cards in it and list them. Then we can just like the buylist page, add to collection directly
 
 edit website
-
-sometimes, some process run in the background and ui say we can close the modal, it will continue. Sure but how can I see it again ??
-
-in got 2 binders in alopier, price estimate shown in moxfield, seems something is different, can you tell what it is ?
-
-in comparator, display a clear button for exports in the little floating component as well. Also the export button should instead of opening a menu with multiple options, open the floating component, and it will contain all those options as well. Rename Review to Preview. Preview should be paginable.
 
 Add exporting to selling as well
