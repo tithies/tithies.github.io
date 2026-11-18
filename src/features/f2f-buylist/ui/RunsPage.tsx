@@ -1,4 +1,5 @@
-import { Anchor, Badge, Button, Group, List, Paper, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Badge, Button, Group, List, Paper, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { IconCards, IconFilter } from '@tabler/icons-react';
 import { DataTable } from 'mantine-datatable';
 import { GettingStarted } from '@/lib/ui/GettingStarted';
 import { JobProgress } from '@/lib/ui/JobProgress';
@@ -12,6 +13,23 @@ import { RunActions } from './RunActions';
 import { CheckCollectionButton, CollectionReadProgress } from './CollectionRun';
 import { dateTime, money, PHASE_LABEL, STATUS_COLOR, STATUS_LABEL } from './format';
 
+/** One way to start a check, in the first-use card. */
+function Choice({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <Paper withBorder p="sm" radius="md">
+      <Stack gap="xs">
+        <Group gap={8} wrap="nowrap">
+          <ThemeIcon variant="light" size="md">
+            {icon}
+          </ThemeIcon>
+          <Title order={5}>{title}</Title>
+        </Group>
+        {children}
+      </Stack>
+    </Paper>
+  );
+}
+
 export function RunsPage() {
   const tableRef = useStickyTableHeader();
   const { key } = useCurrentAccount();
@@ -19,6 +37,8 @@ export function RunsPage() {
   const runs = useRuns(key);
   const navigate = useNavigate();
   const reading = (runs ?? []).some((r) => r.status === 'fetching_collection');
+  // No run yet: the page offers both ways to start (the header's button would repeat one).
+  const empty = !key || (runs !== undefined && runs.length === 0);
 
   return (
     <Stack>
@@ -34,35 +54,45 @@ export function RunsPage() {
           <Button component="a" href={f2fLinks.shopHome} target="_blank" variant="default" size="xs">
             F2F shop
           </Button>
-          <CheckCollectionButton waiting={reading} />
+          {!empty && <CheckCollectionButton waiting={reading} />}
         </Group>
       </Group>
 
-      {!key || (runs && runs.length === 0) ? (
-        <GettingStarted title="Check what F2F pays for your cards">
-          <List type="ordered" size="sm" spacing={6}>
-            <List.Item>
-              Open{' '}
-              <Anchor href="https://moxfield.com/collection" target="_blank" size="sm">
-                your Moxfield collection
-              </Anchor>{' '}
-              while logged in, and apply any filters you want (set, rarity, search…).
-            </List.Item>
-            <List.Item>
-              In the Tithies panel, in the bottom-right corner of that page, click <b>Check selling prices on F2F</b>.
-            </List.Item>
-            <List.Item>
-              The check shows up here and keeps running in the background. Open it to see what F2F pays for each card, in cash and store credit.
-            </List.Item>
-          </List>
+      {empty ? (
+        <GettingStarted title="Check what F2F pays for your cards" maw={960}>
           <Text size="sm">
-            Or check your <b>whole collection</b> from here with <b>Check whole collection</b> (top right): Tithies reads it from Moxfield in the
-            background (only what changed since its last read, when it can), then checks every paper, non-proxy card.
+            Two ways to start. Either way, the check runs in the background and shows up here: open it to see what F2F pays for each card, in cash and
+            store credit.
           </Text>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+            <Choice icon={<IconCards size={16} />} title="Your whole collection">
+              <Text size="sm" c="dimmed">
+                Tithies reads it from Moxfield in the background (only what changed since its last read, when it can), then checks every paper, non-proxy
+                card. Be logged in to Moxfield in this browser.
+              </Text>
+              <CheckCollectionButton waiting={reading} size="sm" align="flex-start" />
+            </Choice>
+            <Choice icon={<IconFilter size={16} />} title="Some cards, picked on Moxfield">
+              <List type="ordered" size="sm" spacing={6}>
+                <List.Item>
+                  Open{' '}
+                  <Anchor href="https://moxfield.com/collection" target="_blank" size="sm">
+                    your Moxfield collection
+                  </Anchor>{' '}
+                  while logged in, and apply any filters you want (set, rarity, search…).
+                </List.Item>
+                <List.Item>
+                  In the Tithies panel, in the bottom-right corner of that page, click <b>Check selling prices on F2F</b>.
+                </List.Item>
+              </List>
+              <Text size="xs" c="dimmed">
+                The panel can be minimised to the Tithies medallion; it stays that way until you open it again.
+              </Text>
+            </Choice>
+          </SimpleGrid>
           <Text size="sm" c="dimmed">
             Non-proxy cards are checked, at NM prices, each in the language Moxfield says it is: F2F lists most prints in English only, and a card it
-            doesn't list in its language counts as not bought. The panel can be minimised to the Tithies medallion; it stays that way until you open it
-            again.
+            doesn't list in its language counts as not bought.
           </Text>
         </GettingStarted>
       ) : (

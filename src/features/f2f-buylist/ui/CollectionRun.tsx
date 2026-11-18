@@ -20,7 +20,7 @@ interface StartError {
 }
 
 /** "Check whole collection": reads the current account's collection (whoever is logged in, with no account yet), then checks it on F2F. */
-export function CheckCollectionButton({ waiting, size = 'xs' }: { waiting: boolean; size?: 'xs' | 'sm' }) {
+export function CheckCollectionButton({ waiting, size = 'xs', align = 'flex-end' }: { waiting: boolean; size?: 'xs' | 'sm'; align?: 'flex-start' | 'flex-end' }) {
   const { key, account } = useCurrentAccount();
   const site = siteOf(account?.type ?? 'moxfield');
   const navigate = useNavigate();
@@ -43,7 +43,7 @@ export function CheckCollectionButton({ waiting, size = 'xs' }: { waiting: boole
   };
 
   return (
-    <Stack gap="xs" align="flex-end">
+    <Stack gap="xs" align={align}>
       <Button
         size={size}
         leftSection={<IconCards size={14} />}
