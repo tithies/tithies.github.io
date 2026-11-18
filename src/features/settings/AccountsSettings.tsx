@@ -1,14 +1,17 @@
 import { Badge, Button, Group, Modal, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
-import { IconTrash, IconUsers } from '@tabler/icons-react';
+import { IconRefresh, IconTrash, IconUsers } from '@tabler/icons-react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { setNickname } from '@/lib/accounts/data';
 import { accountLabel, type AccountRow } from '@/lib/accounts/types';
+import { isSetUp, readSyncSetups, type SyncSetup } from '@/lib/decks/initial-sync';
 import { timeAgo } from '@/lib/format';
 import { sendMessage } from '@/lib/messaging';
 import { siteOf } from '@/lib/sites/registry';
 import { useSiteSessions } from '@/lib/sites/useSiteSessions';
 import { LiveDot } from '@/lib/ui/AccountSelector';
+import { useInitialSync } from '@/lib/ui/InitialSync';
 import { SettingsSection } from '@/lib/ui/SettingsSection';
 import { SiteIcon } from '@/lib/ui/SiteIcon';
 
@@ -33,10 +36,37 @@ function NicknameInput({ account }: { account: AccountRow }) {
   );
 }
 
-/** Settings → Accounts: every account Tithies has acted as, with nicknames and "Forget". */
+/** When the account's decks and collection were last read; the initial sync when they never were. */
+function SyncedCell({ account, setup }: { account: AccountRow; setup: SyncSetup | undefined }) {
+  const { open } = useInitialSync();
+  if (!setup) return null;
+  if (setup.running) {
+    return (
+      <Text size="sm" c="dimmed">
+        Syncing…
+      </Text>
+    );
+  }
+  return (
+    <Stack gap={4} align="flex-start">
+      <Text size="sm" c={isSetUp(setup) ? undefined : 'dimmed'}>
+        Decks {setup.decksSyncedAt ? timeAgo(setup.decksSyncedAt) : 'never'} · Collection {setup.collectionReadAt ? timeAgo(setup.collectionReadAt) : 'never'}
+      </Text>
+      {!isSetUp(setup) && (
+        <Button size="compact-xs" variant="light" color="teal" leftSection={<IconRefresh size={12} />} onClick={() => open({ accountKey: account.key })}>
+          Initial sync
+        </Button>
+      )}
+    </Stack>
+  );
+}
+
+/** Settings → Accounts: every account Tithies has acted as, with nicknames, sync state and "Forget". */
 export function AccountsSettings() {
   const { accounts, key: currentKey } = useCurrentAccount();
   const { liveKeys } = useSiteSessions();
+  const keys = accounts.map((a) => a.key);
+  const setups = useLiveQuery(() => readSyncSetups(keys), [keys.join(',')]);
   const [forgetting, setForgetting] = useState<AccountRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,17 +94,18 @@ export function AccountsSettings() {
       <Paper withBorder radius="md">
         {accounts.length === 0 ? (
           <Text p="md" size="sm" c="dimmed">
-            No account yet. An account is added when Tithies acts as it: "Check selling prices" on your Moxfield collection, or "Sync decks" on the
-            Comparator page.
+            No account yet. Log in to Moxfield in this browser: the header's Initial sync button adds the account and reads its decks and collection.
+            "Check selling prices" on your Moxfield collection adds it too.
           </Text>
         ) : (
-          <Table.ScrollContainer minWidth={640}>
+          <Table.ScrollContainer minWidth={820}>
             <Table verticalSpacing="sm" horizontalSpacing="md">
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Account</Table.Th>
                   <Table.Th w={200}>Nickname</Table.Th>
                   <Table.Th>Logged in now</Table.Th>
+                  <Table.Th>Synced</Table.Th>
                   <Table.Th>Last used</Table.Th>
                   <Table.Th />
                 </Table.Tr>
@@ -112,6 +143,9 @@ export function AccountsSettings() {
                           No (only this one can sync when it is)
                         </Text>
                       )}
+                    </Table.Td>
+                    <Table.Td>
+                      <SyncedCell account={a} setup={setups?.get(a.key)} />
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" c="dimmed">

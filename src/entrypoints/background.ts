@@ -2,9 +2,10 @@ import { defineBackground, storage } from '#imports';
 import { browser } from 'wxt/browser';
 import { findRun } from '@/lib/accounts/data';
 import { forgetAccount, removeAllData } from '@/lib/accounts/forget';
-import { parseAccountKey, type AccountKey } from '@/lib/accounts/types';
+import { accountKey as keyOf, parseAccountKey, type AccountKey } from '@/lib/accounts/types';
 import { migrateStorage } from '@/lib/accounts/migrate';
 import { markStaleOps } from '@/lib/changes/log';
+import { initialSyncStateOf } from '@/lib/decks/initial-sync';
 import { AccountSyncJob } from '@/lib/decks/job';
 import { ExportJob } from '@/lib/export/job';
 import { SiteLock } from '@/lib/sites/lock';
@@ -102,8 +103,12 @@ export default defineBackground(() => {
     await removeAllData({ stopRuns, jobs: allJobs(), clearStorage: () => browser.storage.local.clear() });
   });
 
-  const openDashboard = (runId?: number) =>
-    browser.tabs.create({ url: browser.runtime.getURL('/dashboard.html') + (runId ? `#/f2f/runs/${runId}` : '#/f2f/runs') });
+  const openDashboard = (runId?: number, initialSync?: { accountKey: AccountKey; userName: string }) => {
+    const route = runId ? `#/f2f/runs/${runId}` : '#/f2f/runs';
+    // The dashboard opens the account's initial-sync prompt from these (and drops them from the address).
+    const query = initialSync ? `?${new URLSearchParams({ initialSync: initialSync.accountKey, as: initialSync.userName })}` : '';
+    return browser.tabs.create({ url: browser.runtime.getURL('/dashboard.html') + route + query });
+  };
 
   onMessage('startRun', async ({ data, sender }) => {
     const settings = await getSettings();
@@ -120,7 +125,16 @@ export default defineBackground(() => {
     return { ok, error: ok ? undefined : 'Action not available for this run' };
   });
 
-  onMessage('openDashboard', ({ data }) => void openDashboard(data.runId));
+  onMessage('openDashboard', ({ data }) => {
+    const sync = data?.initialSync;
+    const ok = sync && parseAccountKey(sync.accountKey) && typeof sync.userName === 'string';
+    void openDashboard(data?.runId, ok ? { accountKey: sync.accountKey, userName: sync.userName.slice(0, 80) } : undefined);
+  });
+
+  onMessage('accountSetup', ({ data }) => {
+    const identity = isSiteType(data?.type) ? parseIdentity(data.account) : null;
+    return identity ? initialSyncStateOf(keyOf(data.type, identity.userId)) : null;
+  });
 
   onMessage('startAccountSync', ({ data }) => {
     if (!isSiteType(data.type)) return { ok: false, code: 'no_account', error: 'Unknown site.' } as const;

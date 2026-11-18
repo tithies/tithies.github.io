@@ -1,6 +1,7 @@
 import { defineExtensionMessaging } from '@webext-core/messaging';
 import type { CollectionEntry } from '@/lib/cards/types';
 import type { AccountKey } from '@/lib/accounts/types';
+import type { InitialSyncState } from '@/lib/decks/initial-sync';
 import type { StartSyncResult } from '@/lib/decks/job';
 import type { ReadTargetResult, StartExportRequest, StartExportResult } from '@/lib/export/job';
 import type { ReadProgress, TargetRead } from '@/lib/export/types';
@@ -11,10 +12,21 @@ export type RunAction = 'pause' | 'resume' | 'cancel' | 'retryErrors';
 
 /** Messages between content scripts, extension pages and the background worker. */
 interface ProtocolMap {
-  /** site tab → background: a Selling run of `account`'s collection (the account of the request that read it). */
-  startRun(data: { type: SiteType; account: SiteIdentity; source: Omit<RunSource, 'tabId'>; entries: CollectionEntry[] }): { runId: number; prints: number; accountKey: AccountKey };
+  /**
+   * site tab → background: a Selling run of `account`'s collection (the account of the request that read it).
+   * `needsInitialSync`: the account's decks and collection were never read (and the user didn't say "Not now").
+   */
+  startRun(data: { type: SiteType; account: SiteIdentity; source: Omit<RunSource, 'tabId'>; entries: CollectionEntry[] }): {
+    runId: number;
+    prints: number;
+    accountKey: AccountKey;
+    needsInitialSync: boolean;
+  };
   controlRun(data: { runId: number; action: RunAction }): { ok: boolean; error?: string };
-  openDashboard(data: { runId?: number }): void;
+  /** Opens the dashboard: on a run, or on the initial-sync prompt of an account (`userName` names it when it isn't in Tithies yet). */
+  openDashboard(data: { runId?: number; initialSync?: { accountKey: AccountKey; userName: string } }): void;
+  /** site tab → background: whether the panel's account still needs its initial sync (asking never adds it). */
+  accountSetup(data: { type: SiteType; account: SiteIdentity }): InitialSyncState | null;
   /** The run, or else the newest run of `accountKey` started from the asking tab. */
   getProgress(data: { runId?: number; accountKey?: AccountKey }): RunProgress | null;
   /** background → site tab */

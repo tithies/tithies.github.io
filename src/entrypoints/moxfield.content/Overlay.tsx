@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 // Inlined as a data: URL. A file URL would need web_accessible_resources, which lets any page detect the extension.
 import iconUrl from '@/assets/tithies-icon.webp?inline';
-import { accountKey } from '@/lib/accounts/types';
+import { accountKey, type AccountKey } from '@/lib/accounts/types';
 import { bridge, type CaptureInfo } from '@/lib/sites/moxfield/bridge';
 import { parseIdentity } from '@/lib/sites/validate';
 import type { SiteIdentity } from '@/lib/sites/types';
@@ -11,6 +11,7 @@ import { describeQuery } from '@/lib/sites/moxfield/normalize';
 import { onMessage, sendMessage } from '@/lib/messaging';
 import { overlayCollapsedItem as collapsedItem } from '@/lib/settings';
 import type { RunProgress } from '@/features/f2f-buylist/types';
+import type { InitialSyncState } from '@/lib/decks/initial-sync';
 import { overallPercent } from '@/lib/progress';
 
 type Phase =
@@ -31,6 +32,8 @@ export function Overlay() {
   // null until read from storage, so a minimised panel doesn't flash open on page load.
   const [collapsed, setCollapsed] = useState<boolean | null>(null);
   const [summary, setSummary] = useState<string>('');
+  /** Whether the panel's account still needs its initial sync (offered in the dashboard; checking prices doesn't need it). */
+  const [setup, setSetup] = useState<InitialSyncState | null>(null);
   const runIdRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -89,6 +92,29 @@ export function Overlay() {
     });
   }, [key]);
 
+  // Asked when the account is known, when the tab comes back to the front, and now and then (a sync may run from the dashboard).
+  const userName = account?.userName;
+  useEffect(() => {
+    setSetup(null);
+    if (!key || !userName) return;
+    let alive = true;
+    const who = { userId: key.slice(key.indexOf(':') + 1), userName };
+    const ask = () =>
+      void sendMessage('accountSetup', { type: 'moxfield', account: who })
+        .then((s) => alive && setSetup(s))
+        .catch(() => {});
+    ask();
+    const onVisible = () => document.visibilityState === 'visible' && ask();
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = setInterval(ask, 20_000);
+    return () => {
+      alive = false;
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(timer);
+    };
+  }, [key, userName]);
+  const openInitialSync = () => key && userName && void sendMessage('openDashboard', { initialSync: { accountKey: key as AccountKey, userName } });
+
   const busy = phase.kind === 'reading' || phase.kind === 'starting' || (phase.kind === 'run' && ACTIVE.has(phase.progress.status));
 
   async function start() {
@@ -107,13 +133,15 @@ export function Overlay() {
       }
       setPhase({ kind: 'starting' });
       const { query, summary: s } = describeQuery(res.url);
-      const { runId, prints, accountKey: runAccount } = await sendMessage('startRun', {
+      const { runId, prints, accountKey: runAccount, needsInitialSync } = await sendMessage('startRun', {
         type: 'moxfield',
         account: readAs,
         source: { url: res.url, pageUrl: location.href, query, summary: s },
         entries: eligible,
       });
       runIdRef.current = runId;
+      // The check added the account if it was new: it is in Tithies now.
+      if (accountKey('moxfield', readAs.userId) === keyRef.current) setSetup((s) => ({ known: true, running: s?.running ?? false, needed: needsInitialSync }));
       setPhase({
         kind: 'run',
         progress: { runId, accountKey: runAccount, status: 'queued', phase: 'bulk_rates', done: 0, total: prints, buylistPrints: 0, buylistCash: 0, buylistCredit: 0 },
@@ -197,6 +225,19 @@ export function Overlay() {
         </div>
       )}
       {body}
+      {account && setup?.needed && !setup.running && (
+        <div className="ti-note">
+          <div className="ti-line">
+            {setup.known
+              ? `${account.userName}'s decks and collection aren't fully synced in Tithies yet.`
+              : `${account.userName} is new in Tithies: its decks and collection aren't synced yet.`}{' '}
+            <span className="ti-dim">Checking selling prices works without it.</span>
+          </div>
+          <button className="ti-btn ti-small" onClick={openInitialSync}>
+            Initial sync in the dashboard
+          </button>
+        </div>
+      )}
       {(phase.kind === 'reading' || phase.kind === 'run') && (
         <div className="ti-progress">
           <div className="ti-bar" style={{ width: `${pct}%` }} />

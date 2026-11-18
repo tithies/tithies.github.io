@@ -79,14 +79,17 @@ export async function readActivity(): Promise<ActivityItem[]> {
   }
 
   for (const a of accounts) {
-    const s = await accountData(a.key).meta.get('sync');
+    const data = accountData(a.key);
+    const s = await data.meta.get('sync');
     if (s?.status !== 'running') continue;
+    // The account's decks were never synced to the end: this is its initial sync.
+    const initial = !(await data.meta.get('decks'))?.lastSuccessAt;
     items.push({
       id: `sync:${a.key}`,
       kind: 'sync',
       accountKey: a.key,
       userName: names.get(a.key)!,
-      title: s.withCollection ? 'Deck and collection sync' : 'Deck sync',
+      title: initial ? (s.withCollection ? 'Initial sync (decks and collection)' : 'First deck sync') : s.withCollection ? 'Deck and collection sync' : 'Deck sync',
       detail: syncDetail(s),
       progress: s.overall ?? (s.phase === 'decks' && s.total > 0 ? { done: s.done, total: s.total } : undefined),
       to: '/collection/comparator',

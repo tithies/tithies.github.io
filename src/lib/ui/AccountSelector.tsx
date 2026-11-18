@@ -2,10 +2,10 @@ import { Box, Button, Group, Menu, Text, Tooltip } from '@mantine/core';
 import { IconCheck, IconChevronDown, IconSettings, IconUserPlus } from '@tabler/icons-react';
 import { useNavigate } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
-import { addAccountFromAction } from '@/lib/accounts/data';
 import { accountKey, accountLabel, type AccountRow } from '@/lib/accounts/types';
 import { SITE_TYPES, siteOf } from '@/lib/sites/registry';
 import { useSiteSessions } from '@/lib/sites/useSiteSessions';
+import { useInitialSync } from './InitialSync';
 import { SiteIcon } from './SiteIcon';
 
 /** Green dot: logged in on the site right now (in an open tab). */
@@ -35,10 +35,12 @@ function AccountName({ account }: { account: AccountRow }) {
 /**
  * Header: the account every page shows, with its site icon, and the other accounts to switch to.
  * Accounts appear here once Tithies has acted as them (a run started from the site, a sync…).
+ * Picking an account logged in on the site but not in Tithies yet opens its initial-sync prompt.
  */
 export function AccountSelector() {
   const { account, accounts, switchTo } = useCurrentAccount();
   const { live, liveKeys } = useSiteSessions();
+  const { open: openInitialSync } = useInitialSync();
   const navigate = useNavigate();
   const known = new Set(accounts.map((a) => a.key));
   const notAdded = SITE_TYPES.flatMap((type) => live[type].filter((id) => !known.has(accountKey(type, id.userId))).map((identity) => ({ type, identity })));
@@ -84,7 +86,8 @@ export function AccountSelector() {
         ) : (
           <Menu.Item disabled>
             <Text size="xs" c="dimmed">
-              Accounts are added when you start something as them: a selling check from your Moxfield collection, or a deck sync.
+              Log in to Moxfield in this browser: Tithies offers to add the account and read its decks and collection (the Initial sync button up
+              here). A selling check started from your Moxfield collection adds it too.
             </Text>
           </Menu.Item>
         )}
@@ -93,7 +96,7 @@ export function AccountSelector() {
             <Menu.Divider />
             <Menu.Label>Logged in now, not in Tithies yet</Menu.Label>
             {notAdded.map(({ type, identity }) => (
-              <Menu.Item key={`${type}:${identity.userId}`} leftSection={<SiteIcon type={type} size={18} />} rightSection={<IconUserPlus size={14} />} onClick={() => void addAccountFromAction(type, identity)}>
+              <Menu.Item key={`${type}:${identity.userId}`} leftSection={<SiteIcon type={type} size={18} />} rightSection={<IconUserPlus size={14} />} onClick={() => openInitialSync({ type, identity })}>
                 <Text size="sm">
                   Use {identity.userName}
                   <Text span size="xs" c="dimmed">

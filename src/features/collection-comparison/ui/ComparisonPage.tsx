@@ -10,11 +10,14 @@ import { ExportDialog } from '@/lib/export/ui/ExportDialog';
 import { ExportProgressModal, RecentExportsModal } from '@/lib/export/ui/ExportProgress';
 import { accountLabel } from '@/lib/accounts/types';
 import { DeckTreePicker } from '@/lib/decks/DeckTreePicker';
-import { cancelSync, startSync, useCollectionMeta, useDeckData, useDecks, useDecksMeta, useSyncState } from '@/lib/decks/hooks';
+import { cancelSync, useCollectionMeta, useDeckData, useDecks, useDecksMeta, useSyncState } from '@/lib/decks/hooks';
+import { StartError, useStartSync } from '@/lib/decks/StartSync';
+import { SyncProgress } from '@/lib/decks/SyncProgress';
 import { GettingStarted } from '@/lib/ui/GettingStarted';
+import { useInitialSync } from '@/lib/ui/InitialSync';
 import { markDecksSeen } from '@/lib/decks/sync';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
-import { accountData, addAccountFromAction } from '@/lib/accounts/data';
+import { accountData } from '@/lib/accounts/data';
 import { AccountHint } from '@/lib/ui/AccountHint';
 import type { AccountKey } from '@/lib/accounts/types';
 import type { SiteProvider } from '@/lib/sites/provider';
@@ -26,7 +29,6 @@ import { compareDecksToCollection } from '../compare';
 import { useComparisonConfig, type ComparisonConfig } from '../config';
 import { comparisonFiltersFromParams, comparisonSortFromParams, writeComparisonParams } from '../filtering';
 import { ComparisonTable } from './ComparisonTable';
-import { SyncProgress } from './SyncProgress';
 
 /** The current account, and the site its decks come from (Moxfield before any account exists). */
 function usePageAccount(): { key: AccountKey | null; site: SiteProvider } {
@@ -37,59 +39,25 @@ function usePageAccount(): { key: AccountKey | null; site: SiteProvider } {
 /** Boards always offered, even before any deck uses them. */
 const BASE_BOARDS = ['commanders', 'mainboard', 'sideboard', 'maybeboard'];
 
-/**
- * Starts (or joins) the current account's sync. Without an account, syncs whoever is logged in on
- * the site: that account is added and becomes current (the page then shows it).
- */
-function useStartSync() {
-  const { key, site } = usePageAccount();
-  const [error, setError] = useState<{ message: string; busy: boolean } | null>(null);
-  const [starting, setStarting] = useState(false);
-  const start = async (collection: boolean, fullCollection = false) => {
-    setError(null);
-    setStarting(true);
-    try {
-      const res = await startSync(site.type, key, collection, fullCollection);
-      if (!res.ok && res.code !== 'cancelled') setError({ message: res.error, busy: res.code === 'busy' });
-    } catch (e) {
-      setError({ message: `Couldn't start the sync: ${e instanceof Error ? e.message : String(e)}`, busy: false });
-    } finally {
-      setStarting(false);
-    }
-  };
-  return { start, error, starting, clearError: () => setError(null) };
+/** After a sync stopped because the site is logged in as someone else: switch to that account (or offer its initial sync when new). */
+function useSwitchTo(site: SiteProvider) {
+  const { switchToIdentity } = useInitialSync();
+  return (who: { userId: string; userName: string }) => switchToIdentity(site.type, who);
 }
 
-/** Why a sync couldn't start; when another account's sync is running, offer to cancel it. */
-function StartError({ error, site, onCancelled }: { error: { message: string; busy: boolean }; site: SiteProvider; onCancelled: () => void }) {
-  return (
-    <Alert color={error.busy ? 'yellow' : 'red'} icon={<IconAlertTriangle size={18} />}>
-      <Group justify="space-between" gap="xs">
-        <Text size="sm">{error.message}</Text>
-        {error.busy && (
-          <Button size="xs" variant="light" color="yellow" onClick={() => void cancelSync(site.type).then(onCancelled)}>
-            Cancel the other sync
-          </Button>
-        )}
-      </Group>
-    </Alert>
-  );
-}
-
-/** Switching after a sync stopped because the site is logged in as someone else (an action: adds the account if needed). */
-const switchTo = (site: SiteProvider) => (who: { userId: string; userName: string }) => void addAccountFromAction(site.type, who);
-
+/** The initial sync, from the page: decks, then the whole collection, so the comparison shows right after. */
 function FirstSync({ decks }: { decks: DeckRow[] }) {
   const { key, site } = usePageAccount();
   const sync = useSyncState(key);
-  const { start, error, starting, clearError } = useStartSync();
+  const { start, error, starting, clearError } = useStartSync(site.type, key);
+  const switchTo = useSwitchTo(site);
   const running = sync?.status === 'running' || starting;
   const partial = decks.filter((d) => d.cardsUpdatedAt).length;
   return (
-    <GettingStarted title={`First, sync your ${site.label} decks`}>
+    <GettingStarted title={`First, sync your ${site.label} decks and collection`}>
       <Text size="sm">
-        Tithies reads your deck list, then every deck's cards, and keeps them here. Later syncs only read decks you changed or added
-        (using each deck's last-updated time), so they take seconds.
+        Tithies reads your deck list, every deck's cards, then your whole collection, and keeps them here. Later syncs only read decks you changed or
+        added (using each deck's last-updated time) and what changed in your collection, so they take seconds.
       </Text>
       <Text size="sm" c="dimmed">
         You must be logged in to {site.label} in this browser. If no logged-in {site.label} tab is open, Tithies opens one (shown for a few seconds while {site.label} starts, then it switches back here) and closes it at the end.
@@ -100,11 +68,11 @@ function FirstSync({ decks }: { decks: DeckRow[] }) {
           {partial} of {decks.length} decks were already read by an earlier, unfinished sync; syncing again continues from there.
         </Text>
       )}
-      <SyncProgress state={sync} site={site} onSwitch={switchTo(site)} />
-      {error && <StartError error={error} site={site} onCancelled={clearError} />}
+      <SyncProgress state={sync} site={site} onSwitch={switchTo} />
+      {error && <StartError error={error} type={site.type} onCancelled={clearError} />}
       <Group>
-        <Button leftSection={<IconRefresh size={16} />} loading={running} onClick={() => void start(false)}>
-          Sync decks
+        <Button leftSection={<IconRefresh size={16} />} loading={running} onClick={() => void start(true)}>
+          Sync decks and collection
         </Button>
         {running && (
           <Button variant="default" leftSection={<IconPlayerStop size={16} />} onClick={() => void cancelSync(site.type)}>
@@ -138,7 +106,8 @@ function OptionsCard({
 }) {
   const { key, site } = usePageAccount();
   const sync = useSyncState(key);
-  const { start, error, starting, clearError } = useStartSync();
+  const { start, error, starting, clearError } = useStartSync(site.type, key);
+  const switchTo = useSwitchTo(site);
   const running = sync?.status === 'running' || starting;
   const ignored = new Set(config.ignoredBoards);
   const boardKeys = [...boards.keys()].filter((b) => BASE_BOARDS.includes(b) || (boards.get(b) ?? 0) > 0).sort((a, b) => site.boardOrder(a) - site.boardOrder(b));
@@ -208,8 +177,8 @@ function OptionsCard({
             </>
           )}
         </Text>
-        <SyncProgress state={sync} site={site} onSwitch={switchTo(site)} />
-        {error && <StartError error={error} site={site} onCancelled={clearError} />}
+        <SyncProgress state={sync} site={site} onSwitch={switchTo} />
+        {error && <StartError error={error} type={site.type} onCancelled={clearError} />}
         <Group gap="xs">
           {/* During a decks-only sync this joins it: the collection is read right after the decks. */}
           <Button leftSection={<IconArrowsDiff size={16} />} loading={running && sync?.withCollection} onClick={() => void start(true)}>

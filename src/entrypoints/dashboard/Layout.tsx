@@ -5,6 +5,7 @@ import { Link, Outlet, useLocation } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { AccountSelector } from '@/lib/ui/AccountSelector';
 import { ActivityButton } from '@/lib/ui/ActivityButton';
+import { InitialSyncButton, InitialSyncProvider } from '@/lib/ui/InitialSync';
 import { UpdateBanner } from '@/lib/ui/UpdateBanner';
 import { UpdateCheckButton } from '@/lib/ui/UpdateCheck';
 import iconUrl from '@/assets/tithies-icon.webp';
@@ -32,81 +33,85 @@ export function Layout() {
   const { key: accountKey, loading } = useCurrentAccount();
 
   return (
-    <AppShell header={{ height: 56 }} navbar={{ width: 220, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="md">
-      <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between">
-          <Group gap="sm">
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <Group gap={8} wrap="nowrap">
-              <img src={iconUrl} width={38} height={38} alt="" />
-              <Title order={3}>Tithies</Title>
-            </Group>
-            <Text c="dimmed" size="sm" visibleFrom="sm">
-              Moxfield × Face to Face Games
-            </Text>
-          </Group>
-          <Group gap="sm" wrap="nowrap">
-            <ActivityButton />
-            <UpdateCheckButton />
-            <AccountSelector />
-            <Tooltip label={scheme === 'dark' ? 'Light theme' : 'Dark theme'}>
-              <ActionIcon variant="default" size="lg" onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')} aria-label="Toggle color scheme">
-                {scheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        </Group>
-      </AppShell.Header>
-      <AppShell.Navbar p="xs">
-        <MenuArt />
-        <AppShell.Section grow>
-          {/* A section is a heading (small, bold, uppercase, with its icon) over its links; a line separates sections. */}
-          {NAV.map((section, i) => (
-            <div key={section.label}>
-              {i > 0 && <Divider my="sm" />}
-              <Group gap={6} px="sm" pt={i ? 0 : 6} pb={6} wrap="nowrap" c="dimmed">
-                <section.icon size={14} stroke={2.2} />
-                <Text size="xs" fw={700} tt="uppercase" style={{ letterSpacing: '0.07em' }}>
-                  {section.label}
-                </Text>
+    // The initial-sync prompt of new accounts, opened from the header and from pages.
+    <InitialSyncProvider>
+      <AppShell header={{ height: 56 }} navbar={{ width: 220, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="md">
+        <AppShell.Header>
+          <Group h="100%" px="md" justify="space-between">
+            <Group gap="sm">
+              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+              <Group gap={8} wrap="nowrap">
+                <img src={iconUrl} width={38} height={38} alt="" />
+                <Title order={3}>Tithies</Title>
               </Group>
-              {section.links.map((l) => (
-                <NavLink
-                  key={l.to}
-                  component={Link}
-                  to={l.to}
-                  label={l.label}
-                  leftSection={<l.icon size={18} />}
-                  active={pathname === l.to || (l.to === '/f2f/runs' && pathname.startsWith('/f2f/runs/'))}
-                />
-              ))}
-            </div>
-          ))}
-        </AppShell.Section>
-        <AppShell.Section>
-          <NavLink
-            component={Link}
-            to="/changes"
-            label="Change log"
-            leftSection={<IconListDetails size={18} />}
-            active={pathname === '/changes'}
-            className="ti-nav-on-art"
-          />
-          <NavLink
-            component={Link}
-            to="/settings"
-            label="Settings"
-            leftSection={<IconSettings size={18} />}
-            active={pathname === '/settings'}
-            className="ti-nav-on-art"
-          />
-        </AppShell.Section>
-      </AppShell.Navbar>
-      <AppShell.Main>
-        <UpdateBanner />
-        {/* Every page remounts when the account changes: no state of one account survives into another's view. */}
-        {!loading && <Outlet key={accountKey ?? 'none'} />}
-      </AppShell.Main>
-    </AppShell>
+              <Text c="dimmed" size="sm" visibleFrom="sm">
+                Moxfield × Face to Face Games
+              </Text>
+            </Group>
+            <Group gap="sm" wrap="nowrap">
+              <InitialSyncButton />
+              <ActivityButton />
+              <UpdateCheckButton />
+              <AccountSelector />
+              <Tooltip label={scheme === 'dark' ? 'Light theme' : 'Dark theme'}>
+                <ActionIcon variant="default" size="lg" onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')} aria-label="Toggle color scheme">
+                  {scheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          </Group>
+        </AppShell.Header>
+        <AppShell.Navbar p="xs">
+          <MenuArt />
+          <AppShell.Section grow>
+            {/* A section is a heading (small, bold, uppercase, with its icon) over its links; a line separates sections. */}
+            {NAV.map((section, i) => (
+              <div key={section.label}>
+                {i > 0 && <Divider my="sm" />}
+                <Group gap={6} px="sm" pt={i ? 0 : 6} pb={6} wrap="nowrap" c="dimmed">
+                  <section.icon size={14} stroke={2.2} />
+                  <Text size="xs" fw={700} tt="uppercase" style={{ letterSpacing: '0.07em' }}>
+                    {section.label}
+                  </Text>
+                </Group>
+                {section.links.map((l) => (
+                  <NavLink
+                    key={l.to}
+                    component={Link}
+                    to={l.to}
+                    label={l.label}
+                    leftSection={<l.icon size={18} />}
+                    active={pathname === l.to || (l.to === '/f2f/runs' && pathname.startsWith('/f2f/runs/'))}
+                  />
+                ))}
+              </div>
+            ))}
+          </AppShell.Section>
+          <AppShell.Section>
+            <NavLink
+              component={Link}
+              to="/changes"
+              label="Change log"
+              leftSection={<IconListDetails size={18} />}
+              active={pathname === '/changes'}
+              className="ti-nav-on-art"
+            />
+            <NavLink
+              component={Link}
+              to="/settings"
+              label="Settings"
+              leftSection={<IconSettings size={18} />}
+              active={pathname === '/settings'}
+              className="ti-nav-on-art"
+            />
+          </AppShell.Section>
+        </AppShell.Navbar>
+        <AppShell.Main>
+          <UpdateBanner />
+          {/* Every page remounts when the account changes: no state of one account survives into another's view. */}
+          {!loading && <Outlet key={accountKey ?? 'none'} />}
+        </AppShell.Main>
+      </AppShell>
+    </InitialSyncProvider>
   );
 }

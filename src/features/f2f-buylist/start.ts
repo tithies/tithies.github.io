@@ -2,6 +2,7 @@
 import { accountData, addAccountFromAction, findRun } from '@/lib/accounts/data';
 import type { AccountKey } from '@/lib/accounts/types';
 import type { CollectionEntry } from '@/lib/cards/types';
+import { initialSyncStateOf } from '@/lib/decks/initial-sync';
 import { isSiteType, siteOf } from '@/lib/sites/registry';
 import { parseIdentity } from '@/lib/sites/validate';
 import { createRun as defaultCreateRun, toProgress } from './runner';
@@ -18,20 +19,21 @@ export interface StartRunInput {
 /**
  * A run started from a site tab: it belongs to the account of the collection read (not to
  * whoever the tab is logged in as by now). Starting it is an action as that account, so the
- * account is added if new and becomes the current one.
+ * account is added if new and becomes the current one. The panel is told when the account still
+ * needs its initial sync (decks and collection), which the dashboard offers.
  */
 export async function startRunFromSite(
   input: StartRunInput,
   tabId: number | undefined,
   creditBonus: number,
   createRun = defaultCreateRun,
-): Promise<{ runId: number; prints: number; accountKey: AccountKey }> {
+): Promise<{ runId: number; prints: number; accountKey: AccountKey; needsInitialSync: boolean }> {
   if (!isSiteType(input.type)) throw new Error('Unknown site.');
   const identity = parseIdentity(input.account);
   if (!identity) throw new Error(`Couldn't tell which ${siteOf(input.type).label} account this collection belongs to. Reload the page, then try again.`);
   const account = await addAccountFromAction(input.type, identity);
   const res = await createRun(account.key, { ...input.source, tabId }, input.entries, creditBonus);
-  return { ...res, accountKey: account.key };
+  return { ...res, accountKey: account.key, needsInitialSync: (await initialSyncStateOf(account.key)).needed };
 }
 
 /** Progress of a run, or of the newest run of `accountKey` started from that tab (never another account's). */

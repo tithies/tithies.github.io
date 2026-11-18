@@ -75,6 +75,22 @@ export async function setNickname(key: AccountKey, nickname: string | null): Pro
 }
 
 // ---------------------------------------------------------------------------------------------
+// Initial-sync prompts answered "Not now" (by account key: the account may not be in Tithies yet)
+
+export const getInitialSyncDismissed = async (): Promise<AccountKey[]> => (await getMeta<AccountKey[]>('initialSyncDismissed')) ?? [];
+
+/** Remembers (or forgets) that the user doesn't want the header to offer this account's initial sync. */
+export async function setInitialSyncDismissed(key: AccountKey, dismissed: boolean): Promise<void> {
+  await db.transaction('rw', db.meta, async () => {
+    const cur = await getInitialSyncDismissed();
+    if (cur.includes(key) === dismissed) return;
+    const next = dismissed ? [...cur, key] : cur.filter((k) => k !== key);
+    if (next.length) await db.meta.put({ key: 'initialSyncDismissed', value: next, updatedAt: Date.now() });
+    else await db.meta.delete('initialSyncDismissed');
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
 // Runs by id (a run says which account it belongs to)
 
 export const findRun = (runId: number): Promise<Run | undefined> => db.runs.get(runId);
@@ -223,13 +239,15 @@ export class AccountData {
     return { decks: decks + cards + decksMeta, collection: collection + collectionMeta, runs: runs + items };
   }
 
-  /** Forgets the account: all its rows, then the account itself (and the current-account pointer if it was it). */
+  /** Forgets the account: all its rows, then the account itself (and the current-account pointer and its "Not now" if any). */
   async removeAll(): Promise<void> {
     await db.transaction('rw', scopedTables(), async () => {
       await this.clear(ACCOUNT_DATA_GROUPS);
       await db.accountMeta.where('accountKey').equals(this.key).delete();
       await db.accounts.delete(this.key);
       if ((await db.meta.get('currentAccount'))?.value === this.key) await db.meta.delete('currentAccount');
+      // Back as new: the header offers its initial sync again.
+      await setInitialSyncDismissed(this.key, false);
     });
   }
 }

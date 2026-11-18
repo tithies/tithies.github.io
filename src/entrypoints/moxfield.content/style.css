@@ -118,3 +118,18 @@
 .ti-primary:hover:not(:disabled) {
   background: #1864ab;
 }
+/* A suggestion that never blocks the panel's actions (e.g. the initial sync of a new account). */
+.ti-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid #0c8599;
+  border-radius: 8px;
+  background: rgba(12, 133, 153, 0.12);
+}
+.ti-small {
+  padding: 3px 8px;
+  font-size: 12px;
+}

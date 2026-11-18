@@ -1,11 +1,11 @@
 import { Alert, Button, Group, Text } from '@mantine/core';
 import { IconInfoCircle, IconRefresh, IconUserExclamation } from '@tabler/icons-react';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
-import { addAccountFromAction } from '@/lib/accounts/data';
 import { accountLabel } from '@/lib/accounts/types';
 import { siteOf } from '@/lib/sites/registry';
 import { useSiteSessions } from '@/lib/sites/useSiteSessions';
 import type { SiteType } from '@/lib/sites/types';
+import { useInitialSync } from './InitialSync';
 
 /**
  * Who is logged in on the site, next to features that read it (syncs): only the current account
@@ -14,6 +14,7 @@ import type { SiteType } from '@/lib/sites/types';
 export function AccountHint({ type = 'moxfield' }: { type?: SiteType }) {
   const { account } = useCurrentAccount();
   const { live, liveKeys, silentTabs } = useSiteSessions();
+  const { switchToIdentity } = useInitialSync();
   const site = siteOf(account?.type ?? type);
   const others = live[site.type];
 
@@ -37,7 +38,7 @@ export function AccountHint({ type = 'moxfield' }: { type?: SiteType }) {
             {site.label} is logged in as <b>{other.userName}</b> in your open tabs, but Tithies shows <b>{accountLabel(account)}</b>. Syncing reads{' '}
             {accountLabel(account)}'s data: log in as {account.userName} on {site.label} first, or switch Tithies to {other.userName}.
           </Text>
-          <Button size="xs" variant="light" color="yellow" onClick={() => void addAccountFromAction(site.type, other)}>
+          <Button size="xs" variant="light" color="yellow" onClick={() => switchToIdentity(site.type, other)}>
             Switch Tithies to {other.userName}
           </Button>
         </Group>

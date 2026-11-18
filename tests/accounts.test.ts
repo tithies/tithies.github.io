@@ -1,4 +1,4 @@
-import { addAccountFromAction, getCurrentAccount, listAccounts, resolveCurrent, setCurrentAccount, setNickname } from '@/lib/accounts/data';
+import { accountData, addAccountFromAction, getCurrentAccount, listAccounts, resolveCurrent, setCurrentAccount, setInitialSyncDismissed, setNickname } from '@/lib/accounts/data';
 import { accountKey, accountLabel, parseAccountKey, type AccountKey, type AccountRow } from '@/lib/accounts/types';
 import { db } from '@/lib/db';
 import { SessionRegistry } from '@/lib/sites/sessions';
@@ -72,6 +72,17 @@ describe('Selling runs started from a site tab', () => {
     expect(res.accountKey).toBe('moxfield:111111');
     expect((await db.runs.get(res.runId))).toMatchObject({ accountKey: 'moxfield:111111', source: { tabId: 7 } });
     expect((await getCurrentAccount())?.userName).toBe('alice');
+  });
+
+  it("tell the panel when the account's decks and collection were never read (unless it said \"Not now\")", async () => {
+    expect((await startRunFromSite({ type: 'moxfield', account: ALICE, source, entries: ENTRIES }, 7, 0.3)).needsInitialSync).toBe(true);
+    const alice = accountData('moxfield:111111' as AccountKey);
+    await alice.write((w) => w.meta.put('decks', { lastSuccessAt: 1, initialSyncAt: 1 }));
+    expect((await startRunFromSite({ type: 'moxfield', account: ALICE, source, entries: ENTRIES }, 7, 0.3)).needsInitialSync).toBe(true);
+    await alice.write((w) => w.collection.replace([], { fetchedAt: 2, entries: 0, copies: 0 }));
+    expect((await startRunFromSite({ type: 'moxfield', account: ALICE, source, entries: ENTRIES }, 7, 0.3)).needsInitialSync).toBe(false);
+    await setInitialSyncDismissed('moxfield:222222' as AccountKey, true);
+    expect((await startRunFromSite({ type: 'moxfield', account: BOB, source, entries: ENTRIES }, 7, 0.3)).needsInitialSync).toBe(false);
   });
 
   it('are refused when the account is unknown or malformed', async () => {
