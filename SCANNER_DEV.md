@@ -297,6 +297,15 @@ By method, over all photos: DINOv2 squashed · CLS 41 % first try (46 % top 5), 
 
 ### Phase 4 (optional) — A trained detector
 
+**Status (2026-11-19):** the training kit is in `scanner-train/` (Windows instructions in its README), and the Scanner page can load its output (`card-detector.onnx` dropped on the photos box; "Find cards with": classic, trained detector or both). Training runs on the user's RTX 4070 (12 GB).
+- **Model:** ResNet-18 (torchvision, BSD) with a small feature pyramid, CenterNet-style. It predicts a heat map of card centres on 4-pixel cells, and at each cell the card's 4 corners as offsets. The corner order follows the card up to a half turn; the loss takes the better of the two orders. Input 768 × 768, the photo letterboxed at the top-left with grey 114. The ONNX file is ≈ 46 MB.
+- **Scenes:** `synth.py` (≈ 150 ms a scene at 1024 on one CPU core). Layouts: table spreads, binder pages (1–2 pages, empty pockets), fanned hands, piles, single cards. Holders: sleeves, toploaders, magnetic holders. Also foil, glare, shadows, fingers, distractor shapes, camera tilt (rendered on a canvas 30 % larger, so no edges show), blur, noise and JPEG. Backgrounds: the user's photos of empty surfaces, Scryfall artwork as playmats, and generated wood, stone, fabric and plain surfaces.
+- **Checked here:** a 100-step CPU run learns (validation F1 0.05 → 0.13); the export matches PyTorch to 6e-7; the browser decodes the same cards as Python on a test scene.
+
+**Plan as written before the kit:**
+
+
+
 **When:** only if the measurements show that shape detection misses touching cards, binder pages, playmats, glare or fanned stacks.
 
 **Training data:**
