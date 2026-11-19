@@ -7,9 +7,10 @@
  */
 import { detectCards } from '@/features/scanner/engine/detect';
 import { bench, currentBackend, featuresMany, initOrt, loadModel, matToImageData, ortVersion, toCardSize, warpCard } from '@/features/scanner/engine/features';
+import { loadDetector, runDetector } from '@/features/scanner/engine/detector';
 import { free, loadOpenCv, type CV, type Mat } from '@/features/scanner/engine/opencv';
-import { quadSize } from '@/features/scanner/geometry';
-import { CHANNEL, type CardFeatures, type EngineCall, type EngineReply, type EngineRequest, type EngineResults, type Features } from '@/features/scanner/protocol';
+import { quadIoU, quadSize } from '@/features/scanner/geometry';
+import { CHANNEL, type CardFeatures, type DetectedCard, type EngineCall, type EngineReply, type EngineRequest, type EngineResults, type Features } from '@/features/scanner/protocol';
 
 interface Photo {
   full: Mat;
@@ -63,6 +64,11 @@ async function handle(req: EngineRequest): Promise<Handled<EngineRequest['type']
       const backend = await loadModel(req.bytes);
       return { result: { backend, ms: performance.now() - t0 } };
     }
+    case 'loadDetector': {
+      const t0 = performance.now();
+      const r = await loadDetector(req.bytes);
+      return { result: { ...r, ms: performance.now() - t0 } };
+    }
     case 'loadPhoto': {
       const c = needCv();
       const old = photos.get(req.photoId);
@@ -75,18 +81,31 @@ async function handle(req: EngineRequest): Promise<Handled<EngineRequest['type']
       const c = needCv();
       const t0 = performance.now();
       const p = photo(req.photoId);
-      const scale = Math.max(1, Math.max(p.width, p.height) / req.options.maxSide);
-      const small = new c.Mat();
-      try {
-        if (scale > 1) c.resize(p.full, small, new c.Size(Math.round(p.width / scale), Math.round(p.height / scale)), 0, 0, c.INTER_AREA);
-        else p.full.copyTo(small);
-        const out = detectCards(c, small, scale, req.options.debug);
-        const edges = out.edges ? await createImageBitmap(out.edges) : undefined;
-        const result: EngineResults['detect'] = { width: p.width, height: p.height, cards: out.cards, rejected: out.rejected, edges, ms: performance.now() - t0 };
-        return { result, transfer: edges ? [edges] : [] };
-      } finally {
-        free(small);
+      const method = req.options.method;
+      let cards: DetectedCard[] = [];
+      let rejected: EngineResults['detect']['rejected'] = [];
+      let edges: ImageBitmap | undefined;
+      if (method !== 'model') {
+        const scale = Math.max(1, Math.max(p.width, p.height) / req.options.maxSide);
+        const small = new c.Mat();
+        try {
+          if (scale > 1) c.resize(p.full, small, new c.Size(Math.round(p.width / scale), Math.round(p.height / scale)), 0, 0, c.INTER_AREA);
+          else p.full.copyTo(small);
+          const out = detectCards(c, small, scale, req.options.debug);
+          cards = out.cards;
+          rejected = out.rejected;
+          edges = out.edges ? await createImageBitmap(out.edges) : undefined;
+        } finally {
+          free(small);
+        }
       }
+      if (method !== 'classic') {
+        const found: DetectedCard[] = (await runDetector(c, p.full, req.options.modelThreshold)).map((f) => ({ quad: f.quad, score: f.score, source: 'model' }));
+        // Both: the detector's cards, plus the classic ones it has nothing near.
+        cards = method === 'model' ? found : [...found, ...cards.filter((k) => !found.some((m) => quadIoU(m.quad, k.quad) > 0.3))];
+      }
+      const result: EngineResults['detect'] = { width: p.width, height: p.height, cards, rejected, edges, ms: performance.now() - t0 };
+      return { result, transfer: edges ? [edges] : [] };
     }
     case 'cardFeatures': {
       const c = needCv();

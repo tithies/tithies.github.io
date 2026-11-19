@@ -97,7 +97,7 @@ export async function scanPhoto(
   const { width, height } = await engine.call({ type: 'loadPhoto', photoId: id, bitmap }, [bitmap]);
   const t1 = performance.now();
   try {
-    const det = await engine.call({ type: 'detect', photoId: id, options: { maxSide: opts.maxSide, debug: opts.debug } });
+    const det = await engine.call({ type: 'detect', photoId: id, options: { maxSide: opts.maxSide, debug: opts.debug, method: opts.method, modelThreshold: opts.modelThreshold } });
     const t2 = performance.now();
     const ordered = readingOrder(det.cards);
     const cards: ScannedCard[] = [];

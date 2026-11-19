@@ -14,14 +14,20 @@ export interface EngineInfo {
   backend: 'webgpu' | 'wasm' | null;
 }
 
+/** How cards are found: the classic passes (edges, threshold, lines, grid), the trained detector, or both. */
+export type DetectMethod = 'classic' | 'model' | 'both';
+
 export interface DetectOptions {
   /** The photo is shrunk to this many pixels on its long side for detection (corners are scaled back). */
   maxSide: number;
   /** Also send back the edge map and every rejected shape. */
   debug: boolean;
+  method: DetectMethod;
+  /** The trained detector's score above which a card counts. */
+  modelThreshold: number;
 }
 
-export type CardSource = 'edges' | 'threshold' | 'lines' | 'grid';
+export type CardSource = 'edges' | 'threshold' | 'lines' | 'grid' | 'model';
 
 export interface DetectedCard {
   /** Corners in the photo's pixels (full resolution), card upright or upside down. */
@@ -65,6 +71,8 @@ export interface CardFeatures {
 export type EngineRequest =
   | { type: 'init'; ortWasm: ArrayBuffer }
   | { type: 'loadModel'; bytes: ArrayBuffer }
+  /** The trained card detector (scanner-train/export.py). */
+  | { type: 'loadDetector'; bytes: ArrayBuffer }
   | { type: 'loadPhoto'; photoId: string; bitmap: ImageBitmap }
   | { type: 'detect'; photoId: string; options: DetectOptions }
   | { type: 'cardFeatures'; photoId: string; quads: Quad[] }
@@ -76,6 +84,7 @@ export type EngineRequest =
 export interface EngineResults {
   init: EngineInfo;
   loadModel: { backend: 'webgpu' | 'wasm'; ms: number };
+  loadDetector: { size: number; backend: 'webgpu' | 'wasm'; ms: number };
   loadPhoto: { width: number; height: number };
   detect: DetectResult;
   cardFeatures: { cards: CardFeatures[]; ms: number };

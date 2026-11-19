@@ -39,6 +39,19 @@ export async function loadModelFile(file: ModelFile, onProgress?: (done: number,
   return bytes.buffer;
 }
 
+/** Where a card detector file dropped on the page is kept (a made-up URL: Cache Storage keys are requests). */
+export const DETECTOR_KEY = 'https://tithies.local/scanner/card-detector.onnx';
+
+/** The card detector dropped on the page earlier, if any. */
+export async function cachedDetector(): Promise<ArrayBuffer | null> {
+  const hit = await (await caches.open(MODEL_CACHE)).match(DETECTOR_KEY);
+  return hit ? hit.arrayBuffer() : null;
+}
+
+export async function cacheDetector(bytes: ArrayBuffer): Promise<void> {
+  await (await caches.open(MODEL_CACHE)).put(DETECTOR_KEY, new Response(bytes.slice(0), { headers: { 'content-type': 'application/octet-stream' } }));
+}
+
 /** Removes every cached model file. */
 export async function clearModelCache(): Promise<void> {
   await caches.delete(MODEL_CACHE);

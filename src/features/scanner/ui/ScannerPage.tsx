@@ -4,10 +4,10 @@ import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { accountData } from '@/lib/accounts/data';
 import { accountLabel } from '@/lib/accounts/types';
 import { ScannerEngine } from '../engine-client';
-import { isModelCached, loadModelFile } from '../model-cache';
+import { cacheDetector, cachedDetector, isModelCached, loadModelFile } from '../model-cache';
 import { ALL_METHODS, DINO_FILE } from '../models';
 import { disposePhoto, photoToJson, scanPhoto, type ScannedPhoto } from '../pipeline';
-import type { EngineInfo } from '../protocol';
+import type { DetectMethod, EngineInfo } from '../protocol';
 import { buildReferences, ownedPrints, type BuildProgress, type PrintInfo } from '../reference';
 import { parseLabels, type Labels, type ScoredPhoto } from '../score';
 import { buildIndex, searchIndex, type RefIndex } from '../search-index';
@@ -44,6 +44,9 @@ export function ScannerPage() {
   const [info, setInfo] = useState<EngineInfo | null>(null);
   const [engineError, setEngineError] = useState<string | null>(null);
   const [backend, setBackend] = useState<string | null>(null);
+  const [detector, setDetector] = useState<{ size: number; backend: string } | null>(null);
+  const [detectMethod, setDetectMethod] = useState<DetectMethod>('classic');
+  const [modelThreshold, setModelThreshold] = useState<number>(0.3);
   const [modelCached, setModelCached] = useState<boolean | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +77,13 @@ export function ScannerPage() {
       .then(({ engine, info }) => {
         if (cancelled) return engine.dispose();
         engineRef.current = engine;
+        // A card detector dropped on the page earlier is loaded again.
+        void cachedDetector().then(async (bytes) => {
+          if (!bytes || cancelled) return;
+          const r = await engine.call({ type: 'loadDetector', bytes }, [bytes]);
+          setDetector(r);
+          setDetectMethod('model');
+        }).catch((e: Error) => setError(`The saved card detector didn't load: ${e.message}`));
         // Prototype tuning from the console: await scannerEngine.call({ type: 'bench', ep: 'webgpu', opt: 'all', runs: 5 })
         (window as unknown as { scannerEngine?: ScannerEngine }).scannerEngine = engine;
         setInfo(info);
@@ -199,7 +209,7 @@ export function ScannerPage() {
         for (const [i, p] of list.entries()) {
           setBusy({ label: `Scanning ${p.file.name} (${i + 1} of ${list.length})…` });
           try {
-            const scan = await scanPhoto(engine, p.file, index, { scale: Number(scale), maxSide, debug }, (done, total) =>
+            const scan = await scanPhoto(engine, p.file, index, { scale: Number(scale), maxSide, debug, method: detectMethod, modelThreshold }, (done, total) =>
               setBusy({ label: `Scanning ${p.file.name} (${i + 1} of ${list.length}): card ${done} of ${total}…`, progress: (100 * done) / total }),
             );
             setPhotos((ps) =>
@@ -215,11 +225,22 @@ export function ScannerPage() {
         }
       });
     },
-    [index, scale, maxSide, debug, run],
+    [index, scale, maxSide, debug, detectMethod, modelThreshold, run],
   );
 
   const addFiles = async (files: File[]) => {
-    const json = files.find((f) => f.name.toLowerCase().endsWith('.json'));
+    const onnx = files.find((f) => f.name.toLowerCase().endsWith('.onnx'));
+    if (onnx && engineRef.current) {
+      const engine = engineRef.current;
+      await run(`Loading the card detector ${onnx.name}…`, async () => {
+        const bytes = await onnx.arrayBuffer();
+        await cacheDetector(bytes);
+        const r = await engine.call({ type: 'loadDetector', bytes }, [bytes]);
+        setDetector(r);
+        setDetectMethod('model');
+      });
+    }
+    const json = files.find((f) => f.name.toLowerCase().endsWith('.json') && f.name.toLowerCase() !== 'card-detector.json');
     if (json) {
       try {
         setLabels(parseLabels(await json.text()));
@@ -273,6 +294,10 @@ export function ScannerPage() {
             </Text>
             <Text size="sm">
               {DINO_FILE.label}: {backend ? `running on ${backend === 'webgpu' ? 'WebGPU' : 'the CPU'}` : modelCached ? 'downloaded, not started' : `not downloaded (${mb(DINO_FILE.bytes)})`}
+            </Text>
+            <Text size="sm">
+              Card detector:{' '}
+              {detector ? `trained model loaded (input ${detector.size} px, on ${detector.backend === 'webgpu' ? 'WebGPU' : 'the CPU'})` : 'none: drop card-detector.onnx (scanner-train) on the photos box'}
             </Text>
             <Group>
               <Button size="xs" onClick={loadModel} disabled={!info || !!busy || !!backend}>
@@ -332,7 +357,7 @@ export function ScannerPage() {
           <Text fw={600}>3. Photos</Text>
           <Text size="sm">
             Drop photos here (full camera resolution), with labels.json to score them, or pick them:{' '}
-            <input type="file" multiple accept="image/*,.json,application/json" onChange={(e) => void addFiles([...(e.currentTarget.files ?? [])])} disabled={!ready} />
+            <input type="file" multiple accept="image/*,.json,application/json,.onnx" onChange={(e) => void addFiles([...(e.currentTarget.files ?? [])])} disabled={!ready} />
           </Text>
           <Group gap="lg" align="flex-end">
             <Stack gap={2}>
@@ -349,6 +374,19 @@ export function ScannerPage() {
                 ]}
               />
             </Stack>
+            <Select
+              size="xs"
+              w={190}
+              label="Find cards with"
+              value={detectMethod}
+              onChange={(v) => v && setDetectMethod(v as DetectMethod)}
+              data={[
+                { value: 'classic', label: 'Classic (edges, lines)' },
+                { value: 'model', label: 'Trained detector', disabled: !detector },
+                { value: 'both', label: 'Both', disabled: !detector },
+              ]}
+            />
+            <NumberInput size="xs" w={130} label="Detector threshold" value={modelThreshold} onChange={(v) => setModelThreshold(Number(v) || 0.3)} min={0.05} max={0.95} step={0.05} decimalScale={2} disabled={!detector} />
             <NumberInput size="xs" w={150} label="Detection size (px)" value={maxSide} onChange={(v) => setMaxSide(Number(v) || 2000)} min={600} max={4000} step={200} />
             <NumberInput size="xs" w={170} label="Warn below (card px tall)" value={minHeightPx} onChange={(v) => setMinHeightPx(Number(v) || 0)} min={0} step={50} />
             <Checkbox size="xs" label="Keep debug layers" checked={debug} onChange={(e) => setDebug(e.currentTarget.checked)} />
