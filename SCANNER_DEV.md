@@ -1,6 +1,6 @@
 # Scanner — development notes
 
-**Status:** phase 0 (prototype) in progress (2026-11-19): the hidden test page is built; measurements on real photos are pending. See "Phase 0 — how to run" and "Phase 0 — findings so far" under section 6.
+**Status:** phase 0 (prototype) measured on real photos (2026-11-19): matching works, detection doesn't (41 % of cards named right, mostly because they aren't found). Phase 4 (trained detector) is next. See "Phase 0 — baseline on real photos" under section 6.
 **Feature:** you upload one or more photos, and Tithies finds every Magic card in them. It returns a list of the detected cards, each with its position in the photo (so the page can draw an outline around it), the card and its print. You correct the list, then add it to the Moxfield collection or a binder. This is the "Scanner cards" item of `todo-future.txt`.
 **Out of scope:** telling foil from non-foil in a photo. Finish defaults to non-foil and you change it per row.
 
@@ -184,6 +184,33 @@ Console tuning: `await scannerEngine.call({ type: 'bench', ep: 'webgpu', opt: 'a
 - **Tooling:** `SCANNER_PHOTO=scanner-samples/x.png npx vitest run tests/scanner-photo.debug.test.ts` runs detection in Node (OpenCV.js works there when loaded with `require`: an ESM import loops on its `then`) and writes `x.debug.png` (cards, line quads, lines) and `x.debug.txt`. `SCANNER_EXPECT=x0,y0,x1,y1` reports the line quad closest to a known card box. PNG only.
 - **File picker and Playwright:** while the Playwright MCP is attached to the browser, it intercepts native file dialogs: the page's file input looks dead. Drag and drop works, and so does feeding files through the MCP's `browser_file_upload`.
 - **Size:** the unpacked extension went from ≈ 2.5 MB to ≈ 43 MB (OpenCV.js 10.9 MB in the sandbox chunk, onnxruntime's WebAssembly 29.5 MB). The model (88.5 MB) is downloaded, not bundled.
+
+#### Phase 0 — baseline on real photos (2026-11-19)
+
+19 photos (Pixel phone, 4000 × 3000, plus the earlier toploader shot), 107 cards, labelled in `scanner-samples/labels.json` (104 with their exact print, checked against the owned prints). Current detection (contours + lines + binder grid), matching against the 3,855 owned prints.
+
+| Photo type | Photos | Cards named right, first try (DINOv2 padded · CLS) |
+|---|---|---|
+| Binder pages (9-pocket) | 3 | 16 / 24 (67 %) |
+| Table, cards out of sleeves, plain surface (wood, granite, mat) | 7 | 20 / 42 (48 %) |
+| Deck boxes as background | 2 | 3 / 6 |
+| Toploaders, one-touch holders | 2 | 2 / 4 |
+| Sleeved cards on wood | 1 | 1 / 9 |
+| Busy background (knit blanket), straight and angled | 2 | 2 / 16 |
+| One card held in hand | 1 | 0 / 1 (squashed · CLS: 1 / 1) |
+| Fanned hand | 1 | 0 / 5 |
+| **All** | **19** | **44 / 107 (41 %)** |
+
+By method, over all photos: DINOv2 squashed · CLS 41 % first try (46 % top 5), padded · CLS 41 % (50 %), squashed · mean 26 %, padded · mean 26 %, pHash 20 %. 124 shapes were detected, about 70 of them not a labelled card (pocket and sleeve edges, text boxes, deck-box seams, cards cut by the photo's edge).
+
+**What it says:**
+- **Detection is the bottleneck, not matching.** Among the shapes that were a card, cards 600 px tall or more are named right at the first try 84–95 % of the time (CLS variants), and top 5 adds little over top 1: when the outline is right, the first answer is usually right. The toploader photo with hand-placed corners confirms it (0.872 vs 0.762).
+- Detection holds up only on clean cases: borders visible against a plain surface, or binder pockets. It fails on sleeves, toploaders, busy backgrounds, angled shots and fanned cards, and it adds many false shapes (most with low match scores, under 0.5).
+- **Keep DINOv2 with the CLS token**: mean pooling and pHash are far behind. Squashed and padded tie at first try; padded is slightly better in the top 5. To decide on better crops, after phase 4.
+- **Basic lands:** names right (Forests 4 / 4) but prints mostly wrong (1 / 4): same-name lands with similar landscapes get mixed up.
+- Not measured yet: the minimum card size (every photo here is full resolution with large cards).
+
+**Decision:** phase 4 (trained detector) goes next, before phases 1–2. These photos and labels are its test set.
 
 ### Phase 1 — Reference index of every print
 
