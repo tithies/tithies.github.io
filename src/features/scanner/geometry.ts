@@ -222,6 +222,45 @@ export function dedupe<T extends Candidate>(cands: readonly T[]): T[] {
   return kept;
 }
 
+/**
+ * Touching cards are often outlined together: two side by side make a landscape shape with a
+ * card's proportions (0.70), four in a square too. A shape covered for the most part (70 %) by
+ * two or more card shapes of about the same size that don't overlap is such a group, not a card.
+ * (A card holds at most one card-shaped part, its art box, so it isn't mistaken for a group.)
+ */
+export function dropGroups<T extends Candidate>(cands: readonly T[]): T[] {
+  const areas = cands.map((c) => polygonArea(c.quad));
+  return cands.filter((outer, i) => {
+    const inner = cands
+      .map((c, j) => ({ c, j, share: areas[j] / areas[i] }))
+      .filter(({ c, j, share }) => j !== i && share >= 0.15 && share <= 0.7 && coverage(c.quad, outer.quad) > 0.85)
+      .sort((a, b) => b.share - a.share);
+    for (let s = 0; s < inner.length; s++) {
+      const picked = [inner[s]];
+      for (const x of inner.slice(s + 1)) {
+        if (x.share < inner[s].share * 0.7) break;
+        if (picked.every((p) => quadIoU(p.c.quad, x.c.quad) < 0.2)) picked.push(x);
+      }
+      if (picked.length >= 2 && picked.reduce((sum, p) => sum + p.share, 0) >= 0.7) return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Pieces of a card (a text box, a glare patch) that passed as cards: with 3 cards or more, a
+ * shape under 35 % of the median card's area; and a shape mostly inside a grid cell inferred
+ * for the binder page (the cell is the card).
+ */
+export function dropFragments<T extends Candidate>(cards: readonly T[], cells: readonly Quad[] = []): T[] {
+  let out = [...cards];
+  if (out.length >= 3) {
+    const med = median(out.map((c) => polygonArea(c.quad)));
+    out = out.filter((c) => polygonArea(c.quad) >= 0.35 * med);
+  }
+  return out.filter((c) => !cells.some((cell) => coverage(c.quad, cell) > 0.8 && polygonArea(c.quad) < 0.7 * polygonArea(cell)));
+}
+
 function median(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
   const m = s.length >> 1;

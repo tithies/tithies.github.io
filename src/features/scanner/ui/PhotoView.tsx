@@ -43,7 +43,7 @@ export function PhotoView({ photo, src, method, selected, onSelect, showEdges, s
       <svg viewBox={`0 0 ${photo.width} ${photo.height}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} onClick={() => onSelect(null)}>
         {showRejected &&
           photo.rejected.map((r, i) => (
-            <polygon key={`r${i}`} points={r.quad.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={r.reason === 'duplicate' ? theme.colors.blue[4] : theme.colors.gray[5]} strokeWidth={stroke / 2} strokeDasharray={`${stroke * 2} ${stroke * 2}`}>
+            <polygon key={`r${i}`} points={r.quad.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={r.reason === 'group' ? theme.colors.grape[4] : r.reason === 'duplicate' || r.reason === 'fragment' ? theme.colors.blue[4] : theme.colors.gray[5]} strokeWidth={stroke / 2} strokeDasharray={`${stroke * 2} ${stroke * 2}`}>
               <title>{r.reason}</title>
             </polygon>
           ))}

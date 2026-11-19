@@ -50,6 +50,7 @@ export function ScannerPage() {
   const [prints, setPrints] = useState<PrintInfo[] | null>(null);
   const [index, setIndex] = useState<RefIndex | null>(null);
   const [build, setBuild] = useState<BuildProgress | null>(null);
+  const [building, setBuilding] = useState(false);
   const buildAbort = useRef<AbortController | null>(null);
 
   const [photos, setPhotos] = useState<LoadedPhoto[]>([]);
@@ -135,19 +136,23 @@ export function ScannerPage() {
       setBackend(r.backend);
     });
 
-  const buildRefs = () => {
+  // The build has its own state: photos can be scanned meanwhile (against the prints done when the page opened).
+  const buildRefs = async () => {
     const engine = engineRef.current;
     if (!engine || !prints) return;
     const ctl = new AbortController();
     buildAbort.current = ctl;
-    void run('Building the reference set…', async () => {
-      try {
-        await buildReferences(engine, prints, { signal: ctl.signal, onProgress: (p) => setBuild(p) });
-      } finally {
-        buildAbort.current = null;
-        setIndex(buildIndex(await currentRefs()));
-      }
-    });
+    setBuilding(true);
+    setError(null);
+    try {
+      await buildReferences(engine, prints, { signal: ctl.signal, onProgress: (p) => setBuild(p) });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      buildAbort.current = null;
+      setBuilding(false);
+      setIndex(buildIndex(await currentRefs()));
+    }
   };
 
   const scanAll = useCallback(
@@ -260,10 +265,10 @@ export function ScannerPage() {
               </>
             )}
             <Group>
-              <Button size="xs" onClick={buildRefs} disabled={!ready || !prints?.length || !!busy}>
+              <Button size="xs" onClick={() => void buildRefs()} disabled={!ready || !prints?.length || building}>
                 {index?.size ? 'Add missing prints' : 'Build the reference set'}
               </Button>
-              {buildAbort.current && (
+              {building && (
                 <Button size="xs" variant="default" onClick={() => buildAbort.current?.abort()}>
                   Stop
                 </Button>

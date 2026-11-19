@@ -1,6 +1,6 @@
 # Scanner — development notes
 
-**Status:** exploration only (2026-11-19). Nothing is built yet.
+**Status:** phase 0 (prototype) in progress (2026-11-19): the hidden test page is built; measurements on real photos are pending. See "Phase 0 — how to run" and "Phase 0 — findings so far" under section 6.
 **Feature:** you upload one or more photos, and Tithies finds every Magic card in them. It returns a list of the detected cards, each with its position in the photo (so the page can draw an outline around it), the card and its print. You correct the list, then add it to the Moxfield collection or a binder. This is the "Scanner cards" item of `todo-future.txt`.
 **Out of scope:** telling foil from non-foil in a photo. Finish defaults to non-foil and you change it per row.
 
@@ -147,6 +147,37 @@ Order: **0 → decide → 1 → 2 → measure → 3 and/or 4**, one phase per se
 **Risks:** the engines' size; the CSP for WASM; downloading about 4k reference images.
 
 **Tokens:** about 100–150k output and 30–50M cache reads (≈ $15–25).
+
+**Decided before building (2026-11-19):**
+- the prototype ships hidden in releases (reachable by URL, not in the menu);
+- quality over size: OpenCV.js and onnxruntime-web are bundled (≈ +41 MB unpacked);
+- photos to support: cards spread on a table, binder pages, fanned/overlapping, many cards per photo. The scanner may require high-resolution photos; cards too small to detect are tolerated;
+- matching against owned prints only.
+
+#### Phase 0 — how to run
+
+1. Build and load the extension, then open `dashboard.html#/collection/scanner` (not in the menu).
+2. **1. Engine and model:** *Download and start the model* (88.5 MB from Hugging Face, once; then from Cache Storage).
+3. **2. Reference set:** *Build the reference set*: every print of the current account's synced collection, from Scryfall's `normal` images (≈ 107 KB each, not kept). About 15 minutes for ~3,900 prints on the test machine; it can be stopped and resumes.
+4. **3. Photos:** drop photos (full camera resolution) and `labels.json` together. Each photo is scanned at once; *Scan all again* re-runs them with the current options:
+   - *Simulate lower resolution* (100 / 50 / 33 / 25 %) finds the smallest card size that still works;
+   - *Detection size* is the long side the photo is shrunk to for detection (corners are scaled back; cards are flattened from the full photo);
+   - *Keep debug layers* keeps the edge map and the rejected shapes, shown with *Edges* and *Rejected shapes*.
+5. **Scores:** a table per method (labelled / detected / unpaired, name and print right at first try and in the top 5, name hit rate by card height). *Copy results JSON* copies everything without pixels.
+
+`labels.json` (in the gitignored `scanner-samples/`): one entry per physical card, set and number optional:
+`{ "IMG_0001.jpg": [{ "name": "Sol Ring", "set": "cmm", "cn": "410" }, { "name": "Counterspell" }] }`
+
+Console tuning: `await scannerEngine.call({ type: 'bench', ep: 'webgpu', opt: 'all', runs: 5, batch: 16 })` times the model with other session options.
+
+#### Phase 0 — findings so far
+
+- **Both engines need a sandboxed page.** OpenCV.js (embind) and every onnxruntime-web build with WebGPU call `new Function`, which the extension pages' CSP forbids (`'unsafe-eval'` is not allowed in MV3 extension pages). They run in `scanner.html`, a manifest `sandbox` page loaded in a hidden iframe. It has an opaque origin, no storage and no extension APIs: the Scanner page sends it the photos, the model bytes and onnxruntime's WebAssembly, and keeps every result (IndexedDB, Cache Storage).
+- **OpenCV.js trap:** Emscripten's Module has a `then` that resolves with itself, so `await`ing it (or returning it from an async function) loops forever in microtasks. `engine/opencv.ts` wraps it and deletes `then`.
+- **The DINOv2-small ONNX export (Xenova) has fixed position embeddings:** only 224 × 224 input (16 × 16 patches). 224 × 308 fails. The card's proportions are kept by padding (161 × 224 centred) instead; both "squashed" and "padded" are measured.
+- **WebGPU on the test machine has a large fixed cost per model run**: 680 ms for 1 picture, 800 ms for 4, 1.7 s for 16 (≈ 105 ms a picture). The CPU (one thread) takes ≈ 900 ms a picture. A trivial WebGPU read-back there takes ≈ 100 ms, and a naive 1024³ matmul reaches ≈ 18 GFLOPS, so it's that machine's GPU path, not the model (`'all'` graph optimization, JSEP and the newer WebGPU build behave the same). Runs are therefore batched by 16 pictures: 8 reference images (2 resizes each), or 4 photo cards (2 ways up × 2 resizes).
+- **onnxruntime build:** the JSEP build (`onnxruntime-web`, `ort-wasm-simd-threaded.jsep.wasm`, 29.5 MB) is used. One thread only: several would need cross-origin isolation, which would break the image thumbnails on other pages.
+- **Size:** the unpacked extension went from ≈ 2.5 MB to ≈ 43 MB (OpenCV.js 10.9 MB in the sandbox chunk, onnxruntime's WebAssembly 29.5 MB). The model (88.5 MB) is downloaded, not bundled.
 
 ### Phase 1 — Reference index of every print
 

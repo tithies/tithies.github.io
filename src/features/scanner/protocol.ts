@@ -32,7 +32,8 @@ export interface DetectedCard {
 
 export interface RejectedShape {
   quad: Quad;
-  reason: RejectReason | 'duplicate';
+  /** Not card-shaped (RejectReason), a duplicate outline, a group of touching cards, or a piece of a card. */
+  reason: RejectReason | 'duplicate' | 'group' | 'fragment';
 }
 
 export interface DetectResult {

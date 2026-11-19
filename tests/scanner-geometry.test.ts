@@ -3,6 +3,8 @@ import {
   boundingBox,
   coverage,
   dedupe,
+  dropFragments,
+  dropGroups,
   inferGridCells,
   isConvex,
   orderCorners,
@@ -145,5 +147,48 @@ describe('inferGridCells', () => {
     const { found } = page([[1, 1]]);
     const cells = inferGridCells([...found, orderCorners(card(1000, 1000, 200))]);
     expect(cells.map((c) => `${c.col},${c.row}`)).toEqual(['1,1']);
+  });
+});
+
+describe('dropGroups', () => {
+  const rect = (x0: number, y0: number, x1: number, y1: number): Quad =>
+    orderCorners([
+      { x: x0, y: y0 },
+      { x: x1, y: y0 },
+      { x: x1, y: y1 },
+      { x: x0, y: y1 },
+    ]);
+
+  it('drops the outline around two touching cards, keeps the cards', () => {
+    const left = { quad: rect(0, 0, 63, 88), score: 0.9, id: 'left' };
+    const right = { quad: rect(65, 0, 128, 88), score: 0.9, id: 'right' };
+    // The pair's outline: 128 × 88, a "sideways card" (0.69).
+    const pair = { quad: rect(0, 0, 128, 88), score: 0.95, id: 'pair' };
+    expect(quadSize(pair.quad).ratio).toBeGreaterThan(0.6);
+    expect(dropGroups([pair, left, right]).map((c) => c.id).sort()).toEqual(['left', 'right']);
+  });
+
+  it('drops a 2×2 block of cards', () => {
+    const cards = [rect(0, 0, 63, 88), rect(65, 0, 128, 88), rect(0, 90, 63, 178), rect(65, 90, 128, 178)].map((quad, i) => ({ quad, score: 0.9, id: `c${i}` }));
+    const block = { quad: rect(0, 0, 128, 178), score: 0.9, id: 'block' };
+    expect(dropGroups([block, ...cards]).map((c) => c.id)).not.toContain('block');
+  });
+
+  it('keeps a card that holds one card-shaped part (its art box)', () => {
+    const c = { quad: rect(0, 0, 63, 88), score: 0.9, id: 'card' };
+    const art = { quad: rect(5, 10, 58, 48), score: 0.8, id: 'art' };
+    expect(dropGroups([c, art]).map((x) => x.id).sort()).toEqual(['art', 'card']);
+  });
+});
+
+describe('dropFragments', () => {
+  it('drops pieces much smaller than the other cards, and pieces inside a grid cell', () => {
+    const cards = [card(100, 100, 63), card(200, 100, 63), card(300, 100, 63)].map((quad, i) => ({ quad, score: 0.9, id: `c${i}` }));
+    const piece = { quad: card(400, 100, 20), score: 0.9, id: 'piece' };
+    expect(dropFragments([...cards, piece]).map((c) => c.id)).toEqual(['c0', 'c1', 'c2']);
+    // Two cards only: sizes can't be judged.
+    expect(dropFragments([cards[0], piece])).toHaveLength(2);
+    // Inside an inferred cell.
+    expect(dropFragments([cards[0], piece], [card(400, 100, 63)]).map((c) => c.id)).toEqual(['c0']);
   });
 });

@@ -10,6 +10,8 @@ import {
   CARD_RATIO,
   DEFAULT_LIMITS,
   dedupe,
+  dropFragments,
+  dropGroups,
   inferGridCells,
   orderCorners,
   polygonArea,
@@ -148,17 +150,29 @@ export function detectCards(cv: CV, small: Mat, scale: number, debug: boolean): 
     free(gray, blur, edges, thresh, kernel);
   }
 
-  const kept = dedupe(cands);
-  const keptSet = new Set(kept);
-  const dupes = cands.filter((c) => !keptSet.has(c));
-  const grid = inferGridCells(kept.map((c) => c.quad)).map((g): Candidate => ({ quad: g.quad, score: 0, source: 'grid' }));
+  // Groups of touching cards first (dedupe would keep the group and drop its cards), then
+  // duplicates, then pieces of cards; the binder grid fills what's left, and drops the pieces
+  // found inside its cells.
+  const ungrouped = dropGroups(cands);
+  const unique = dedupe(ungrouped);
+  const deduped = dropFragments(unique);
+  const grid = inferGridCells(deduped.map((c) => c.quad)).map((g): Candidate => ({ quad: g.quad, score: 0, source: 'grid' }));
+  const kept = dropFragments(deduped, grid.map((g) => g.quad));
 
   const cards = [...kept, ...grid].map((c) => ({ quad: scaleQuad(c.quad, scale), score: c.score, source: c.source }));
-  const rejectedOut: RejectedShape[] = debug
-    ? [
-        ...rejected.sort((a, b) => b.area - a.area).slice(0, MAX_REJECTED).map((r) => ({ quad: scaleQuad(r.quad, scale), reason: r.reason })),
-        ...dupes.slice(0, MAX_REJECTED).map((d) => ({ quad: scaleQuad(d.quad, scale), reason: 'duplicate' as const })),
-      ]
-    : [];
+  let rejectedOut: RejectedShape[] = [];
+  if (debug) {
+    const sets = { ungrouped: new Set(ungrouped), unique: new Set(unique), kept: new Set(kept) };
+    const dropped = cands
+      .filter((c) => !sets.kept.has(c))
+      .map((c): RejectedShape => ({
+        quad: scaleQuad(c.quad, scale),
+        reason: !sets.ungrouped.has(c) ? 'group' : !sets.unique.has(c) ? 'duplicate' : 'fragment',
+      }));
+    rejectedOut = [
+      ...rejected.sort((a, b) => b.area - a.area).slice(0, MAX_REJECTED).map((r) => ({ quad: scaleQuad(r.quad, scale), reason: r.reason })),
+      ...dropped.slice(0, MAX_REJECTED),
+    ];
+  }
   return { cards, rejected: rejectedOut, edges: edgesImage };
 }
