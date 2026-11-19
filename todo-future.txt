@@ -1,3 +1,5 @@
+remove ignore proxy in comparator and move the options to a button that opens a popover to configure them. Display it above the decks directly. Also, move the button that refreshes the decks and collection directly above the decks as well. The few notes can be move and simplified to take less space
+
 add a global setting to ignore basic lands (default true) when starting a selling runs. There should be a checkbox also in moxfield popup to override it for the run (default to the current global setting value), and it is displayed under "advanced settings" that needs to be clicked to expand it
 
 add the possibility to start a selling run from a deck. Same as "ignore basic land" setting, there are also checkboxes for boards (only mainboard, sideboard, commanders) in global settings, and we can override for the run in the popup in advanced settings as well.
