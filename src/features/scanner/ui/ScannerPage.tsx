@@ -10,7 +10,8 @@ import { disposePhoto, photoToJson, scanPhoto, type ScannedPhoto } from '../pipe
 import type { EngineInfo } from '../protocol';
 import { buildReferences, ownedPrints, type BuildProgress, type PrintInfo } from '../reference';
 import { parseLabels, type Labels, type ScoredPhoto } from '../score';
-import { buildIndex, type RefIndex } from '../search-index';
+import { buildIndex, searchIndex, type RefIndex } from '../search-index';
+import { orderCorners } from '../geometry';
 import { currentRefs } from '../store';
 import { CardsTable } from './CardsTable';
 import { PhotoView } from './PhotoView';
@@ -104,6 +105,41 @@ export function ScannerPage() {
   // Object URLs and bitmaps are freed when photos go.
   const photosRef = useRef(photos);
   photosRef.current = photos;
+  const indexRef = useRef(index);
+  indexRef.current = index;
+
+  // Prototype debugging from the console: names the card under a hand-placed quad (full-photo
+  // pixels, clockwise from the card's top-left), to tell detection failures from matching ones:
+  //   await scannerDebug.identifyQuad('photo.png', [[x, y], [x, y], [x, y], [x, y]])
+  useEffect(() => {
+    (window as unknown as { scannerDebug?: unknown }).scannerDebug = {
+      identifyQuad: async (fileName: string, corners: [number, number][]) => {
+        const engine = engineRef.current;
+        const idx = indexRef.current;
+        const p = photosRef.current.find((x) => x.file.name === fileName);
+        if (!engine || !idx?.size || !p) throw new Error('Engine, reference set or photo missing');
+        const bitmap = await createImageBitmap(p.file, { imageOrientation: 'from-image' });
+        const photoId = `debug-${Date.now()}`;
+        await engine.call({ type: 'loadPhoto', photoId, bitmap }, [bitmap]);
+        try {
+          const quad = orderCorners(corners.map(([x, y]) => ({ x, y })));
+          const { cards } = await engine.call({ type: 'cardFeatures', photoId, quads: [quad] });
+          const f = cards[0];
+          f.crop.close();
+          return Object.fromEntries(
+            ALL_METHODS.map((m) => {
+              const up = searchIndex(idx, f.upright, m.id, 5);
+              const down = searchIndex(idx, f.turned, m.id, 5);
+              const hits = (down[0]?.score ?? -1) > (up[0]?.score ?? -1) ? down : up;
+              return [m.id, hits.map((h) => `${idx.prints[h.index].name} (${idx.prints[h.index].set} #${idx.prints[h.index].cn}) ${h.score.toFixed(3)}`)];
+            }),
+          );
+        } finally {
+          await engine.call({ type: 'releasePhoto', photoId });
+        }
+      },
+    };
+  }, []);
   useEffect(
     () => () => {
       for (const p of photosRef.current) {

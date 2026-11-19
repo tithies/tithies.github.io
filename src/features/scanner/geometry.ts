@@ -191,9 +191,9 @@ export interface Candidate {
 }
 
 /**
- * Keeps one quad per card. A quad mostly inside a bigger one of the same shape (a card in its
- * sleeve, or the art box inside a card) is the card when they're about the same size, else the
- * bigger one wins; other overlapping quads keep the best score.
+ * Keeps one quad per card. A quad mostly inside a bigger one of the same shape is the card when
+ * it's more than 55 % of its area (a card in its sleeve or toploader), and a part of the bigger
+ * one when it's less (the art box inside a card); other overlapping quads keep the best score.
  */
 export function dedupe<T extends Candidate>(cands: readonly T[]): T[] {
   const byArea = [...cands].sort((a, b) => polygonArea(b.quad) - polygonArea(a.quad));
@@ -206,11 +206,11 @@ export function dedupe<T extends Candidate>(cands: readonly T[]): T[] {
       const cov = coverage(c.quad, k.quad);
       if (cov < 0.5) continue;
       const sizeRatio = area / polygonArea(k.quad);
-      if (cov > 0.9 && sizeRatio > 0.82) {
-        // Same card, slightly smaller: the card inside its sleeve (or a tighter outline). Keep the inner one.
+      if (cov > 0.9 && sizeRatio > 0.55) {
+        // A card inside its sleeve (0.9 of the outline), its toploader (0.7) or a tighter outline: keep the inner one.
         kept[i] = c;
       } else if (cov > 0.9) {
-        // Something much smaller inside a card (art box, text box): not a card of its own.
+        // Something much smaller inside a card (its art box: 0.4): not a card of its own.
       } else if (c.score > k.score) {
         kept[i] = c;
       }

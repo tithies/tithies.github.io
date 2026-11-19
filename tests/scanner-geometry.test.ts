@@ -93,10 +93,17 @@ describe('dedupe', () => {
   it('keeps the card inside its sleeve, drops what is inside a card, keeps separate cards', () => {
     const sleeve = { quad: card(100, 100, 66), score: 0.9, id: 'sleeve' };
     const inner = { quad: card(100, 100, 63), score: 0.8, id: 'card' };
-    const artBox = { quad: card(100, 85, 50), score: 0.7, id: 'art' };
+    // A landscape art box (≈ 0.4 of the card) passes as a sideways card.
+    const artBox = { quad: orderCorners(card(100, 80, 39, 90)), score: 0.7, id: 'art' };
     const other = { quad: card(300, 100, 63), score: 0.5, id: 'other' };
     const kept = dedupe([artBox, sleeve, other, inner]).map((c) => c.id);
     expect(kept.sort()).toEqual(['card', 'other']);
+  });
+
+  it('keeps the card inside its toploader', () => {
+    const toploader = { quad: card(100, 100, 73), score: 0.95, id: 'toploader' };
+    const inner = { quad: card(100, 100, 63), score: 0.7, id: 'card' };
+    expect(dedupe([toploader, inner]).map((c) => c.id)).toEqual(['card']);
   });
 
   it('keeps the better of two overlapping shapes', () => {

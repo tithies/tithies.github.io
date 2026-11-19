@@ -3,8 +3,9 @@
  * Canny edges (thresholds from the photo's median brightness), and an adaptive threshold (both
  * polarities: dark borders on a light table, light on dark). Each outline that is a convex
  * quadrilateral, or close to its minimum-area rectangle (rounded corners), and has a card's
- * proportions and a plausible size, is a candidate. Duplicates are merged, then the binder grid
- * fills the cells the passes missed.
+ * proportions and a plausible size, is a candidate. A third pass builds quads from long straight
+ * edges (lines.ts), for cards whose outline touches other edges (art, toploader, pocket).
+ * Duplicates are merged, then the binder grid fills the cells the passes missed.
  */
 import {
   CARD_RATIO,
@@ -21,6 +22,7 @@ import {
   type Point,
   type Quad,
 } from '../geometry';
+import { lineQuads, mergeSegments, type Line, type LineQuad, type Segment } from '../lines';
 import type { CardSource, DetectedCard, RejectedShape } from '../protocol';
 import { free, type CV, type Mat } from './opencv';
 
@@ -100,6 +102,62 @@ function collect(cv: CV, binary: Mat, source: CardSource, imageArea: number, out
   }
 }
 
+/** At most this many line quads (best first) join the candidates. */
+const MAX_LINE_QUADS = 150;
+
+/** The long straight edges of an edge map (lines.ts), and the quads they make, best first. */
+export function findLineQuads(cv: CV, edges: Mat, maxLines?: number): { lines: Line[]; quads: LineQuad[] } {
+  const w = edges.cols;
+  const h = edges.rows;
+  const size = Math.min(w, h);
+  const segsMat = new cv.Mat();
+  const near = new cv.Mat();
+  const k5 = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+  try {
+    cv.HoughLinesP(edges, segsMat, 1, Math.PI / 180, 50, Math.round(size * 0.1), Math.round(size * 0.015));
+    const d: Int32Array = segsMat.data32S;
+    const segs: Segment[] = [];
+    for (let i = 0; i + 3 < d.length; i += 4) segs.push({ x1: d[i], y1: d[i + 1], x2: d[i + 2], y2: d[i + 3] });
+    // Sides are checked against the edges thickened by 2 px (tilt, slight curvature).
+    cv.dilate(edges, near, k5);
+    const px: Uint8Array = near.data;
+    const onEdge = (x: number, y: number) => {
+      const xi = Math.round(x);
+      const yi = Math.round(y);
+      return xi >= 0 && yi >= 0 && xi < w && yi < h && px[yi * w + xi] > 0;
+    };
+    const lines = mergeSegments(segs, Math.max(w, h) * 0.008);
+    return { lines, quads: lineQuads(lines, { width: w, height: h, onEdge, maxLines }).slice(0, MAX_LINE_QUADS) };
+  } finally {
+    free(segsMat, near, k5);
+  }
+}
+
+/** Pass C: quads made of long straight edges, kept when their sides lie on edges. */
+function collectLines(cv: CV, edges: Mat, imageArea: number, out: Candidate[], rejected: { quad: Quad; reason: RejectedShape['reason']; area: number }[]) {
+  for (const q of findLineQuads(cv, edges).quads) {
+    const reason = rejectReason(q.quad, imageArea);
+    if (reason) rejected.push({ quad: q.quad, reason, area: polygonArea(q.quad) });
+    else out.push({ quad: q.quad, score: q.score, source: 'lines' });
+  }
+}
+
+/** Canny edges of the photo (thresholds: `lo` and `hi` times its median brightness), on its blurred grey. */
+export function cannyEdges(cv: CV, small: Mat, lo = 0.66, hi = 1.33): Mat {
+  const gray = new cv.Mat();
+  const blur = new cv.Mat();
+  const edges = new cv.Mat();
+  try {
+    cv.cvtColor(small, gray, cv.COLOR_RGBA2GRAY);
+    cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+    const med = medianOf(blur.data);
+    cv.Canny(blur, edges, Math.max(10, lo * med), Math.min(255, Math.max(30, hi * med)));
+    return edges;
+  } finally {
+    free(gray, blur);
+  }
+}
+
 export interface DetectOutput {
   cards: DetectedCard[];
   rejected: RejectedShape[];
@@ -126,9 +184,13 @@ export function detectCards(cv: CV, small: Mat, scale: number, debug: boolean): 
     cv.cvtColor(small, gray, cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
 
-    // Pass A: edges.
     const med = medianOf(blur.data);
     cv.Canny(blur, edges, Math.max(10, 0.66 * med), Math.min(255, Math.max(40, 1.33 * med)));
+
+    // Pass C (on the raw edges, before pass A thickens them): straight lines.
+    collectLines(cv, edges, imageArea, cands, rejected);
+
+    // Pass A: closed outlines of the edges.
     cv.dilate(edges, edges, kernel);
     collect(cv, edges, 'edges', imageArea, cands, rejected);
 

@@ -21,7 +21,7 @@ export interface DetectOptions {
   debug: boolean;
 }
 
-export type CardSource = 'edges' | 'threshold' | 'grid';
+export type CardSource = 'edges' | 'threshold' | 'lines' | 'grid';
 
 export interface DetectedCard {
   /** Corners in the photo's pixels (full resolution), card upright or upside down. */
