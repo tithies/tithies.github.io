@@ -44,6 +44,9 @@ const router = createHashRouter([
       { path: 'changes', element: <ChangeLogPage /> },
       { path: 'f2f/settings', element: <Navigate to="/settings" replace /> },
       { path: 'collection/comparator', element: <ComparisonPage /> },
+      // Scanner prototype (SCANNER_DEV.md, phase 0): not in the menu. Lazy, so the dashboard
+      // loads its engine only when this page opens.
+      { path: 'collection/scanner', lazy: async () => ({ Component: (await import('@/features/scanner/ui/ScannerPage')).ScannerPage }) },
       // Earlier addresses of the same page.
       ...['decks/comparison', 'decks/comparisons', 'decks/mismatches'].map((path) => ({ path, element: <Navigate to="/collection/comparator" replace /> })),
       { path: '*', element: <Navigate to="/f2f/runs" replace /> },

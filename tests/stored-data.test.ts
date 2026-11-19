@@ -8,6 +8,7 @@ import { comparisonConfigKey } from '@/features/collection-comparison/config';
 import { sellingDeckFilterKey } from '@/features/f2f-buylist/deck-filter';
 import { clearStoredData, listStoredPreferences, measureStoredData, resetAllSettings } from '@/features/settings/stored-data';
 import { listOps, startOp, writeLogger } from '@/lib/changes/log';
+import { MODEL_KEY, scannerDb } from '@/features/scanner/store';
 import { newAccount, resetDb } from './helpers';
 
 // Rows only need their keys for these tests.
@@ -37,6 +38,8 @@ async function fill() {
   await putMeta('f2fSets', { fetchedAt: 1, sets: ['Alpha'] });
   const opId = await startOp({ site: 'moxfield', accountKey: A.key, userName: 'alice', kind: 'export', title: 'Export', source: 'test', details: {} });
   await writeLogger(opId).begin({ method: 'POST', url: 'u', body: 'b' });
+  await scannerDb.refs.clear();
+  await scannerDb.refs.add(row({ scryfallId: 's1', modelKey: MODEL_KEY, vectors: { v: new Float32Array(4) }, phash: new Uint32Array(2) }));
 }
 
 const counts = async (data: AccountData) => ({
@@ -86,7 +89,11 @@ describe('Settings → Stored data', () => {
     // The change log is its own (global) group.
     expect(await listOps()).toHaveLength(1);
     await clearStoredData(['changeLog'], null);
-    expect(await measureStoredData(A.key)).toEqual({ f2fCache: 0, changeLog: 0, decks: 0, collection: 0, runs: 0 });
+    // So is the Scanner prototype's data.
+    expect(await scannerDb.refs.count()).toBe(1);
+    await clearStoredData(['scanner'], null);
+    expect(await scannerDb.refs.count()).toBe(0);
+    expect(await measureStoredData(A.key)).toEqual({ f2fCache: 0, changeLog: 0, scanner: 0, decks: 0, collection: 0, runs: 0 });
     expect(await counts(A.data)).toEqual({ runs: 0, items: 0, decks: 0, deckCards: 0, decksMeta: false, collection: 0, collectionMeta: false });
     expect(await counts(B.data)).toEqual(full);
     // Only the current-account pointer is left in the global meta table.

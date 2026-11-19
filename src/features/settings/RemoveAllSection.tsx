@@ -21,6 +21,7 @@ function WhatGoes({ accounts, actions, running }: { accounts: number; actions: n
         Every account ({n(accounts)}), with its Selling runs, synced decks, collection snapshot and Comparator options
       </List.Item>
       <List.Item>The F2F caches (prices looked up, bulk rates, the set list)</List.Item>
+      <List.Item>The Scanner prototype's image vectors and downloaded model</List.Item>
       <List.Item>
         The{' '}
         <Anchor component={Link} to="/changes" size="sm">

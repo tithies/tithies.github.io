@@ -16,3 +16,6 @@ Thumbs.db
 
 # GitHub Pages build (npm run site)
 site-dist
+
+# Scanner prototype: sample photos and labels (personal, never committed)
+scanner-samples

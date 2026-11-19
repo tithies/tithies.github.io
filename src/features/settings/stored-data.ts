@@ -2,6 +2,8 @@
  * Everything Tithies keeps in the browser, for the Settings page:
  * - IndexedDB ("tithies", see src/lib/db.ts): the F2F caches (shared), and for each account its
  *   synced decks, collection snapshot and Selling runs. `clearStoredData` empties any of these.
+ * - The Scanner prototype (src/features/scanner/store.ts): reference vectors of prints
+ *   ("tithies-scanner" database) and its downloaded model (Cache Storage), shared by every account.
  * - Extension storage (chrome.storage.local) and the dashboard's localStorage: settings and
  *   preferences only. `resetAllSettings` empties both, so every setting falls back to its default.
  */
@@ -13,14 +15,15 @@ import { db } from '@/lib/db';
 import { sendMessage } from '@/lib/messaging';
 import { clearCaches } from '@/features/f2f-buylist/runner';
 import { clearChangeLog, measureChangeLog } from '@/lib/changes/log';
+import { clearScannerData, measureScannerData } from '@/features/scanner/store';
 
 
 /** The groups of IndexedDB data the user can clear: the shared F2F cache, the change log (every account's), or one account's data. */
-export type DataGroup = 'f2fCache' | 'changeLog' | AccountDataGroup;
+export type DataGroup = 'f2fCache' | 'changeLog' | 'scanner' | AccountDataGroup;
 export const ACCOUNT_GROUPS: AccountDataGroup[] = ['decks', 'collection', 'runs'];
-export const DATA_GROUPS: DataGroup[] = ['f2fCache', 'changeLog', ...ACCOUNT_GROUPS];
+export const DATA_GROUPS: DataGroup[] = ['f2fCache', 'changeLog', 'scanner', ...ACCOUNT_GROUPS];
 
-const isAccountGroup = (g: DataGroup): g is AccountDataGroup => g !== 'f2fCache' && g !== 'changeLog';
+const isAccountGroup = (g: DataGroup): g is AccountDataGroup => g !== 'f2fCache' && g !== 'changeLog' && g !== 'scanner';
 
 /**
  * Empties the chosen groups (account groups: of `accountKey`'s data only). Active Selling runs
@@ -34,6 +37,7 @@ export async function clearStoredData(groups: Iterable<DataGroup>, accountKey: A
   }
   if (g.has('f2fCache')) await clearCaches();
   if (g.has('changeLog')) await clearChangeLog();
+  if (g.has('scanner')) await clearScannerData();
   const own = [...g].filter(isAccountGroup);
   if (data && own.length) await data.clear(own);
 }
@@ -54,13 +58,14 @@ async function tableSize(table: Table): Promise<number> {
  * rows until the browser compacts them, later. Reads every row, so call it on demand.
  */
 export async function measureStoredData(accountKey: AccountKey | null): Promise<Record<DataGroup, number>> {
-  const [lookups, f2fMeta, changes, own] = await Promise.all([
+  const [lookups, f2fMeta, changes, scanner, own] = await Promise.all([
     tableSize(db.f2fCache),
     db.meta.bulkGet(['bulkRates', 'f2fSets']).then((rows) => rows.reduce((sum, r) => sum + (r ? jsonSize(r) : 0), 0)),
     measureChangeLog().then((m) => m.bytes),
+    measureScannerData().then((m) => m.bytes),
     accountKey ? accountData(accountKey).measure() : Promise.resolve({ decks: 0, collection: 0, runs: 0 }),
   ]);
-  return { f2fCache: lookups + f2fMeta, changeLog: changes, ...own };
+  return { f2fCache: lookups + f2fMeta, changeLog: changes, scanner, ...own };
 }
 
 /** What each known preference key holds, for the "Reset all settings" list. */

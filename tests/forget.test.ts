@@ -8,6 +8,7 @@ import { SessionRegistry } from '@/lib/sites/sessions';
 import { comparisonConfigKey } from '@/features/collection-comparison/config';
 import { sellingDeckFilterKey } from '@/features/f2f-buylist/deck-filter';
 import { accountOfPreference } from '@/features/settings/stored-data';
+import { MODEL_KEY, scannerDb } from '@/features/scanner/store';
 import { newAccount, resetDb } from './helpers';
 
 const row = (v: object) => v as never;
@@ -100,6 +101,7 @@ describe('Remove all data', () => {
     await db.f2fCache.add(row({ key: 'x', fetchedAt: 1 }));
     await db.meta.put({ key: 'bulkRates', value: {}, updatedAt: 1 });
     await db.changeOps.add(row({ accountKey: A.key, status: 'done', startedAt: 1 }));
+    await scannerDb.refs.add(row({ scryfallId: 's1', modelKey: MODEL_KEY }));
     await storage.setItem('local:settings', { batchSize: 30 });
     const order: string[] = [];
     const job = (name: string) => ({
@@ -120,6 +122,7 @@ describe('Remove all data', () => {
 
     expect(order).toEqual([`stop runs ${[runA, runB].sort().join(',')}`, 'cancel sync', 'sync finished', 'cancel export', 'export finished', 'storage']);
     for (const t of db.tables) expect(await t.count()).toBe(0);
+    expect(await scannerDb.refs.count()).toBe(0);
     expect(await listAccounts()).toEqual([]);
     expect(await getCurrentAccount()).toBeNull();
     expect(Object.keys(await browser.storage.local.get(null))).toEqual([]);

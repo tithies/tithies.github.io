@@ -13,6 +13,7 @@ import { getSettings, settingsItem } from '@/lib/settings';
 import { siteOf } from '@/lib/sites/registry';
 import { SettingsSection } from '@/lib/ui/SettingsSection';
 import { SiteIcon } from '@/lib/ui/SiteIcon';
+import { scannerDb } from '@/features/scanner/store';
 import { clearStoredData, measureStoredData, type DataGroup } from './stored-data';
 
 const n = (v: number) => v.toLocaleString('en-CA');
@@ -40,17 +41,18 @@ type AccountStats = Awaited<ReturnType<typeof accountStats>>;
 function useStats(ttlHours: number, keys: AccountKey[]) {
   return useLiveQuery(async () => {
     const cutoff = Date.now() - ttlHours * 3600_000;
-    const [lookups, fresh, oldest, bulk, sets, changes, perAccount] = await Promise.all([
+    const [lookups, fresh, oldest, bulk, sets, changes, scannerRefs, perAccount] = await Promise.all([
       db.f2fCache.count(),
       ttlHours > 0 ? db.f2fCache.where('fetchedAt').aboveOrEqual(cutoff).count() : 0,
       db.f2fCache.orderBy('fetchedAt').first(),
       getMeta<BulkRates>('bulkRates'),
       getMeta<{ fetchedAt: number; sets: string[] }>('f2fSets'),
       changeLogCounts(),
+      scannerDb.refs.count(),
       Promise.all(keys.map(accountStats)),
     ]);
     const accounts = Object.fromEntries(keys.map((k, i) => [k, perAccount[i]])) as Record<AccountKey, AccountStats>;
-    return { lookups, fresh, oldest: oldest?.fetchedAt, bulk, sets, changeOps: changes.ops, changeCalls: changes.calls, changesRunning: changes.running, accounts };
+    return { lookups, fresh, oldest: oldest?.fetchedAt, bulk, sets, changeOps: changes.ops, changeCalls: changes.calls, changesRunning: changes.running, scannerRefs, accounts };
   }, [ttlHours, keys.join(',')]);
 }
 
@@ -141,7 +143,7 @@ export function StoredDataSection() {
     void navigator.storage?.estimate?.().then((e) => setUsage(e.usage ?? null));
     void Promise.all([measureStoredData(null), ...keys.map((k) => measureStoredData(k).then((m) => [k, m] as const))])
       .then(([shared, ...perAccount]) => {
-        const out: Record<string, number> = { f2fCache: shared.f2fCache, changeLog: shared.changeLog };
+        const out: Record<string, number> = { f2fCache: shared.f2fCache, changeLog: shared.changeLog, scanner: shared.scanner };
         for (const [k, m] of perAccount) for (const g of ['decks', 'collection', 'runs'] as const) out[`${k}|${g}`] = m[g];
         setSizes(out);
       })
@@ -179,8 +181,18 @@ export function StoredDataSection() {
     empty: !s.changeOps,
     blocked: s.changesRunning ? 'An export is running: wait for it to finish.' : undefined,
   };
+  const scanner: Row = {
+    id: 'scanner',
+    group: 'scanner',
+    account: null,
+    title: 'Scanner prototype',
+    kind: CACHE,
+    details: [`${n(s.scannerRefs)} prints with image vectors`, 'Its image model, once downloaded (about 89 MB)'],
+    effect: 'Shared by every account. The Scanner prototype downloads the model again and makes the vectors again from Scryfall images.',
+    empty: !s.scannerRefs,
+  };
   const blocks: { account: AccountRow | null; rows: Row[] }[] = [
-    { account: null, rows: [shared, changeLog] },
+    { account: null, rows: [shared, changeLog, scanner] },
     ...accounts.filter((a) => s.accounts[a.key]).map((a) => ({ account: a, rows: accountRows(a, s.accounts[a.key]) })),
   ];
   const rows = blocks.flatMap((b) => b.rows);
@@ -201,7 +213,7 @@ export function StoredDataSection() {
   const clear = async () => {
     setBusy(true);
     try {
-      const global = chosen.filter((r) => r.group === 'f2fCache' || r.group === 'changeLog').map((r) => r.group);
+      const global = chosen.filter((r) => r.group === 'f2fCache' || r.group === 'changeLog' || r.group === 'scanner').map((r) => r.group);
       if (global.length) await clearStoredData(global, null);
       for (const a of accounts) {
         const groups = chosen.filter((r) => r.account?.key === a.key).map((r) => r.group);

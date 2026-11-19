@@ -6,6 +6,7 @@
  */
 import { clearChangeLogOf } from '@/lib/changes/log';
 import { clearDatabase } from '@/lib/db';
+import { clearScannerData } from '@/features/scanner/store';
 import { accountData, unfinishedRuns } from './data';
 import { accountStorageKeys } from './storage-keys';
 import type { AccountKey } from './types';
@@ -44,7 +45,8 @@ export interface RemoveAllDeps {
 /**
  * Settings → Remove all data: Tithies as after a fresh install. Every run, sync and export is
  * stopped and waited for first, so nothing writes into the emptied database; then every table
- * (accounts and their data, the F2F caches, the change log) and the extension storage go. The
+ * (accounts and their data, the F2F caches, the change log), the Scanner prototype's data and
+ * the extension storage go. The
  * dashboard empties its own localStorage (page sizes, theme).
  */
 export async function removeAllData(deps: RemoveAllDeps): Promise<void> {
@@ -55,5 +57,6 @@ export async function removeAllData(deps: RemoveAllDeps): Promise<void> {
     await done;
   }
   await clearDatabase();
+  await clearScannerData();
   await deps.clearStorage();
 }
