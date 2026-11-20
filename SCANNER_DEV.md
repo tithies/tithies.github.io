@@ -56,6 +56,10 @@
 5. **Cleanup without training:**
    - drop a shape that contains two cards named better;
    - of two overlapping outlines named the same print, keep the better one.
+6. **Face-down cards in the labels:** while labelling, a card lying face down is named `Card back` (no set or number) and ticked "Mostly hidden", so the current scoring neither misses nor counts it.
+   - The training code must still treat it as a card **for the detector**: it is fully visible, unlike a covered card.
+   - It must skip it for recognition.
+   - A proper "face down" field in the labelling mode would be cleaner.
 
 Later: phase 1 (every print), phase 2 (the real page and Moxfield export), phase 3 (bottom line, for same-art reprints).
 
