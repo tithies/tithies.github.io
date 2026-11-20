@@ -100,6 +100,7 @@ export function ScannerPage() {
   const [maxSide, setMaxSide] = useState<number>(2000);
   // Off by default: the edge map of every scanned photo takes ~12 MB (many photos when labelling).
   const [debug, setDebug] = useState(false);
+  const [cleanup, setCleanup] = useState(true);
   const [showEdges, setShowEdges] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
   const [minHeightPx, setMinHeightPx] = useState<number>(0);
@@ -269,7 +270,7 @@ export function ScannerPage() {
         for (const [i, p] of list.entries()) {
           setBusy({ label: `Scanning ${p.file.name} (${i + 1} of ${list.length})…` });
           try {
-            const scan = await scanPhoto(engine, p.file, index, { scale: Number(scale), maxSide, debug, method: detectMethod, modelThreshold }, (done, total) =>
+            const scan = await scanPhoto(engine, p.file, index, { scale: Number(scale), maxSide, debug, method: detectMethod, modelThreshold, cleanup }, (done, total) =>
               setBusy({ label: `Scanning ${p.file.name} (${i + 1} of ${list.length}): card ${done} of ${total}…`, progress: (100 * done) / total }),
             );
             setPhotos((ps) =>
@@ -285,7 +286,7 @@ export function ScannerPage() {
         }
       });
     },
-    [index, scale, maxSide, debug, detectMethod, modelThreshold, recognizer, run],
+    [index, scale, maxSide, debug, detectMethod, modelThreshold, recognizer, cleanup, run],
   );
 
   const addFiles = async (files: File[]) => {
@@ -693,6 +694,7 @@ export function ScannerPage() {
             <NumberInput size="xs" w={150} label="Detection size (px)" value={maxSide} onChange={(v) => setMaxSide(Number(v) || 2000)} min={600} max={4000} step={200} />
             <NumberInput size="xs" w={170} label="Warn below (card px tall)" value={minHeightPx} onChange={(v) => setMinHeightPx(Number(v) || 0)} min={0} step={50} />
             <Checkbox size="xs" label="Keep debug layers" checked={debug} onChange={(e) => setDebug(e.currentTarget.checked)} />
+            <Checkbox size="xs" label="Drop bad shapes" checked={cleanup} onChange={(e) => setCleanup(e.currentTarget.checked)} title="Once named: an outline around neighbours, or a second outline of one card (see Rejected shapes)" />
             <Button size="xs" variant="default" disabled={!ready || !photos.length || !!busy} onClick={() => void scanAll(photos)}>
               Scan all again
             </Button>

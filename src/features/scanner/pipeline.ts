@@ -5,6 +5,7 @@
  * method keeps the way up whose best hit scores higher.
  */
 import type { ScannerEngine } from './engine-client';
+import { cleanupShapes, type CleanupReason } from './cleanup';
 import { boundingBox, centroid, quadSize, type Box, type Quad } from './geometry';
 import { nameMargin } from './match';
 import { ALL_METHODS } from './models';
@@ -63,7 +64,12 @@ export type Recognizer = 'dino' | 'tuned';
 export interface ScanOptions extends DetectOptions {
   /** Share of the photo's resolution to scan (1, 0.5, 0.33, 0.25). */
   scale: number;
+  /** Drop bad shapes once named (cleanup.ts; default on). */
+  cleanup?: boolean;
 }
+
+/** The method the cleanup reads names and scores from (the one kept: padded · CLS). */
+export const CLEANUP_METHOD = 'dino-pad-cls';
 
 /** Numbering order: rows top to bottom (a row: centres within half a card height), then left to right. */
 function readingOrder<T extends { quad: Quad }>(cards: T[]): T[] {
@@ -145,14 +151,24 @@ export async function scanPhoto(
       onProgress?.(cards.length, ordered.length);
     }
     const t3 = performance.now();
+    // Bad shapes go once named: an outline around neighbours, a second outline of one card.
+    const drop =
+      opts.cleanup !== false && index?.size
+        ? cleanupShapes(cards.map((c) => ({ quad: c.quad, score: c.byMethod[CLEANUP_METHOD]?.candidates[0]?.score ?? 0, name: c.byMethod[CLEANUP_METHOD]?.candidates[0]?.name })))
+        : new Map<number, CleanupReason>();
+    const kept = cards.filter((_, i) => !drop.has(i)).map((c, k) => ({ ...c, n: k + 1 }));
+    const dropped: RejectedShape[] = [...drop].map(([i, reason]) => {
+      cards[i].crop.close();
+      return { quad: cards[i].quad, reason };
+    });
     return {
       id,
       file: file.name,
       width,
       height,
       scale: opts.scale,
-      cards,
-      rejected: det.rejected,
+      cards: kept,
+      rejected: [...det.rejected, ...dropped],
       edges: det.edges,
       timings: { loadMs: t1 - t0, detectMs: t2 - t1, cardsMs: t3 - t2, totalMs: t3 - t0 },
     };

@@ -4,6 +4,7 @@
  * (`new Function`), which extension pages forbid and sandboxed pages allow. The sandbox has no
  * storage and no network of its own: the page sends it the bytes it needs and keeps the results.
  */
+import type { CleanupReason } from './cleanup';
 import type { Quad, RejectReason } from './geometry';
 
 export interface EngineInfo {
@@ -39,7 +40,8 @@ export interface DetectedCard {
 export interface RejectedShape {
   quad: Quad;
   /** Not card-shaped (RejectReason), a duplicate outline, a group of touching cards, or a piece of a card. */
-  reason: RejectReason | 'duplicate' | 'group' | 'fragment';
+  /** …or, once named (cleanup.ts), an outline around neighbours or a second outline of one card. */
+  reason: RejectReason | 'duplicate' | 'group' | 'fragment' | CleanupReason;
 }
 
 export interface DetectResult {
