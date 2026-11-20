@@ -332,6 +332,32 @@ By method, over all photos: DINOv2 squashed · CLS 41 % first try (46 % top 5), 
 - **Data workers start with "spawn"** on every system: forked workers hung on Linux once the main process had used threads (Windows always spawns).
 - **Why tuned vectors differ so much from DINOv2's** (cosine 0.3 for the same card after 12 steps, with weights moved under 1 %): DINOv2-small's CLS output has a few very large channels (mean |x| ≈ 5 against 1.7 typical) that make all cards look alike (wrong matches at 0.7–0.9). Tuning shrinks them first (to 1.5–2.9), so different cards look less alike (0.39 → 0.27). The full run warms up over 500 steps; the tiny run had one.
 
+**First tuned recognition model (2026-11-20):** trained on the RTX 4070 in 2 h 40 min (20 epochs × 500 steps × 64 pairs, about 60 pairs/s, limited by the pair generation on 10 CPU workers). 19,681 training pictures, 1,101 validation cards (artworks never trained on) searched among 3,101.
+
+| | Right print first | Right name first |
+|---|---|---|
+| DINOv2-small as is | 0.643 | 0.724 |
+| After epoch 1 | 0.906 | 0.971 |
+| Best (epoch 15, kept) | **0.948** | **0.986** |
+| Epoch 20 | 0.945 | 0.987 |
+
+- It levels off from epoch 6 (0.93–0.95); training loss 0.024 at the end. A longer run would add little; more varied pairs would add more.
+- **On the 19 real photos** (trained detector, threshold 0.2; reference set of the 3,855 owned prints, 3,910 pictures with back faces, built with the tuned model in 14 min):
+
+| | DINOv2 as is | Tuned |
+|---|---|---|
+| Name right, first try (padded · CLS) | 83 / 107 (78 %) | **105 / 107 (98 %)** |
+| Print right, first try | 76 / 104 (73 %) | **100 / 104 (96 %)** |
+| Shapes not matching a labelled card | 31 | 13 |
+
+  (The page's own table says 98 / 104 prints: it pairs labels to cards by name only, so it can pair two Forests the wrong way round. Pairing exact prints first gives 100.) Squashed · CLS and both mean variants also reach 97–98 % names now: the choice of variant matters much less.
+- **What's left:**
+  - 2 names: Eldrazi Displacer was not found by the detector; Danitha Capashen, mostly hidden in the fanned hand, was cut out as a 413 px piece and named Massacre Wurm.
+  - 2 prints: Viscera Seer (CMR vs TDC) and Bonders' Enclave (M3C vs OTC) are same-artwork reprints with the same frame; only the set symbol and collector number differ. That's phase 3 (reading the bottom line), or a choice left to the user.
+  - The 13 extra shapes: 1 real card the labels missed (Sulfuric Vortex as "Hades Grip", half out of the frame, named right at 0.83), 1 second outline of Pay No Heed (0.54, next to the real one at 0.90), and 11 shapes that span two neighbouring cards. Those score 0.39–0.55, against 0.73 for the 10th percentile of right cards (median 0.875).
+- **Confidence limits per model:** the tuned model gets "sure" from 0.6 with a margin of 0.08 ("review" from 0.4); DINOv2 keeps 0.5 / 0.05 / 0.3. On these photos that makes 105 of the 106 right cards sure and none of the 12 wrong shapes. These limits come from the same photos, so they need checking on new ones.
+- **Next steps it suggests:** drop a shape that contains two better-scoring cards, and keep one of two overlapping shapes named the same print (the better score), before showing the list.
+
 **Plan as written before the kit:**
 
 

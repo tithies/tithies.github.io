@@ -54,7 +54,11 @@ export interface ScannedPhoto {
   rejected: RejectedShape[];
   edges?: ImageBitmap;
   timings: { loadMs: number; detectMs: number; cardsMs: number; totalMs: number };
+  /** The recognition model the cards were named with (its scores need their own limits). */
+  recognizer?: Recognizer;
 }
+
+export type Recognizer = 'dino' | 'tuned';
 
 export interface ScanOptions extends DetectOptions {
   /** Share of the photo's resolution to scan (1, 0.5, 0.33, 0.25). */
@@ -152,11 +156,22 @@ export function disposePhoto(p: ScannedPhoto) {
 /** Confidence of one method's answer, for the outline colours (thresholds to tune from the measurements). */
 export type Confidence = 'sure' | 'review' | 'unknown';
 
-export function confidence(r: MethodResult | undefined, method: string): Confidence {
+/**
+ * Limits on the best score (and its margin over the next other name) per recognition model.
+ * The tuned model's, from the 19 test photos (2026-11-20): every right card but one is "sure",
+ * and the shapes that span two cards or double a card score below 0.55.
+ */
+const LIMITS: Record<Recognizer, { sure: number; margin: number; review: number }> = {
+  dino: { sure: 0.5, margin: 0.05, review: 0.3 },
+  tuned: { sure: 0.6, margin: 0.08, review: 0.4 },
+};
+
+export function confidence(r: MethodResult | undefined, method: string, recognizer: Recognizer = 'dino'): Confidence {
   const top = r?.candidates[0];
   if (!r || !top) return 'unknown';
   if (method === 'phash') return top.score >= 0.8 ? 'sure' : top.score >= 0.7 ? 'review' : 'unknown';
-  return top.score >= 0.5 && r.margin >= 0.05 ? 'sure' : top.score >= 0.3 ? 'review' : 'unknown';
+  const l = LIMITS[recognizer];
+  return top.score >= l.sure && r.margin >= l.margin ? 'sure' : top.score >= l.review ? 'review' : 'unknown';
 }
 
 /** The results without pixels, for "Copy results JSON". */
@@ -167,6 +182,7 @@ export function photoToJson(p: ScannedPhoto) {
     width: p.width,
     height: p.height,
     scale: p.scale,
+    recognizer: p.recognizer ?? 'dino',
     timings: Object.fromEntries(Object.entries(p.timings).map(([k, v]) => [k, Math.round(v)])),
     cards: p.cards.map((c) => ({
       n: c.n,

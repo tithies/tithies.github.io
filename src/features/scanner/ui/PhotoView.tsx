@@ -34,7 +34,7 @@ export function PhotoView({ photo, src, method, selected, onSelect, showEdges, s
   }, [photo.edges, showEdges]);
   const stroke = Math.max(2, Math.round(Math.max(photo.width, photo.height) / 400));
   const font = Math.max(14, Math.round(Math.max(photo.width, photo.height) / 60));
-  const cards = useMemo(() => photo.cards.map((c) => ({ c, conf: confidence(c.byMethod[method], method), center: centroid(c.quad) })), [photo, method]);
+  const cards = useMemo(() => photo.cards.map((c) => ({ c, conf: confidence(c.byMethod[method], method, photo.recognizer), center: centroid(c.quad) })), [photo, method]);
 
   return (
     <div style={{ position: 'relative', width: '100%', lineHeight: 0 }}>

@@ -6,7 +6,7 @@ import { accountLabel } from '@/lib/accounts/types';
 import { ScannerEngine } from '../engine-client';
 import { cacheDetector, cachedDetector, cachedRecognizer, cacheRecognizer, isModelCached, loadModelFile } from '../model-cache';
 import { ALL_METHODS, DINO_FILE } from '../models';
-import { disposePhoto, photoToJson, scanPhoto, type ScannedPhoto } from '../pipeline';
+import { disposePhoto, photoToJson, scanPhoto, type Recognizer, type ScannedPhoto } from '../pipeline';
 import type { DetectMethod, EngineInfo } from '../protocol';
 import { buildReferences, ownedPrints, type BuildProgress, type PrintInfo } from '../reference';
 import { parseLabels, type Labels, type ScoredPhoto } from '../score';
@@ -49,7 +49,7 @@ export function ScannerPage() {
   const [modelThreshold, setModelThreshold] = useState<number>(0.2);
   const [modelCached, setModelCached] = useState<boolean | null>(null);
   /** Which recognition model: the downloaded DINOv2, or a tuned one dropped on the page (card-recognizer.onnx). */
-  const [recognizer, setRecognizer] = useState<'dino' | 'tuned'>('dino');
+  const [recognizer, setRecognizer] = useState<Recognizer>('dino');
   const [tunedCached, setTunedCached] = useState(false);
   /** The running model's vectors key (store.ts): the reference set is read and built for it. */
   const [modelKey, setModelKey] = useState<string>(MODEL_KEY);
@@ -225,8 +225,9 @@ export function ScannerPage() {
       setError((e as Error).message);
     } finally {
       buildAbort.current = null;
-      setBuilding(false);
+      // The new index first, so the page never shows "done" next to the old count.
       setIndex(buildIndex(await currentRefs(modelKey)));
+      setBuilding(false);
     }
   };
 
@@ -245,7 +246,7 @@ export function ScannerPage() {
               ps.map((x) => {
                 if (x.url !== p.url) return x;
                 if (x.scan) disposePhoto(x.scan);
-                return { ...x, scan, error: undefined };
+                return { ...x, scan: { ...scan, recognizer }, error: undefined };
               }),
             );
           } catch (e) {
@@ -254,7 +255,7 @@ export function ScannerPage() {
         }
       });
     },
-    [index, scale, maxSide, debug, detectMethod, modelThreshold, run],
+    [index, scale, maxSide, debug, detectMethod, modelThreshold, recognizer, run],
   );
 
   const addFiles = async (files: File[]) => {

@@ -38,7 +38,7 @@ export function CardsTable({ photo, method, labels, selected, onSelect, minHeigh
       <Table.Tbody>
         {photo.cards.map((c) => {
           const r = c.byMethod[method];
-          const conf = confidence(r, method);
+          const conf = confidence(r, method, photo.recognizer);
           return (
             <Table.Tr key={c.n} bg={selected === c.n ? 'var(--mantine-color-blue-light)' : undefined} style={{ cursor: 'pointer' }} onClick={() => onSelect(selected === c.n ? null : c.n)}>
               <Table.Td>
