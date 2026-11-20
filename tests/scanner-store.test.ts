@@ -1,6 +1,6 @@
 import { ownedPrints } from '@/features/scanner/reference';
 import { buildIndex } from '@/features/scanner/search-index';
-import { addNoBack, currentRefIds, dropOtherTuned, MODEL_KEY, noBackIds, rowKey, scannerDb, tunedModelKey, type RefRow } from '@/features/scanner/store';
+import { addNoBack, clearScannerData, currentRefIds, dropOtherTuned, labelDrafts, labelsDownloadedAt, markLabelsDownloaded, MODEL_KEY, noBackIds, rowKey, saveLabelDraft, scannerDb, tunedModelKey, type RefRow } from '@/features/scanner/store';
 
 const row = (v: Partial<RefRow>): RefRow => ({ scryfallId: '', modelKey: MODEL_KEY, name: 'X', set: 's', setName: 'S', cn: '1', vectors: {}, phash: new Uint32Array(2), addedAt: 1, ...v });
 
@@ -8,6 +8,7 @@ describe('scanner reference store', () => {
   beforeEach(async () => {
     await scannerDb.refs.clear();
     await scannerDb.meta.clear();
+    await scannerDb.labels.clear();
   });
 
   it('keys rows by model and face, keeping the first model’s plain ids', () => {
@@ -46,6 +47,18 @@ describe('scanner reference store', () => {
     await addNoBack(['a', 'b']);
     await addNoBack(['b', 'c']);
     expect([...(await noBackIds())].sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('keeps label drafts per photo, and Remove all data clears them', async () => {
+    await saveLabelDraft('a.jpg', 10, { cards: [{ name: 'Opt', checked: true }] });
+    await saveLabelDraft('a.jpg', 10, { cards: [{ name: 'Opt' }, { name: 'Island' }] });
+    await markLabelsDownloaded(5);
+    const drafts = await labelDrafts();
+    expect(drafts.map((d) => [d.file, d.labels.cards.length])).toEqual([['a.jpg', 2]]);
+    expect(await labelsDownloadedAt()).toBe(5);
+    await clearScannerData();
+    expect(await labelDrafts()).toEqual([]);
+    expect(await labelsDownloadedAt()).toBe(0);
   });
 
   it('counts the faces of owned prints', () => {

@@ -3,7 +3,7 @@ import { CardThumb } from '@/lib/ui/CardThumb';
 import { scryfallImage } from '@/lib/f2f/links';
 import { ALL_METHODS } from '../models';
 import { confidence, type ScannedPhoto } from '../pipeline';
-import { sameName, type LabelCard } from '../score';
+import { sameName, type LabelCard } from '../labels';
 import { BitmapCanvas } from './BitmapCanvas';
 
 const CONF_COLOR = { sure: 'green', review: 'orange', unknown: 'red' } as const;

@@ -8,7 +8,7 @@ import type { ScannerEngine } from './engine-client';
 import { boundingBox, centroid, quadSize, type Box, type Quad } from './geometry';
 import { nameMargin } from './match';
 import { ALL_METHODS } from './models';
-import type { CardSource, DetectOptions, RejectedShape } from './protocol';
+import type { CardFeatures, CardSource, DetectOptions, RejectedShape } from './protocol';
 import type { PrintInfo } from './reference';
 import { searchIndex, type RefIndex } from './search-index';
 
@@ -77,6 +77,34 @@ function readingOrder<T extends { quad: Quad }>(cards: T[]): T[] {
   });
 }
 
+/** A card's best prints by every method, each keeping the way up whose best hit scores higher. */
+export function nameCard(index: RefIndex | null, f: Pick<CardFeatures, 'upright' | 'turned'>): Record<string, MethodResult> {
+  const byMethod: Record<string, MethodResult> = {};
+  if (!index?.size) return byMethod;
+  for (const m of ALL_METHODS) {
+    const up = searchIndex(index, f.upright, m.id, TOP_K);
+    const down = searchIndex(index, f.turned, m.id, TOP_K);
+    const turned = (down[0]?.score ?? -Infinity) > (up[0]?.score ?? -Infinity);
+    const hits = turned ? down : up;
+    byMethod[m.id] = {
+      candidates: hits.map((h) => ({ ...index.prints[h.index], score: h.score })),
+      margin: nameMargin(hits, (i) => index.prints[i].name),
+      turned,
+    };
+  }
+  return byMethod;
+}
+
+/** Names cards at corners placed by hand, in a photo already loaded in the engine (full-resolution pixels). */
+export async function nameQuads(engine: ScannerEngine, photoId: string, quads: readonly Quad[], index: RefIndex | null): Promise<{ crop: ImageBitmap; heightPx: number; byMethod: Record<string, MethodResult> }[]> {
+  const out = [];
+  for (let g = 0; g < quads.length; g += CARD_GROUP) {
+    const res = await engine.call({ type: 'cardFeatures', photoId, quads: quads.slice(g, g + CARD_GROUP) });
+    for (const f of res.cards) out.push({ crop: f.crop, heightPx: f.heightPx, byMethod: nameCard(index, f) });
+  }
+  return out;
+}
+
 let nextPhoto = 1;
 
 export async function scanPhoto(
@@ -112,21 +140,7 @@ export async function scanPhoto(
       const each = (performance.now() - tc) / group.length;
       group.forEach((c, k) => {
         const f = res.cards[k];
-        const byMethod: Record<string, MethodResult> = {};
-        if (index?.size) {
-          for (const m of ALL_METHODS) {
-            const up = searchIndex(index, f.upright, m.id, TOP_K);
-            const down = searchIndex(index, f.turned, m.id, TOP_K);
-            const turned = (down[0]?.score ?? -Infinity) > (up[0]?.score ?? -Infinity);
-            const hits = turned ? down : up;
-            byMethod[m.id] = {
-              candidates: hits.map((h) => ({ ...index.prints[h.index], score: h.score })),
-              margin: nameMargin(hits, (i) => index.prints[i].name),
-              turned,
-            };
-          }
-        }
-        cards.push({ n: g + k + 1, quad: c.quad, box: boundingBox(c.quad), source: c.source, shapeScore: c.score, heightPx: f.heightPx, crop: f.crop, byMethod, ms: each });
+        cards.push({ n: g + k + 1, quad: c.quad, box: boundingBox(c.quad), source: c.source, shapeScore: c.score, heightPx: f.heightPx, crop: f.crop, byMethod: nameCard(index, f), ms: each });
       });
       onProgress?.(cards.length, ordered.length);
     }

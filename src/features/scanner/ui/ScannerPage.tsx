@@ -1,19 +1,24 @@
-import { Alert, Badge, Button, Card, Checkbox, CopyButton, Group, NumberInput, Progress, SegmentedControl, Select, Stack, Text, Title } from '@mantine/core';
+import { Alert, Badge, Button, Card, Checkbox, CopyButton, Group, Kbd, NumberInput, Progress, SegmentedControl, Select, Stack, Text, Title, useMantineTheme } from '@mantine/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { accountData } from '@/lib/accounts/data';
 import { accountLabel } from '@/lib/accounts/types';
+import { downloadText } from '@/lib/ui/download';
 import { ScannerEngine } from '../engine-client';
 import { cacheDetector, cachedDetector, cachedRecognizer, cacheRecognizer, isModelCached, loadModelFile } from '../model-cache';
 import { ALL_METHODS, DINO_FILE } from '../models';
-import { disposePhoto, photoToJson, scanPhoto, type Recognizer, type ScannedPhoto } from '../pipeline';
+import { confidence, disposePhoto, nameQuads, photoToJson, scanPhoto, type Recognizer, type ScannedPhoto } from '../pipeline';
 import type { DetectMethod, EngineInfo } from '../protocol';
 import { buildReferences, ownedPrints, type BuildProgress, type PrintInfo } from '../reference';
-import { parseLabels, type Labels, type ScoredPhoto } from '../score';
+import type { ScoredPhoto } from '../score';
+import type { Quad } from '../geometry';
+import { draftFromScan, fromMatch, newLabelId, parseLabels, photoChecked, sameName, serializeLabels, turnQuad, type CardMatchView, type LabelCard, type Labels, type PhotoLabels } from '../labels';
 import { buildIndex, searchIndex, type RefIndex } from '../search-index';
 import { orderCorners } from '../geometry';
-import { currentRefs, dropOtherTuned, MODEL_KEY, tunedModelKey } from '../store';
+import { currentRefs, dropOtherTuned, labelDrafts, labelsDownloadedAt, markLabelsDownloaded, MODEL_KEY, saveLabelDraft, tunedModelKey } from '../store';
 import { CardsTable } from './CardsTable';
+import { LabelEditor } from './LabelEditor';
+import { LabelsTable } from './LabelsTable';
 import { PhotoView } from './PhotoView';
 import { ResultsTable } from './ResultsTable';
 
@@ -28,8 +33,15 @@ interface LoadedPhoto {
 
 const toScored = (p: ScannedPhoto): ScoredPhoto => ({
   file: p.file,
-  detections: p.cards.map((c) => ({ heightPx: c.heightPx, byModel: Object.fromEntries(Object.entries(c.byMethod).map(([m, r]) => [m, r.candidates])) })),
+  scale: p.scale,
+  detections: p.cards.map((c) => ({ heightPx: c.heightPx, quad: c.quad, byModel: Object.fromEntries(Object.entries(c.byMethod).map(([m, r]) => [m, r.candidates])) })),
 });
+
+/** Labels a person gave (checked, or from an older labels file): the only ones that score. */
+const truthOf = (l: PhotoLabels | undefined) => l?.cards.filter((c) => c.checked || c.manual);
+
+/** Drafts and files get fresh editing ids (the counter restarts with the page). */
+const withIds = (l: PhotoLabels): PhotoLabels => ({ ...l, cards: l.cards.map((c) => ({ ...c, id: newLabelId() })) });
 
 const mb = (bytes: number) => `${Math.round(bytes / 1e6)} MB`;
 
@@ -63,10 +75,27 @@ export function ScannerPage() {
   const buildAbort = useRef<AbortController | null>(null);
 
   const [photos, setPhotos] = useState<LoadedPhoto[]>([]);
-  const [labels, setLabels] = useState<Labels | null>(null);
+  /** Labels of every photo (drafts saved as you go, and labels.json dropped): file -> labels. */
+  const [labels, setLabels] = useState<Labels>({});
+  const labelsRef = useRef(labels);
+  labelsRef.current = labels;
+  const [labelUpdated, setLabelUpdated] = useState<Record<string, number>>({});
+  const [downloadedAt, setDownloadedAt] = useState(0);
+  /** What the scanner saw at each label (cut-out, top 5), by file and label id: not saved. */
+  const [matches, setMatches] = useState<Record<string, Map<string, CardMatchView>>>({});
+  const matchesRef = useRef(matches);
+  matchesRef.current = matches;
+  const [view, setView] = useState<'results' | 'labels'>('results');
+  const [labelSel, setLabelSel] = useState<string | null>(null);
+  /** Placing corners: of a new card, or of the card with this id. */
+  const [adding, setAdding] = useState<'new' | string | null>(null);
+  const [zoom, setZoom] = useState('1');
+  const [naming, setNaming] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
+  const theme = useMantineTheme();
   const [current, setCurrent] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
-  const [method, setMethod] = useState<string>(ALL_METHODS[0].id);
+  const [method, setMethod] = useState<string>('dino-pad-cls');
   const [scale, setScale] = useState('1');
   const [maxSide, setMaxSide] = useState<number>(2000);
   const [debug, setDebug] = useState(true);
@@ -281,7 +310,17 @@ export function ScannerPage() {
     const json = files.find((f) => f.name.toLowerCase().endsWith('.json') && f.name.toLowerCase() !== 'card-detector.json');
     if (json) {
       try {
-        setLabels(parseLabels(await json.text()));
+        const parsed = parseLabels(await json.text());
+        const drafted = new Set((await labelDrafts()).map((d) => d.file));
+        const next = { ...labelsRef.current };
+        let kept = 0;
+        for (const [f, l] of Object.entries(parsed)) {
+          if (drafted.has(f)) kept++;
+          else next[f] = l;
+        }
+        labelsRef.current = next;
+        setLabels(next);
+        setNotice(kept ? `${json.name}: ${kept} photo${kept === 1 ? '' : 's'} kept the labels edited here (saved in the browser); the file gave the others.` : null);
       } catch (e) {
         setError((e as Error).message);
       }
@@ -308,6 +347,209 @@ export function ScannerPage() {
   const eta = build && build.done > 0 ? ((Date.now() - build.startedAt) / build.done) * (build.total - build.done - build.failed) : null;
   const ready = !!info && !!backend;
 
+  // ---- Labelling mode ----
+
+  // Drafts saved in the browser come back (they win over a labels.json dropped later).
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([labelDrafts(), labelsDownloadedAt()])
+      .then(([drafts, at]) => {
+        if (cancelled) return;
+        const next = { ...labelsRef.current, ...Object.fromEntries(drafts.map((d) => [d.file, withIds(d.labels)])) };
+        labelsRef.current = next;
+        setLabels(next);
+        setLabelUpdated(Object.fromEntries(drafts.map((d) => [d.file, d.updatedAt])));
+        setDownloadedAt(at);
+      })
+      .catch((e: Error) => setError(`Reading the saved labels failed: ${e.message}`));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const putLabels = useCallback((file: string, next: PhotoLabels) => {
+    labelsRef.current = { ...labelsRef.current, [file]: next };
+    setLabels(labelsRef.current);
+    setLabelUpdated((u) => ({ ...u, [file]: Date.now() }));
+    const size = photosRef.current.find((x) => x.file.name === file)?.file.size ?? 0;
+    void saveLabelDraft(file, size, next).catch((e: Error) => setError(`Saving the labels failed: ${e.message}`));
+  }, []);
+  const editCards = useCallback(
+    (file: string, fn: (cards: LabelCard[]) => LabelCard[]) => {
+      const cur = labelsRef.current[file];
+      if (cur) putLabels(file, { ...cur, cards: fn(cur.cards) });
+    },
+    [putLabels],
+  );
+  const setMatch = (file: string, id: string, m: CardMatchView) =>
+    setMatches((all) => {
+      const next = new Map(all[file] ?? []);
+      next.set(id, m);
+      return { ...all, [file]: next };
+    });
+
+  // The photo being labelled stays loaded in the engine (full resolution) to name edited corners.
+  // One engine job at a time: loading a photo and naming its cards must not interleave.
+  const editPhoto = useRef<{ url: string; id: string } | null>(null);
+  const editQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const releaseEditPhoto = () => {
+    const old = editPhoto.current;
+    editPhoto.current = null;
+    if (old) void engineRef.current?.call({ type: 'releasePhoto', photoId: old.id }).catch(() => undefined);
+  };
+  const nameAt = (file: string, quads: Quad[]) => {
+    const job = editQueue.current.then(async () => {
+      const engine = engineRef.current;
+      const p = photosRef.current.find((x) => x.file.name === file);
+      if (!engine || !p) throw new Error('The photo or the engine is gone');
+      if (editPhoto.current?.url !== p.url) {
+        releaseEditPhoto();
+        const bitmap = await createImageBitmap(p.file, { imageOrientation: 'from-image' });
+        const id = `edit-${Date.now()}`;
+        await engine.call({ type: 'loadPhoto', photoId: id, bitmap }, [bitmap]);
+        editPhoto.current = { url: p.url, id };
+      }
+      return nameQuads(engine, editPhoto.current!.id, quads, indexRef.current);
+    });
+    editQueue.current = job.catch(() => undefined);
+    setNaming((n) => n + 1);
+    return job.finally(() => setNaming((n) => n - 1));
+  };
+  useEffect(() => {
+    if (view !== 'labels') releaseEditPhoto();
+  }, [view]);
+
+  // Opening a photo in the Labels view: a draft from its scan when it has no corners yet (older
+  // labels get the corners of their card), else its corners are named once for the cut-outs.
+  useEffect(() => {
+    if (view !== 'labels' || !shown?.scan) return;
+    const file = shown.file.name;
+    const cur = labelsRef.current[file];
+    if (!cur?.cards.some((c) => c.quad)) {
+      const draft = draftFromScan(shown.scan, method, cur?.cards);
+      putLabels(file, draft.photo);
+      setMatches((all) => ({ ...all, [file]: draft.matches }));
+      return;
+    }
+    const have = matchesRef.current[file];
+    const todo = cur.cards.filter((c) => c.quad && !have?.has(c.id!));
+    if (!todo.length || !indexRef.current?.size) return;
+    nameAt(
+      file,
+      todo.map((c) => c.quad!),
+    ).then(
+      (res) => res.forEach((r, k) => setMatch(file, todo[k].id!, { crop: r.crop, heightPx: r.heightPx, result: r.byMethod[method] })),
+      (e: Error) => setError(e.message),
+    );
+  }, [view, shown?.url, shown?.scan]);
+
+  /** Names a card again after its corners changed. A print given by a person stays (and its way up,
+   * unless the corners were just clicked and the match agrees on the name); else the best match is taken. */
+  const renameCard = async (file: string, id: string, quad: Quad, clicked: boolean) => {
+    try {
+      const [r] = await nameAt(file, [quad]);
+      const res = r.byMethod[method];
+      setMatch(file, id, { crop: r.crop, heightPx: r.heightPx, result: res });
+      editCards(file, (cards) =>
+        cards.map((c) => {
+          if (c.id !== id) return c;
+          if (!c.manual) return { ...c, ...fromMatch(quad, res) };
+          const top = res?.candidates[0];
+          const turn = clicked && !!res?.turned && !!top && sameName(c.name, top.name);
+          return { ...c, quad: turn ? turnQuad(quad) : quad };
+        }),
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const shownFile = shown?.file.name ?? '';
+  const shownLabels = labels[shownFile];
+  const colorOf = (c: LabelCard) => {
+    if (c.checked) return theme.colors.blue[6];
+    const r = c.id ? matches[shownFile]?.get(c.id)?.result : undefined;
+    if (!r) return theme.colors.gray[6];
+    const conf = confidence(r, method, shown?.scan?.recognizer);
+    return theme.colors[conf === 'sure' ? 'green' : conf === 'review' ? 'orange' : 'red'][6];
+  };
+  const onQuadChange = (id: string, quad: Quad) => {
+    editCards(shownFile, (cards) => cards.map((c) => (c.id === id ? { ...c, quad } : c)));
+    void renameCard(shownFile, id, quad, false);
+  };
+  const onAdded = (quad: Quad) => {
+    const target = adding;
+    setAdding(null);
+    if (target === 'new') {
+      const id = newLabelId();
+      editCards(shownFile, (cards) => [...cards, { id, name: '?', quad }]);
+      setLabelSel(id);
+      void renameCard(shownFile, id, quad, true);
+    } else if (target) {
+      editCards(shownFile, (cards) => cards.map((c) => (c.id === target ? { ...c, quad } : c)));
+      setLabelSel(target);
+      void renameCard(shownFile, target, quad, true);
+    }
+  };
+  const deleteLabel = (id: string) => {
+    editCards(shownFile, (cards) => cards.filter((c) => c.id !== id));
+    if (labelSel === id) setLabelSel(null);
+  };
+  const turnLabel = (id: string) => {
+    const c = shownLabels?.cards.find((x) => x.id === id);
+    if (!c?.quad) return;
+    const quad = turnQuad(c.quad);
+    // Turned by a person: the print and this way up are kept.
+    editCards(shownFile, (cards) => cards.map((x) => (x.id === id ? { ...x, quad, manual: true } : x)));
+    void renameCard(shownFile, id, quad, false);
+  };
+  const nextUnchecked = () => {
+    if (!photos.length) return;
+    const at = Math.max(0, photos.findIndex((p) => p.url === current));
+    for (let k = 1; k <= photos.length; k++) {
+      const p = photos[(at + k) % photos.length];
+      const l = labels[p.file.name];
+      if (!l || !photoChecked(l)) {
+        setCurrent(p.url);
+        setLabelSel(null);
+        setAdding(null);
+        return;
+      }
+    }
+  };
+  // Keys in the Labels view (not while typing in a field).
+  useEffect(() => {
+    if (view !== 'labels') return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement | null)?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (e.key === 'a' || e.key === 'A') setAdding('new');
+      else if (e.key === 'Escape') {
+        setAdding(null);
+        setLabelSel(null);
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && labelSel) {
+        e.preventDefault();
+        deleteLabel(labelSel);
+      } else if (e.key === 'n' || e.key === 'N') nextUnchecked();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const downloadLabels = async () => {
+    const all: Labels = { ...labelsRef.current };
+    for (const d of await labelDrafts()) all[d.file] ??= d.labels;
+    downloadText('labels.json', serializeLabels(all), 'application/json');
+    const at = Date.now();
+    await markLabelsDownloaded(at);
+    setDownloadedAt(at);
+  };
+  const labelledPhotos = Object.values(labels).filter((l) => l.cards.length);
+  const checkedPhotos = labelledPhotos.filter(photoChecked).length;
+  const notDownloaded = Object.values(labelUpdated).filter((t) => t > downloadedAt).length;
+  const hasTruth = Object.values(labels).some((l) => truthOf(l)?.length);
+
   return (
     <Stack gap="md">
       <Group justify="space-between">
@@ -320,6 +562,11 @@ export function ScannerPage() {
       {error && (
         <Alert color="red" withCloseButton onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+      {notice && (
+        <Alert color="blue" withCloseButton onClose={() => setNotice(null)}>
+          {notice}
         </Alert>
       )}
 
@@ -451,7 +698,7 @@ export function ScannerPage() {
           </Group>
           <Text size="xs" c="dimmed">
             {photos.length} photo{photos.length === 1 ? '' : 's'}
-            {labels ? ` · labels for ${Object.keys(labels).length}` : ' · no labels.json'}
+            {labelledPhotos.length ? ` · labels for ${labelledPhotos.length} (${checkedPhotos} checked)` : ' · no labels yet'}
             {!index?.size ? ' · no reference set yet: cards are found but not named' : ''}
           </Text>
         </Stack>
@@ -464,7 +711,7 @@ export function ScannerPage() {
         </Card>
       )}
 
-      {labels && scanned.length > 0 && (
+      {hasTruth && scanned.length > 0 && (
         <Card withBorder>
           <Stack gap={6}>
             <Group justify="space-between">
@@ -491,15 +738,96 @@ export function ScannerPage() {
                 }}
                 data={photos.map((p) => ({ value: p.url, label: `${p.file.name}${p.scan ? ` · ${p.scan.cards.length} cards` : p.error ? ' · failed' : ''}` }))}
               />
+              <Stack gap={2}>
+                <Text size="xs">View</Text>
+                <SegmentedControl
+                  size="xs"
+                  value={view}
+                  onChange={(v) => {
+                    setView(v as 'results' | 'labels');
+                    setAdding(null);
+                  }}
+                  data={[
+                    { value: 'results', label: 'Results' },
+                    { value: 'labels', label: 'Labels' },
+                  ]}
+                />
+              </Stack>
               <Select size="xs" w={240} label="Method shown" value={method} onChange={(v) => v && setMethod(v)} data={ALL_METHODS.map((m) => ({ value: m.id, label: m.label }))} />
               <Checkbox size="xs" label="Edges" checked={showEdges} onChange={(e) => setShowEdges(e.currentTarget.checked)} />
               <Checkbox size="xs" label="Rejected shapes" checked={showRejected} onChange={(e) => setShowRejected(e.currentTarget.checked)} />
-              {!labels && !!scanned.length && (
+              {!hasTruth && !!scanned.length && (
                 <CopyButton value={resultsJson}>{({ copied, copy }) => <Button size="xs" variant="default" onClick={copy}>{copied ? 'Copied' : 'Copy results JSON'}</Button>}</CopyButton>
               )}
             </Group>
             {shown?.error && <Alert color="red">{shown.error}</Alert>}
-            {shown?.scan && (
+            {shown?.scan && view === 'labels' && shownLabels && (
+              <>
+                <Group gap="sm" align="flex-end">
+                  <Button size="xs" variant={adding === 'new' ? 'filled' : 'default'} onClick={() => setAdding(adding === 'new' ? null : 'new')}>
+                    {adding === 'new' ? 'Click its 4 corners… (Esc)' : 'Add a card (A)'}
+                  </Button>
+                  <Button size="xs" variant="default" onClick={() => editCards(shownFile, (cards) => cards.map((c) => ({ ...c, checked: true })))}>
+                    Mark all checked
+                  </Button>
+                  <Button size="xs" variant="default" onClick={nextUnchecked}>
+                    Next photo to check (N)
+                  </Button>
+                  <Stack gap={2}>
+                    <Text size="xs">Zoom</Text>
+                    <SegmentedControl size="xs" value={zoom} onChange={setZoom} data={['1', '2', '4'].map((z) => ({ value: z, label: z === '1' ? 'Fit' : `${z}×` }))} />
+                  </Stack>
+                  <Button size="xs" onClick={() => void downloadLabels()}>
+                    Download labels.json{notDownloaded ? ` (${notDownloaded} changed)` : ''}
+                  </Button>
+                  {naming > 0 && (
+                    <Text size="xs" c="dimmed">
+                      Naming…
+                    </Text>
+                  )}
+                </Group>
+                <Text size="xs" c="dimmed">
+                  {shownLabels.cards.length} cards · {shownLabels.cards.filter((c) => c.checked).length} checked · {shownLabels.cards.filter((c) => !c.quad && !c.hidden).length} need an outline ·{' '}
+                  {photoChecked(shownLabels) ? 'photo checked' : 'photo not checked yet'} · {checkedPhotos} of {labelledPhotos.length} photos checked. Outline every card whole, where it lies (even
+                  under others); tick "Mostly hidden" when little of it shows. The filled corner is the card's own top-left. Keys: <Kbd>A</Kbd> add, <Kbd>Del</Kbd> delete the selected card,{' '}
+                  <Kbd>Esc</Kbd> cancel, <Kbd>N</Kbd> next photo to check. Labels are saved in this browser as you go; download labels.json to keep them.
+                </Text>
+                {adding && adding !== 'new' && (
+                  <Alert color="orange" p="xs">
+                    Click the 4 corners of {shownLabels.cards.find((c) => c.id === adding)?.name ?? 'the card'} (Esc to cancel).
+                  </Alert>
+                )}
+                <LabelEditor
+                  src={shown.url}
+                  width={shownLabels.width ?? Math.round(shown.scan.width / shown.scan.scale)}
+                  height={shownLabels.height ?? Math.round(shown.scan.height / shown.scan.scale)}
+                  cards={shownLabels.cards}
+                  colorOf={colorOf}
+                  selected={labelSel}
+                  onSelect={setLabelSel}
+                  onQuadChange={onQuadChange}
+                  adding={!!adding}
+                  onAdded={onAdded}
+                  zoom={Number(zoom)}
+                />
+                <LabelsTable
+                  cards={shownLabels.cards}
+                  matches={matches[shownFile]}
+                  colorOf={colorOf}
+                  prints={index?.prints ?? prints ?? []}
+                  selected={labelSel}
+                  onSelect={setLabelSel}
+                  onChange={(id, patch) => editCards(shownFile, (cards) => cards.map((c) => (c.id === id ? { ...c, ...patch } : c)))}
+                  onDelete={deleteLabel}
+                  onTurn={turnLabel}
+                  onOutline={(id) => {
+                    setLabelSel(id);
+                    setAdding(id);
+                  }}
+                />
+              </>
+            )}
+            {shown?.scan && view === 'results' && (
               <>
                 <Text size="xs" c="dimmed">
                   {shown.scan.width} × {shown.scan.height} px scanned ({Math.round(shown.scan.scale * 100)} %) · {shown.scan.cards.length} cards ·{' '}
@@ -507,7 +835,7 @@ export function ScannerPage() {
                   {Math.round(shown.scan.timings.detectMs)} ms · cards {Math.round(shown.scan.timings.cardsMs)} ms
                 </Text>
                 <PhotoView photo={shown.scan} src={shown.url} method={method} selected={selected} onSelect={setSelected} showEdges={showEdges} showRejected={showRejected} />
-                <CardsTable photo={shown.scan} method={method} labels={labels?.[shown.scan.file]} selected={selected} onSelect={setSelected} minHeightPx={minHeightPx} />
+                <CardsTable photo={shown.scan} method={method} labels={truthOf(labels[shown.scan.file])} selected={selected} onSelect={setSelected} minHeightPx={minHeightPx} />
               </>
             )}
             {shown && !shown.scan && !shown.error && <Text size="sm">Not scanned yet.</Text>}

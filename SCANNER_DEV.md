@@ -165,8 +165,50 @@ Order: **0 → decide → 1 → 2 → measure → 3 and/or 4**, one phase per se
    - *Keep debug layers* keeps the edge map and the rejected shapes, shown with *Edges* and *Rejected shapes*.
 5. **Scores:** a table per method (labelled / detected / unpaired, name and print right at first try and in the top 5, name hit rate by card height). *Copy results JSON* copies everything without pixels.
 
-`labels.json` (in the gitignored `scanner-samples/`): one entry per physical card, set and number optional:
+`labels.json` (in the gitignored `scanner-samples/`), format 1: one entry per physical card, set and number optional:
 `{ "IMG_0001.jpg": [{ "name": "Sol Ring", "set": "cmm", "cn": "410" }, { "name": "Counterspell" }] }`
+
+#### Labelling mode (2026-11-20)
+
+Real photos only help the models once each card has its corners and its print. The page's **View: Labels** makes them from the scan, for a person to fix:
+- **Drafts:**
+  - Opening a photo in Labels makes a draft: every card found, with its corners (turned to the card's own top-left) and its best print, unchecked.
+  - With older name-only labels, each label gets the corners of the card found with its name (exact print first, then the best match: a card outlined twice gets the better outline), and keeps its print. Labels left unpaired show "needs an outline".
+- **Fixing:**
+  - **Corners:** drag the 4 handles of the selected card (the filled one is its top-left). The card is named again on release; a print given by a person stays.
+  - **Add a card** (A): click its 4 corners, in any order.
+  - **Delete** (Del) a junk shape; **turn 180°**.
+  - **Print:** pick it from the scanner's top 5, from any of your prints (search), or as a card you don't own (name, set, number).
+  - "Checked", "Mostly hidden", "Mark all checked", "Next photo to check" (N), and zoom (fit, 2×, 4×).
+- **Colours:** checked = blue; otherwise the confidence colour; mostly hidden = dashed.
+- **Saving:** drafts are saved in the browser as you go (`labels` table of `tithies-scanner`). Dropping the same photo again brings them back, and they win over a `labels.json` dropped later. **Download labels.json** writes format 2 for every photo.
+- **Scoring uses only cards a person checked** (or from an older file): a draft is the scanner's own guess.
+  - With **checked** corners, labels pair with the cards found by overlap (IoU ≥ 0.5). "Found" then measures the detector alone, and "extra shapes" are what it found that is no card. Corners copied from a scan into a draft would find themselves, so they don't count until checked.
+  - Without corners, pairing is by name, exact print first (two Forests no longer get swapped).
+
+Format 2:
+```json
+{ "IMG_0001.jpg": { "width": 4000, "height": 3000, "checked": true, "cards": [
+  { "name": "Sol Ring", "set": "cmm", "cn": "410", "scryfallId": "…", "quad": [[x, y], [x, y], [x, y], [x, y]], "checked": true, "manual": true },
+  { "name": "Danitha Capashen, Paragon", "quad": [[x, y], …], "hidden": true, "checked": true } ] } }
+```
+- **Corners:** in the photo's full-resolution pixels with the phone's orientation applied (OpenCV's `imread` applies it too), clockwise from the card's own top-left.
+- **Covered cards:** a fanned or covered card is outlined whole, where it lies (the detector's convention). `hidden` marks one mostly covered: it is neither a miss nor an extra shape, and not a recognition pair.
+- **`checked`:** a person looked at the card: corners and print.
+- **`manual`:** the print was given by a person, or came from a format-1 file. It counts for scoring before its corners are checked, and moving the corners keeps it.
+
+**Photos to take next** (40–80, your own cards, full resolution):
+- **Small cards:** 20–40 cards on a table in one shot; full 9-pocket binder pages from arm's length.
+- **Binders:** other binders and pocket colours; glare; the page sideways.
+- **Fans and piles:** fans where only a strip of a card shows; offset piles.
+- **Holders:** coloured and matte sleeves, double sleeves, toploaders, one-touch holders.
+- **Light:** daylight, warm lamp, flash; shadows of a hand or phone.
+- **Surfaces:** busy playmats, carpet, bedding.
+- **Angles:** straight down, and tilted 30–45°.
+- **Special cards:** foils, borderless and showcase frames, non-English cards, tokens, basic lands, back faces.
+- **Backgrounds:** 10–20 more photos with no cards.
+
+One in four new photos (and the first 19) stays out of training, as the test set.
 
 Console tuning: `await scannerEngine.call({ type: 'bench', ep: 'webgpu', opt: 'all', runs: 5, batch: 16 })` times the model with other session options.
 

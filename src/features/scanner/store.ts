@@ -1,10 +1,12 @@
 /**
  * The Scanner prototype's own IndexedDB database ("tithies-scanner"), apart from the main one so
  * its schema can change freely while it's a prototype. It holds the reference vectors of prints
- * (Scryfall prints: shared by every account, so forgetting an account leaves them). Model files
- * live in Cache Storage (model-cache.ts). Settings → Remove all data deletes both.
+ * (Scryfall prints: shared by every account, so forgetting an account leaves them) and the
+ * labelling mode's drafts (labels.ts). Model files live in Cache Storage (model-cache.ts).
+ * Settings → Remove all data deletes all of it.
  */
 import Dexie, { type EntityTable } from 'dexie';
+import type { PhotoLabels } from './labels';
 import { clearModelCache } from './model-cache';
 import { DINO_FILE, RUNS } from './models';
 
@@ -57,15 +59,26 @@ export interface ScannerMeta {
   value: unknown;
 }
 
+/** A photo's labels as last edited (the labelling mode saves as you go). */
+export interface LabelDraft {
+  file: string;
+  /** The photo file's size, to notice another photo with the same name. */
+  size: number;
+  labels: PhotoLabels;
+  updatedAt: number;
+}
+
 export class ScannerDB extends Dexie {
   refs!: EntityTable<RefRow, 'scryfallId'>;
   /** 'noBack': Scryfall ids of two-named prints with no back picture (adventures, split cards). */
   meta!: EntityTable<ScannerMeta, 'key'>;
+  labels!: EntityTable<LabelDraft, 'file'>;
 
   constructor(name = 'tithies-scanner') {
     super(name);
     this.version(1).stores({ refs: 'scryfallId, modelKey' });
     this.version(2).stores({ meta: 'key' });
+    this.version(3).stores({ labels: 'file' });
   }
 }
 
@@ -90,7 +103,22 @@ export async function addNoBack(ids: Iterable<string>): Promise<void> {
   await scannerDb.meta.put({ key: 'noBack', value: [...all] });
 }
 
-/** Bytes the reference vectors take (vectors and hash), and how many prints. */
+export const labelDrafts = (): Promise<LabelDraft[]> => scannerDb.labels.toArray();
+
+export async function saveLabelDraft(file: string, size: number, labels: PhotoLabels): Promise<void> {
+  await scannerDb.labels.put({ file, size, labels, updatedAt: Date.now() });
+}
+
+/** When labels.json was last downloaded (drafts edited after it are "not downloaded"). */
+export async function labelsDownloadedAt(): Promise<number> {
+  return ((await scannerDb.meta.get('labelsDownloadedAt'))?.value as number | undefined) ?? 0;
+}
+
+export async function markLabelsDownloaded(at = Date.now()): Promise<void> {
+  await scannerDb.meta.put({ key: 'labelsDownloadedAt', value: at });
+}
+
+/** Bytes the reference vectors take (vectors and hash) and the label drafts, and how many prints. */
 export async function measureScannerData(): Promise<{ prints: number; bytes: number }> {
   let prints = 0;
   let bytes = 0;
@@ -98,12 +126,16 @@ export async function measureScannerData(): Promise<{ prints: number; bytes: num
     prints++;
     bytes += Object.values(r.vectors).reduce((s, v) => s + v.byteLength, 0) + r.phash.byteLength + 120;
   });
+  await scannerDb.labels.each((d) => {
+    bytes += 200 + d.labels.cards.length * 220;
+  });
   return { prints, bytes };
 }
 
-/** Deletes every reference vector and every cached model file. */
+/** Deletes every reference vector, label draft and cached model file. */
 export async function clearScannerData(): Promise<void> {
   await scannerDb.refs.clear();
   await scannerDb.meta.clear();
+  await scannerDb.labels.clear();
   if (typeof caches !== 'undefined') await clearModelCache();
 }
