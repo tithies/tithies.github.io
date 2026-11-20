@@ -1,8 +1,69 @@
 # Scanner — development notes
 
-**Status:** phase 0 (prototype) measured on real photos (2026-11-19): matching works, detection doesn't (41 % of cards named right, mostly because they aren't found). Phase 4 (trained detector) is next. See "Phase 0 — baseline on real photos" under section 6.
+**Status (2026-11-20):** prototype page with a trained detector and a fine-tuned recognizer: 98 % of cards named right on the 19 test photos (41 % at the start). A labelling mode makes real training and test data. See "0. Current state and next steps" just below.
 **Feature:** you upload one or more photos, and Tithies finds every Magic card in them. It returns a list of the detected cards, each with its position in the photo (so the page can draw an outline around it), the card and its print. You correct the list, then add it to the Moxfield collection or a binder. This is the "Scanner cards" item of `todo-future.txt`.
 **Out of scope:** telling foil from non-foil in a photo. Finish defaults to non-foil and you change it per row.
+
+---
+
+## 0. Current state and next steps (2026-11-20)
+
+**Built** (hidden page `dashboard.html#/collection/scanner`, on master, not pushed):
+- **Engines:** OpenCV.js 4.12 and onnxruntime-web 1.31.1, WebGPU, in a sandboxed iframe.
+- **Detection:** the trained detector (`card-detector.onnx`, threshold 0.2), plus the classic passes.
+- **Recognition:**
+  - the fine-tuned DINOv2-small (`card-recognizer.onnx`), or DINOv2 as downloaded; padded · CLS;
+  - each model has its own reference set: the owned prints, back faces included.
+  - Both model files are dropped on the photos box and kept in Cache Storage.
+- **Labelling mode** (View: Labels) and `labels.json` format 2 (see "Labelling mode" in section 6).
+- **Training kit `scanner-train/`:**
+  - detector: `synth.py`, `train.py`, `export.py`;
+  - recognizer: `crops.py`, `train_recog.py`, `export_recog.py`;
+  - training runs on a separate Windows PC (RTX 4070), see "Working method" below.
+
+**Scores on the 19 test photos** (107 cards):
+- names 98 % (105 / 107), prints 96 % (100 / 104);
+- every card found was named right; 2 cards were not found;
+- 12–13 extra shapes, low scores, shown orange.
+- Details under Phase 4.
+
+**Batch 2** (51 more photos in `scanner-samples/batch2/`, 2026-11-20, not labelled yet): 461 shapes found, 368 green (80 %).
+- **Works well:** table spreads (small cards too), white table in sun, carpet, blanket, bed, binder close-ups, the storage tray.
+- **Struggles:**
+
+| Kind of photo | Files (`PXL_20261120_…`) | Scan |
+|---|---|---|
+| Binder pages from further away | `201024215`, `201030477` | 1 card found on a full page; 9 on two pages |
+| Fanned hands | `200435284`, `200441842`, `200608106`, `200935920`, `201733355`, `201744369`, `201749336` | mostly orange; the far fan has nothing green and a 3,144 px shape |
+| Offset stacks held in hand | `201327370`, `201539832`, `202017871`, `202028053` | few cards found |
+| Sleeved cards at an angle | `200313518` | 9 of 13 orange |
+| Piles among bags, or stacked on a blanket | `202115291`, `201411141`, `201414718` | few found, mostly orange |
+
+- 36 photos of empty surfaces are in `scanner-samples/backgrounds/`, for the generator.
+
+**In progress (the user):** labelling batch 2 and the first 19 in the Labels view, then downloading `labels.json` into `scanner-samples/`.
+
+**Next** (agreed in principle; plan it first):
+1. **Test / training split:** the first 19 photos plus 1 in 4 of the others, chosen from a hash of the file name, so it never changes. Test photos never go into training.
+2. **`scanner-train/eval.py`:**
+   - it runs the exported detector and recognizer on the labelled test photos and gives the page's numbers: found (IoU ≥ 0.5), extra shapes, name and print right;
+   - recognizer gallery: the labelled prints plus distractors from `data/cards`;
+   - images read with EXIF orientation, like the labels.
+3. **Real photos in training:**
+   - detector: fine-tune from the current `best.pt` on labelled training photos mixed with generated scenes;
+   - recognizer: real cut-outs (warped along the label corners) paired with their clean Scryfall pictures, downloaded by `scryfallId`.
+4. **Generated scenes for the failures above:** fans where only narrow strips show, offset stacks held in hand, binder pages from a distance (small pockets), piles, and tightly touching cards (the shapes that span two cards).
+5. **Cleanup without training:**
+   - drop a shape that contains two cards named better;
+   - of two overlapping outlines named the same print, keep the better one.
+
+Later: phase 1 (every print), phase 2 (the real page and Moxfield export), phase 3 (bottom line, for same-art reprints).
+
+**Working method:**
+- **Training happens on the user's Windows PC** (RTX 4070, 12 GB). Scripts go there as a zip built from the commit (`git archive --format=zip HEAD scanner-train`), copied to the user's Windows home; nothing is pushed for it.
+- **Results come back:** the user copies `*.onnx`, `*.json` and logs into `scanner-train/` (gitignored; the recognition log is `log-recog.txt`).
+- **Local checks:** a CPU venv at `~/.venvs/scanner-train` for short runs. Data loaders use `spawn`, because forked workers hang on Linux.
+- **Photos:** `scanner-samples/` is gitignored.
 
 ---
 
