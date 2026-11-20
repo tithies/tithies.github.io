@@ -46,7 +46,7 @@ export function ScannerPage() {
   const [backend, setBackend] = useState<string | null>(null);
   const [detector, setDetector] = useState<{ size: number; backend: string } | null>(null);
   const [detectMethod, setDetectMethod] = useState<DetectMethod>('classic');
-  const [modelThreshold, setModelThreshold] = useState<number>(0.3);
+  const [modelThreshold, setModelThreshold] = useState<number>(0.2);
   const [modelCached, setModelCached] = useState<boolean | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
@@ -386,7 +386,7 @@ export function ScannerPage() {
                 { value: 'both', label: 'Both', disabled: !detector },
               ]}
             />
-            <NumberInput size="xs" w={130} label="Detector threshold" value={modelThreshold} onChange={(v) => setModelThreshold(Number(v) || 0.3)} min={0.05} max={0.95} step={0.05} decimalScale={2} disabled={!detector} />
+            <NumberInput size="xs" w={130} label="Detector threshold" value={modelThreshold} onChange={(v) => setModelThreshold(Number(v) || 0.2)} min={0.05} max={0.95} step={0.05} decimalScale={2} disabled={!detector} />
             <NumberInput size="xs" w={150} label="Detection size (px)" value={maxSide} onChange={(v) => setMaxSide(Number(v) || 2000)} min={600} max={4000} step={200} />
             <NumberInput size="xs" w={170} label="Warn below (card px tall)" value={minHeightPx} onChange={(v) => setMinHeightPx(Number(v) || 0)} min={0} step={50} />
             <Checkbox size="xs" label="Keep debug layers" checked={debug} onChange={(e) => setDebug(e.currentTarget.checked)} />

@@ -302,6 +302,25 @@ By method, over all photos: DINOv2 squashed · CLS 41 % first try (46 % top 5), 
 - **Scenes:** `synth.py` (≈ 150 ms a scene at 1024 on one CPU core). Layouts: table spreads, binder pages (1–2 pages, empty pockets), fanned hands, piles, single cards. Holders: sleeves, toploaders, magnetic holders. Also foil, glare, shadows, fingers, distractor shapes, camera tilt (rendered on a canvas 30 % larger, so no edges show), blur, noise and JPEG. Backgrounds: the user's photos of empty surfaces, Scryfall artwork as playmats, and generated wood, stone, fabric and plain surfaces.
 - **Checked here:** a 100-step CPU run learns (validation F1 0.05 → 0.13); the export matches PyTorch to 6e-7; the browser decodes the same cards as Python on a test scene.
 
+**First trained detector (2026-11-20):** trained on the RTX 4070 in 5 h (30 epochs × 1,000 steps × 16 scenes, 27 scenes/s, limited by the data loading on Windows). Generated test scenes at the best epoch (23): F1 0.93 (precision 0.88, recall 0.98), mean corner error 4.8 px at 768 px input. On the 19 real photos (same labels as the baseline):
+
+| Photo type | Classic detection | Trained detector (threshold 0.3) |
+|---|---|---|
+| Plain table (wood, granite, mat) | 20 / 42 | 40 / 42 |
+| Toploaders, one-touch holders | 2 / 4 | 4 / 4 |
+| Sleeved cards on wood | 1 / 9 | 6 / 9 |
+| Knit blanket (straight and angled) | 2 / 16 | 9 / 16 |
+| Binder pages | 16 / 24 | 16 / 24 |
+| Deck boxes as background | 3 / 6 | 4 / 6 |
+| Fanned hand | 0 / 5 | 1 / 5 |
+| One card in hand | 0 / 1 | 1 / 1 |
+| **All** (DINOv2 padded · CLS, first try) | **44 / 107 (41 %)** | **81 / 107 (76 %)**; threshold 0.2: **83 / 107 (78 %)**, prints 76 / 104 |
+
+- Detection is no longer the main limit: 112 shapes found for 107 cards (30 not a labelled card, against about 70 before). Cards 600 px tall or more that it finds are named right 99 % of the time (padded · CLS).
+- **Padded · CLS is the method to keep** (78 % at threshold 0.2; squashed · CLS 71 %, mean pooling 54 %, pHash 50 %).
+- What fails now is mostly **matching on hard crops**: sleeve and pocket reflections (sleeved cards on wood; binder page photographed sideways under glare), small, slanted and blurred cards in an angled shot, fanned cards (the crop includes the cards on top), and back faces of double-faced cards (Volcanic Fissure: the reference set only has front faces). Basic lands still get the wrong print (Forests 4 / 4 names, 1 / 4 prints).
+- Default detector threshold set to 0.2.
+
 **Plan as written before the kit:**
 
 
