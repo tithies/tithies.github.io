@@ -98,7 +98,8 @@ export function ScannerPage() {
   const [method, setMethod] = useState<string>('dino-pad-cls');
   const [scale, setScale] = useState('1');
   const [maxSide, setMaxSide] = useState<number>(2000);
-  const [debug, setDebug] = useState(true);
+  // Off by default: the edge map of every scanned photo takes ~12 MB (many photos when labelling).
+  const [debug, setDebug] = useState(false);
   const [showEdges, setShowEdges] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
   const [minHeightPx, setMinHeightPx] = useState<number>(0);
