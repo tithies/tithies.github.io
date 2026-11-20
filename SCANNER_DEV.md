@@ -352,9 +352,9 @@ By method, over all photos: DINOv2 squashed · CLS 41 % first try (46 % top 5), 
 
   (The page's own table says 98 / 104 prints: it pairs labels to cards by name only, so it can pair two Forests the wrong way round. Pairing exact prints first gives 100.) Squashed · CLS and both mean variants also reach 97–98 % names now: the choice of variant matters much less.
 - **What's left:**
-  - 2 names: Eldrazi Displacer was not found by the detector; Danitha Capashen, mostly hidden in the fanned hand, was cut out as a 413 px piece and named Massacre Wurm.
+  - 2 names, both not found by the detector: Eldrazi Displacer in the bottom-left pocket of a binder page (fully visible: a plain miss), and Danitha Capashen, almost all hidden behind Bond of Discipline in the fanned hand (only a strip with its name shows).
   - 2 prints: Viscera Seer (CMR vs TDC) and Bonders' Enclave (M3C vs OTC) are same-artwork reprints with the same frame; only the set symbol and collector number differ. That's phase 3 (reading the bottom line), or a choice left to the user.
-  - The 13 extra shapes: 1 real card the labels missed (Sulfuric Vortex as "Hades Grip", half out of the frame, named right at 0.83), 1 second outline of Pay No Heed (0.54, next to the real one at 0.90), and 11 shapes that span two neighbouring cards. Those score 0.39–0.55, against 0.73 for the 10th percentile of right cards (median 0.875).
+  - The 13 extra shapes: 1 real card the labels missed (Sulfuric Vortex as "Hades Grip", half out of the frame, named right at 0.83), 1 second outline of Pay No Heed (0.54, next to the real one at 0.90), and 11 shapes that span two neighbouring cards, or a small piece where fanned cards overlap (the 413 px "Massacre Wurm" in the fan). Those score 0.39–0.55, against 0.73 for the 10th percentile of right cards (median 0.875).
 - **Confidence limits per model:** the tuned model gets "sure" from 0.6 with a margin of 0.08 ("review" from 0.4); DINOv2 keeps 0.5 / 0.05 / 0.3. On these photos that makes 105 of the 106 right cards sure and none of the 12 wrong shapes. These limits come from the same photos, so they need checking on new ones.
 - **Next steps it suggests:** drop a shape that contains two better-scoring cards, and keep one of two overlapping shapes named the same print (the better score), before showing the list.
 
