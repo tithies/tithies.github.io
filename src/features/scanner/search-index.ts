@@ -23,7 +23,7 @@ export function buildIndex(rows: readonly RefRow[]): RefIndex {
   const hashes = new Uint32Array(n * 2);
   const prints: PrintInfo[] = [];
   rows.forEach((r, i) => {
-    prints.push({ scryfallId: r.scryfallId, name: r.name, set: r.set, setName: r.setName, cn: r.cn, lang: r.lang });
+    prints.push({ scryfallId: r.printId ?? r.scryfallId, name: r.name, set: r.set, setName: r.setName, cn: r.cn, lang: r.lang, back: r.back });
     for (const v of VARIANTS) {
       const vec = r.vectors[v.id];
       if (vec?.length === DIM) matrices[v.id].set(vec, i * DIM);

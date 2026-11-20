@@ -20,7 +20,7 @@ export const f2fLinks = {
 export const scryfallCardLink = (set: string, cn: string) =>
   `https://scryfall.com/card/${encodeURIComponent(set)}/${encodeURIComponent(cn)}`;
 
-export function scryfallImage(scryfallId: string, size: 'small' | 'normal' = 'small'): string | null {
+export function scryfallImage(scryfallId: string, size: 'small' | 'normal' = 'small', face: 'front' | 'back' = 'front'): string | null {
   if (!/^[0-9a-f-]{36}$/i.test(scryfallId)) return null;
-  return `https://cards.scryfall.io/${size}/front/${scryfallId[0]}/${scryfallId[1]}/${scryfallId}.jpg`;
+  return `https://cards.scryfall.io/${size}/${face}/${scryfallId[0]}/${scryfallId[1]}/${scryfallId}.jpg`;
 }

@@ -4,7 +4,7 @@ import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { accountData } from '@/lib/accounts/data';
 import { accountLabel } from '@/lib/accounts/types';
 import { ScannerEngine } from '../engine-client';
-import { cacheDetector, cachedDetector, isModelCached, loadModelFile } from '../model-cache';
+import { cacheDetector, cachedDetector, cachedRecognizer, cacheRecognizer, isModelCached, loadModelFile } from '../model-cache';
 import { ALL_METHODS, DINO_FILE } from '../models';
 import { disposePhoto, photoToJson, scanPhoto, type ScannedPhoto } from '../pipeline';
 import type { DetectMethod, EngineInfo } from '../protocol';
@@ -12,7 +12,7 @@ import { buildReferences, ownedPrints, type BuildProgress, type PrintInfo } from
 import { parseLabels, type Labels, type ScoredPhoto } from '../score';
 import { buildIndex, searchIndex, type RefIndex } from '../search-index';
 import { orderCorners } from '../geometry';
-import { currentRefs } from '../store';
+import { currentRefs, dropOtherTuned, MODEL_KEY, tunedModelKey } from '../store';
 import { CardsTable } from './CardsTable';
 import { PhotoView } from './PhotoView';
 import { ResultsTable } from './ResultsTable';
@@ -48,6 +48,11 @@ export function ScannerPage() {
   const [detectMethod, setDetectMethod] = useState<DetectMethod>('classic');
   const [modelThreshold, setModelThreshold] = useState<number>(0.2);
   const [modelCached, setModelCached] = useState<boolean | null>(null);
+  /** Which recognition model: the downloaded DINOv2, or a tuned one dropped on the page (card-recognizer.onnx). */
+  const [recognizer, setRecognizer] = useState<'dino' | 'tuned'>('dino');
+  const [tunedCached, setTunedCached] = useState(false);
+  /** The running model's vectors key (store.ts): the reference set is read and built for it. */
+  const [modelKey, setModelKey] = useState<string>(MODEL_KEY);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,6 +95,13 @@ export function ScannerPage() {
       })
       .catch((e: Error) => !cancelled && setEngineError(e.message));
     isModelCached(DINO_FILE).then(setModelCached, () => setModelCached(false));
+    // A tuned recognition model dropped earlier is the one to start.
+    cachedRecognizer().then((b) => {
+      if (b && !cancelled) {
+        setTunedCached(true);
+        setRecognizer('tuned');
+      }
+    }, () => undefined);
     return () => {
       cancelled = true;
       buildAbort.current?.abort();
@@ -106,11 +118,17 @@ export function ScannerPage() {
       accountData(accountKey)
         .collection.list()
         .then((entries) => !cancelled && setPrints(ownedPrints(entries)));
-    currentRefs().then((rows) => !cancelled && setIndex(buildIndex(rows)));
     return () => {
       cancelled = true;
     };
   }, [accountKey]);
+  useEffect(() => {
+    let cancelled = false;
+    currentRefs(modelKey).then((rows) => !cancelled && setIndex(buildIndex(rows)));
+    return () => {
+      cancelled = true;
+    };
+  }, [modelKey]);
 
   // Object URLs and bitmaps are freed when photos go.
   const photosRef = useRef(photos);
@@ -172,14 +190,25 @@ export function ScannerPage() {
     }
   }, []);
 
-  const loadModel = () =>
-    run(`Loading ${DINO_FILE.label}…`, async () => {
+  const loadModel = (which: 'dino' | 'tuned' = recognizer) =>
+    run(which === 'tuned' ? 'Loading the tuned recognition model…' : `Loading ${DINO_FILE.label}…`, async () => {
       const engine = engineRef.current!;
-      const bytes = await loadModelFile(DINO_FILE, (done, total) => setBusy({ label: `Downloading ${DINO_FILE.label} (${mb(done)} of ${mb(total)})…`, progress: (100 * done) / total }));
-      setModelCached(true);
+      let bytes: ArrayBuffer;
+      let key = MODEL_KEY;
+      if (which === 'tuned') {
+        const tuned = await cachedRecognizer();
+        if (!tuned) throw new Error('No tuned model: drop card-recognizer.onnx on the photos box');
+        bytes = tuned;
+        key = tunedModelKey(tuned);
+      } else {
+        bytes = await loadModelFile(DINO_FILE, (done, total) => setBusy({ label: `Downloading ${DINO_FILE.label} (${mb(done)} of ${mb(total)})…`, progress: (100 * done) / total }));
+        setModelCached(true);
+      }
       setBusy({ label: 'Starting the model…' });
       const r = await engine.call({ type: 'loadModel', bytes }, [bytes]);
       setBackend(r.backend);
+      setRecognizer(which);
+      setModelKey(key);
     });
 
   // The build has its own state: photos can be scanned meanwhile (against the prints done when the page opened).
@@ -191,13 +220,13 @@ export function ScannerPage() {
     setBuilding(true);
     setError(null);
     try {
-      await buildReferences(engine, prints, { signal: ctl.signal, onProgress: (p) => setBuild(p) });
+      await buildReferences(engine, prints, { signal: ctl.signal, onProgress: (p) => setBuild(p), modelKey });
     } catch (e) {
       setError((e as Error).message);
     } finally {
       buildAbort.current = null;
       setBuilding(false);
-      setIndex(buildIndex(await currentRefs()));
+      setIndex(buildIndex(await currentRefs(modelKey)));
     }
   };
 
@@ -229,7 +258,15 @@ export function ScannerPage() {
   );
 
   const addFiles = async (files: File[]) => {
-    const onnx = files.find((f) => f.name.toLowerCase().endsWith('.onnx'));
+    const tuned = files.find((f) => /recogni[sz]er.*\.onnx$/i.test(f.name));
+    if (tuned && engineRef.current) {
+      const bytes = await tuned.arrayBuffer();
+      await cacheRecognizer(bytes);
+      await dropOtherTuned(tunedModelKey(bytes));
+      setTunedCached(true);
+      await loadModel('tuned');
+    }
+    const onnx = files.find((f) => f.name.toLowerCase().endsWith('.onnx') && f !== tuned);
     if (onnx && engineRef.current) {
       const engine = engineRef.current;
       await run(`Loading the card detector ${onnx.name}…`, async () => {
@@ -293,15 +330,30 @@ export function ScannerPage() {
               {info ? `OpenCV ${info.opencv} · onnxruntime ${info.ort} · WebGPU ${info.webgpu ? 'available' : 'not available'}` : engineError ? 'Not started' : 'Starting…'}
             </Text>
             <Text size="sm">
-              {DINO_FILE.label}: {backend ? `running on ${backend === 'webgpu' ? 'WebGPU' : 'the CPU'}` : modelCached ? 'downloaded, not started' : `not downloaded (${mb(DINO_FILE.bytes)})`}
+              Recognition: {recognizer === 'tuned' ? 'tuned model (card-recognizer.onnx)' : DINO_FILE.label}:{' '}
+              {backend ? `running on ${backend === 'webgpu' ? 'WebGPU' : 'the CPU'}` : recognizer === 'tuned' || modelCached ? 'not started' : `not downloaded (${mb(DINO_FILE.bytes)})`}
             </Text>
+            <SegmentedControl
+              size="xs"
+              value={recognizer}
+              onChange={(v) => {
+                const which = v as 'dino' | 'tuned';
+                setRecognizer(which);
+                if (backend) void loadModel(which);
+              }}
+              data={[
+                { value: 'dino', label: 'DINOv2 (download)' },
+                { value: 'tuned', label: 'Tuned (card-recognizer.onnx)', disabled: !tunedCached },
+              ]}
+              disabled={!!busy}
+            />
             <Text size="sm">
               Card detector:{' '}
               {detector ? `trained model loaded (input ${detector.size} px, on ${detector.backend === 'webgpu' ? 'WebGPU' : 'the CPU'})` : 'none: drop card-detector.onnx (scanner-train) on the photos box'}
             </Text>
             <Group>
-              <Button size="xs" onClick={loadModel} disabled={!info || !!busy || !!backend}>
-                {modelCached ? 'Start the model' : 'Download and start the model'}
+              <Button size="xs" onClick={() => void loadModel()} disabled={!info || !!busy || !!backend}>
+                {recognizer === 'tuned' || modelCached ? 'Start the model' : 'Download and start the model'}
               </Button>
             </Group>
           </Stack>
@@ -313,12 +365,14 @@ export function ScannerPage() {
               {account ? `${accountLabel(account)}: ` : ''}
               {prints ? `${prints.length.toLocaleString()} prints in the synced collection` : accountKey ? 'Reading the collection…' : 'No account: sync your collection first'}
             </Text>
-            <Text size="sm">{index ? `${index.size.toLocaleString()} prints have vectors` : '…'}</Text>
+            <Text size="sm">
+              {index ? `${index.size.toLocaleString()} card pictures have vectors (${index.prints.filter((p) => p.back).length.toLocaleString()} of them back faces)` : '…'}
+            </Text>
             {build && (
               <>
                 <Progress value={build.total ? (100 * (build.done + build.failed)) / build.total : 100} />
                 <Text size="xs" c="dimmed">
-                  {build.done.toLocaleString()} of {build.total.toLocaleString()} new prints
+                  {build.done.toLocaleString()} of {build.total.toLocaleString()} new pictures
                   {build.failed ? ` · ${build.failed} failed` : ''}
                   {build.skipped ? ` · ${build.skipped.toLocaleString()} already done` : ''}
                   {eta !== null && build.done + build.failed < build.total ? ` · about ${Math.ceil(eta / 60000)} min left` : ''}

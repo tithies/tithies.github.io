@@ -52,6 +52,18 @@ export async function cacheDetector(bytes: ArrayBuffer): Promise<void> {
   await (await caches.open(MODEL_CACHE)).put(DETECTOR_KEY, new Response(bytes.slice(0), { headers: { 'content-type': 'application/octet-stream' } }));
 }
 
+/** Where a tuned recognition model dropped on the page is kept (scanner-train/export_recog.py). */
+export const RECOGNIZER_KEY = 'https://tithies.local/scanner/card-recognizer.onnx';
+
+export async function cachedRecognizer(): Promise<ArrayBuffer | null> {
+  const hit = await (await caches.open(MODEL_CACHE)).match(RECOGNIZER_KEY);
+  return hit ? hit.arrayBuffer() : null;
+}
+
+export async function cacheRecognizer(bytes: ArrayBuffer): Promise<void> {
+  await (await caches.open(MODEL_CACHE)).put(RECOGNIZER_KEY, new Response(bytes.slice(0), { headers: { 'content-type': 'application/octet-stream' } }));
+}
+
 /** Removes every cached model file. */
 export async function clearModelCache(): Promise<void> {
   await caches.delete(MODEL_CACHE);

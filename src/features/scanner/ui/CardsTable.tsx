@@ -69,7 +69,7 @@ export function CardsTable({ photo, method, labels, selected, onSelect, minHeigh
                     const hit = inLabels(m.name);
                     return (
                       <Stack key={m.scryfallId} gap={0} w={92}>
-                        <CardThumb alt={m.name} small={scryfallImage(m.scryfallId, 'small')} large={scryfallImage(m.scryfallId, 'normal')} />
+                        <CardThumb alt={m.name} small={scryfallImage(m.scryfallId, 'small', m.back ? 'back' : 'front')} large={scryfallImage(m.scryfallId, 'normal', m.back ? 'back' : 'front')} />
                         <Text size="xs" fw={i === 0 ? 700 : 400} lineClamp={2} c={hit === true ? 'green' : hit === false && i === 0 ? 'red' : undefined}>
                           {hit === true ? '✓ ' : ''}
                           {m.name}
