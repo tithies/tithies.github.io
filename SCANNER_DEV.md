@@ -56,7 +56,7 @@
 5. **Cleanup without training:**
    - drop a shape that contains two cards named better;
    - of two overlapping outlines named the same print, keep the better one.
-6. **Face-down cards in the labels:** while labelling, a card lying face down is named `Card back` (no set or number) and ticked "Mostly hidden", so the current scoring neither misses nor counts it.
+6. **Face-down and unreadable cards in the labels:** while labelling, a card lying face down is named `Card back`, and a visible card nobody can identify `Unknown card` (no set or number, never a guess). Both are ticked "Mostly hidden", so the current scoring neither misses nor counts them.
    - The training code must still treat it as a card **for the detector**: it is fully visible, unlike a covered card.
    - It must skip it for recognition.
    - A proper "face down" field in the labelling mode would be cleaner.
