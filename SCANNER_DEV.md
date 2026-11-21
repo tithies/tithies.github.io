@@ -46,7 +46,10 @@
 - **Shared prints:** the same decks appear in several photos, so test and training photos share prints. `eval.py` also reports the test prints that appear in no training photo.
 
 **Measured offline** (`scanner-train/eval.py`, the page's pipeline: detector decode, warp both ways, recognizer):
-- **Test photos, current models:** 98.5 % found (196 / 199), 23 extra shapes (16 with the cleanup), corners off by 1.9 % of the card height, 96 % named right (191 / 199). The gallery was the 250 labelled prints plus 357 other pictures; the owned list wasn't available yet.
+- **Test photos, current models, against the owned collection** (3,897 pictures, `owned-prints.json` read from the page's reference set):
+  - 98.5 % found (196 / 199), 23 extra shapes (16 with the cleanup), corners off by 1.9 % of the card height;
+  - 96 % of names right (191 / 199), 94.5 % of prints right (188 / 199).
+  - A small gallery (607 pictures) gave the same names and 96 % prints: the collection's similar reprints cost 3 prints.
 - **Training photos** (not trained on yet): 91.7 % found. The misses are concentrated in the batch-2 weak spots, e.g. 0 / 7 on the far binder page `201024215`.
 - **Wrong names on found cards** score 0.45–0.53, so they show orange.
 
