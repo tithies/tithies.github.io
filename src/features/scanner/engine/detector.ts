@@ -1,5 +1,5 @@
 /**
- * The trained card detector (sandbox): an ONNX model from scanner-train/ (export.py). The
+ * The trained card detector (sandbox): an ONNX model from the tithies-scanner-trainer repo (export.py). The
  * photo is letterboxed the way training did: shrunk to fit the model's square input, at the
  * top-left, the rest grey (114); outputs are decoded into card quads (detector-decode.ts),
  * then scaled back to the photo's pixels.

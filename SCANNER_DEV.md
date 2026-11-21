@@ -16,7 +16,7 @@
   - each model has its own reference set: the owned prints, back faces included.
   - Both model files are dropped on the photos box and kept in Cache Storage.
 - **Labelling mode** (View: Labels) and `labels.json` format 2 (see "Labelling mode" in section 6).
-- **Training kit `scanner-train/`:**
+- **Training kit:** the private repo `tithies-scanner-trainer` (cloned next to this one, `~/tithies-scanner-trainer`), with the labelled photos and backgrounds:
   - detector: `synth.py`, `train.py`, `export.py`;
   - recognizer: `crops.py`, `train_recog.py`, `export_recog.py`;
   - training runs on a separate Windows PC (RTX 4070), see "Working method" below.
@@ -27,7 +27,7 @@
 - 12–13 extra shapes, low scores, shown orange.
 - Details under Phase 4.
 
-**Batch 2** (51 more photos in `scanner-samples/batch2/`, 2026-11-20, not labelled yet): 461 shapes found, 368 green (80 %).
+**Batch 2** (51 more photos, now `real/batch2/` in the trainer repo, 2026-11-20): 461 shapes found, 368 green (80 %).
 - **Works well:** table spreads (small cards too), white table in sun, carpet, blanket, bed, binder close-ups, the storage tray.
 - **Struggles:**
 
@@ -39,13 +39,13 @@
 | Sleeved cards at an angle | `200313518` | 9 of 13 orange |
 | Piles among bags, or stacked on a blanket | `202115291`, `201411141`, `201414718` | few found, mostly orange |
 
-- 36 photos of empty surfaces are in `scanner-samples/backgrounds/`, for the generator.
+- 36 photos of empty surfaces, for the generator: `backgrounds/` in the trainer repo.
 
-**Labelled (2026-11-20):** all 70 photos, 619 cards with checked corners (`scanner-samples/labels.json`).
+**Labelled (2026-11-20):** all 70 photos, 619 cards with checked corners (`real/labels.json` in the trainer repo).
 - **Split:** `split.json` holds 33 test photos (the first 19 plus 1 in 4 of batch 2 by hash; 199 scored cards) and 37 training photos (312 scored cards). Photos in a subfolder named `test…` are always test photos.
 - **Shared prints:** the same decks appear in several photos, so test and training photos share prints. `eval.py` also reports the test prints that appear in no training photo.
 
-**Measured offline** (`scanner-train/eval.py`, the page's pipeline: detector decode, warp both ways, recognizer):
+**Measured offline** (the trainer's `eval.py`, the page's pipeline: detector decode, warp both ways, recognizer):
 - **Test photos, current models, against the owned collection** (3,897 pictures, `owned-prints.json` read from the page's reference set):
   - 98.5 % found (196 / 199), 23 extra shapes (16 with the cleanup), corners off by 1.9 % of the card height;
   - 96 % of names right (191 / 199), 94.5 % of prints right (188 / 199).
@@ -61,7 +61,7 @@
 
 **Next:** the user runs README section 8 on the 4070 (`fetch_real.py`, baseline `eval.py`, both fine-tunes, exports, `eval.py` again). Then the new models are loaded on the page and the test photos rescanned. The first plan, for reference:
 1. **Test / training split:** the first 19 photos plus 1 in 4 of the others, chosen from a hash of the file name, so it never changes. Test photos never go into training.
-2. **`scanner-train/eval.py`:**
+2. **The trainer's `eval.py`:**
    - it runs the exported detector and recognizer on the labelled test photos and gives the page's numbers: found (IoU ≥ 0.5), extra shapes, name and print right;
    - recognizer gallery: the labelled prints plus distractors from `data/cards`;
    - images read with EXIF orientation, like the labels.
@@ -80,10 +80,13 @@
 Later: phase 1 (every print), phase 2 (the real page and Moxfield export), phase 3 (bottom line, for same-art reprints).
 
 **Working method:**
-- **Training happens on the user's Windows PC** (RTX 4070, 12 GB). Scripts go there as a zip built from the commit (`git archive --format=zip HEAD scanner-train`), copied to the user's Windows home; nothing is pushed for it.
-- **Results come back:** the user copies `*.onnx`, `*.json` and logs into `scanner-train/` (gitignored; the recognition log is `log-recog.txt`).
+- **Training happens on the user's Windows PC** (RTX 4070, 12 GB), from the private repo `tithies-scanner-trainer` (since 2026-11-21; it was `scanner-train/` here, then zips). The user pulls it there; I commit here (neutral identity) and the user pushes.
+- **Results come back:**
+  - logs and `eval-*.json` are committed in the trainer repo's `results/`;
+  - the model files (`*.onnx`) are copied by hand into its root (ignored by git) and dropped on the page.
+- **Photos:** before a new batch is committed, its metadata is stripped (`strip_metadata.py`: GPS, motion-photo video; pixels unchanged).
 - **Local checks:** a CPU venv at `~/.venvs/scanner-train` for short runs. Data loaders use `spawn`, because forked workers hang on Linux.
-- **Photos:** `scanner-samples/` is gitignored.
+- **Local scratch:** `scanner-samples/` here (gitignored) only keeps debug files now.
 
 ---
 
@@ -420,7 +423,7 @@ By method, over all photos: DINOv2 squashed · CLS 41 % first try (46 % top 5), 
 
 ### Phase 4 (optional) — A trained detector
 
-**Status (2026-11-19):** the training kit is in `scanner-train/` (Windows instructions in its README), and the Scanner page can load its output (`card-detector.onnx` dropped on the photos box; "Find cards with": classic, trained detector or both). Training runs on the user's RTX 4070 (12 GB).
+**Status (2026-11-19):** the training kit is in `scanner-train/` (since 2026-11-21: the `tithies-scanner-trainer` repo) (Windows instructions in its README), and the Scanner page can load its output (`card-detector.onnx` dropped on the photos box; "Find cards with": classic, trained detector or both). Training runs on the user's RTX 4070 (12 GB).
 - **Model:** ResNet-18 (torchvision, BSD) with a small feature pyramid, CenterNet-style. It predicts a heat map of card centres on 4-pixel cells, and at each cell the card's 4 corners as offsets. The corner order follows the card up to a half turn; the loss takes the better of the two orders. Input 768 × 768, the photo letterboxed at the top-left with grey 114. The ONNX file is ≈ 46 MB.
 - **Scenes:** `synth.py` (≈ 150 ms a scene at 1024 on one CPU core). Layouts: table spreads, binder pages (1–2 pages, empty pockets), fanned hands, piles, single cards. Holders: sleeves, toploaders, magnetic holders. Also foil, glare, shadows, fingers, distractor shapes, camera tilt (rendered on a canvas 30 % larger, so no edges show), blur, noise and JPEG. Backgrounds: the user's photos of empty surfaces, Scryfall artwork as playmats, and generated wood, stone, fabric and plain surfaces.
 - **Checked here:** a 100-step CPU run learns (validation F1 0.05 → 0.13); the export matches PyTorch to 6e-7; the browser decodes the same cards as Python on a test scene.
@@ -446,7 +449,7 @@ By method, over all photos: DINOv2 squashed · CLS 41 % first try (46 % top 5), 
 
 **Back faces in the reference set (2026-11-20):** owned prints with two faces get a second picture (Scryfall's `back` image), stored as `<id>~back` and indexed under the print, so a match on it names the print and the card list shows the back. A print whose back picture is a 404 (adventures, split, flip cards: two names, one picture) is remembered in the `meta` table and not asked again. In the test collection: 115 two-faced prints, 55 back pictures, 60 without one. Result on the 19 photos: unchanged at 83 / 107 (prints 76 / 104). They show one back face (Volcanic Fissure, sleeved, on the knit blanket): its back picture now comes second, at 0.78 against 0.78 for the wrong first answer; before, it wasn't among the candidates at all.
 
-**Recognition fine-tune (kit ready, 2026-11-20):** `scanner-train/` also fine-tunes DINOv2-small for this job (README step 7).
+**Recognition fine-tune (kit ready, 2026-11-20):** the training kit also fine-tunes DINOv2-small for this job (README step 7).
 - **Pairs:** `crops.py` photographs one card (random holder, neighbours in a mini scene, a covering card or a finger, glare, blur, noise, JPEG, 200–900 px tall), then flattens it with corners off by 0.5–3 % of its height, as the detector would. The other side of the pair is the card's clean picture, prepared exactly like the page does (224 × 224, card padded to 161 px wide, grey ImageNet mean around).
 - **Training:** `train_recog.py`, symmetric InfoNCE (temperature 0.05) on batches of 64 pairs; 30 % of each batch is same-name cards with other artworks (basic lands, reprints with new art), and an artwork never appears twice in a batch. A linear head (identity at the start) on the CLS output; backbone learning rate 2e-5, head 1e-3.
 - **Validation:** photos of 1 artwork in 20 that training never sees, searched among their clean pictures plus 2,000 others: share found first (right print) and right name.

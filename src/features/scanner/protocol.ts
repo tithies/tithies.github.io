@@ -73,7 +73,7 @@ export interface CardFeatures {
 export type EngineRequest =
   | { type: 'init'; ortWasm: ArrayBuffer }
   | { type: 'loadModel'; bytes: ArrayBuffer }
-  /** The trained card detector (scanner-train/export.py). */
+  /** The trained card detector (export.py in the tithies-scanner-trainer repo). */
   | { type: 'loadDetector'; bytes: ArrayBuffer }
   | { type: 'loadPhoto'; photoId: string; bitmap: ImageBitmap }
   | { type: 'detect'; photoId: string; options: DetectOptions }

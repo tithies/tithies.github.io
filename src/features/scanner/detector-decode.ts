@@ -1,5 +1,5 @@
 /**
- * Reads cards out of the trained detector's outputs (scanner-train/model.py): a heat map of
+ * Reads cards out of the trained detector's outputs (model.py in the tithies-scanner-trainer repo): a heat map of
  * card centres on a grid of `stride`-pixel cells, and for each cell the card's 4 corners as
  * offsets from the cell's centre. A card is a local maximum of the heat map above the
  * threshold; overlapping answers for one card are merged (the best score wins).

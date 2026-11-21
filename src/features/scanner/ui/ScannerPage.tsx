@@ -599,7 +599,7 @@ export function ScannerPage() {
             />
             <Text size="sm">
               Card detector:{' '}
-              {detector ? `trained model loaded (input ${detector.size} px, on ${detector.backend === 'webgpu' ? 'WebGPU' : 'the CPU'})` : 'none: drop card-detector.onnx (scanner-train) on the photos box'}
+              {detector ? `trained model loaded (input ${detector.size} px, on ${detector.backend === 'webgpu' ? 'WebGPU' : 'the CPU'})` : 'none: drop card-detector.onnx (from the scanner trainer) on the photos box'}
             </Text>
             <Group>
               <Button size="xs" onClick={() => void loadModel()} disabled={!info || !!busy || !!backend}>
