@@ -1,12 +1,15 @@
 /**
  * Detection on a real photo, in Node (no browser): for tuning the Scanner prototype.
- * Skipped unless SCANNER_PHOTO names a PNG, e.g.
- *   SCANNER_PHOTO=scanner-samples/Untitled2.png npx vitest run tests/scanner-photo.debug.test.ts
- * Writes <photo>.debug.png next to it (scanner-samples is gitignored): cards found in green
+ * Skipped unless SCANNER_PHOTO names a PNG, e.g. one of the labelled photos of the
+ * tithies-scanner-trainer repo:
+ *   SCANNER_PHOTO=../tithies-scanner-trainer/real/Untitled2.png npx vitest run tests/scanner-photo.debug.test.ts
+ * Writes <photo>.debug.png into the system's temp folder (scanner-debug/): cards found in green
  * (dashed blue: inferred from the binder grid), line quads in orange, the 40 longest lines in
  * blue; and <photo>.debug.txt with the cards found.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
 import { cannyEdges, detectCards, findLineQuads } from '@/features/scanner/engine/detect';
 import { free, loadOpenCv } from '@/features/scanner/engine/opencv';
 import { quadIoU, quadSize, type Quad } from '@/features/scanner/geometry';
@@ -62,10 +65,14 @@ describe.skipIf(!photo)('scanner detection on a photo', () => {
     }
     for (const q of quads.slice(0, 10)) poly(q.quad, color(255, 150, 0), 2);
     for (const c of out.cards) poly(c.quad, c.source === 'grid' ? color(80, 80, 255) : color(0, 220, 0), 4, scale);
-    writeFileSync(photo!.replace(/\.png$/i, '.debug.png'), encodePng({ width: small.cols, height: small.rows, data: new Uint8ClampedArray(small.data) }));
+    // Outside both repos: the photos live in the trainer repo, whose folders are tracked.
+    const outDir = join(tmpdir(), 'scanner-debug');
+    mkdirSync(outDir, { recursive: true });
+    const base = join(outDir, basename(photo!).replace(/\.png$/i, ''));
+    writeFileSync(`${base}.debug.png`, encodePng({ width: small.cols, height: small.rows, data: new Uint8ClampedArray(small.data) }));
 
     writeFileSync(
-      photo!.replace(/\.png$/i, '.debug.txt'),
+      `${base}.debug.txt`,
       `${img.width}×${img.height}, detection at ${small.cols}×${small.rows}, ${Math.round(ms)} ms: ${out.cards.length} cards, ${lines.length} lines, ${quads.length} line quads\n` +
         out.cards.map((c) => `  ${c.source} score ${c.score.toFixed(2)} ${Math.round(quadSize(c.quad).w)}×${Math.round(quadSize(c.quad).h)} ratio ${quadSize(c.quad).ratio.toFixed(3)}`).join('\n') +
         '\n line quads (top 5):\n' +

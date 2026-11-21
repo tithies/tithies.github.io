@@ -86,7 +86,6 @@ Later: phase 1 (every print), phase 2 (the real page and Moxfield export), phase
   - the model files (`*.onnx`) are copied by hand into its root (ignored by git) and dropped on the page.
 - **Photos:** before a new batch is committed, its metadata is stripped (`strip_metadata.py`: GPS, motion-photo video; pixels unchanged).
 - **Local checks:** a CPU venv at `~/.venvs/scanner-train` for short runs. Data loaders use `spawn`, because forked workers hang on Linux.
-- **Local scratch:** `scanner-samples/` here (gitignored) only keeps debug files now.
 
 ---
 
@@ -249,7 +248,7 @@ Order: **0 → decide → 1 → 2 → measure → 3 and/or 4**, one phase per se
    - *Keep debug layers* keeps the edge map and the rejected shapes, shown with *Edges* and *Rejected shapes*.
 5. **Scores:** a table per method (labelled / detected / unpaired, name and print right at first try and in the top 5, name hit rate by card height). *Copy results JSON* copies everything without pixels.
 
-`labels.json` (in the gitignored `scanner-samples/`), format 1: one entry per physical card, set and number optional:
+`labels.json` (then in a gitignored `scanner-samples/`; now `real/` in the trainer repo), format 1: one entry per physical card, set and number optional:
 `{ "IMG_0001.jpg": [{ "name": "Sol Ring", "set": "cmm", "cn": "410" }, { "name": "Counterspell" }] }`
 
 #### Labelling mode (2026-11-20)
@@ -307,7 +306,7 @@ Console tuning: `await scannerEngine.call({ type: 'bench', ep: 'webgpu', opt: 'a
   - The card's left and right edges barely exist in the image (silver-grey foil against grey plastic); its outline joins the art's and the toploader's edges, so no closed card shape is found. A line-based pass (lines.ts: long straight edges, two near-parallel pairs, sides checked on the edge map) was added; on this photo it still builds wrong quads from the text box and the toploader.
   - With the card's corners placed by hand (`scannerDebug.identifyQuad` in the console), every method names it first, print included: DINOv2 padded · CLS 0.872 vs 0.762 for the next card, squashed · CLS 0.858 vs 0.710, pHash 0.781 vs 0.688.
   - So close-ups of cards in toploaders or sleeves need either a "place the corners yourself" fallback or the trained detector (phase 4).
-- **Tooling:** `SCANNER_PHOTO=scanner-samples/x.png npx vitest run tests/scanner-photo.debug.test.ts` runs detection in Node (OpenCV.js works there when loaded with `require`: an ESM import loops on its `then`) and writes `x.debug.png` (cards, line quads, lines) and `x.debug.txt`. `SCANNER_EXPECT=x0,y0,x1,y1` reports the line quad closest to a known card box. PNG only.
+- **Tooling:** `SCANNER_PHOTO=../tithies-scanner-trainer/real/x.png npx vitest run tests/scanner-photo.debug.test.ts` (output in the system's temp folder, `scanner-debug/`) runs detection in Node (OpenCV.js works there when loaded with `require`: an ESM import loops on its `then`) and writes `x.debug.png` (cards, line quads, lines) and `x.debug.txt`. `SCANNER_EXPECT=x0,y0,x1,y1` reports the line quad closest to a known card box. PNG only.
 - **File picker and Playwright:** while the Playwright MCP is attached to the browser, it intercepts native file dialogs: the page's file input looks dead. Drag and drop works, and so does feeding files through the MCP's `browser_file_upload`.
 - **Size:** the unpacked extension went from ≈ 2.5 MB to ≈ 43 MB (OpenCV.js 10.9 MB in the sandbox chunk, onnxruntime's WebAssembly 29.5 MB). The model (88.5 MB) is downloaded, not bundled.
 

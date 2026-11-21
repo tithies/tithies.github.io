@@ -1,5 +1,6 @@
 /**
- * Hand-checked labels of the Scanner's test and training photos (scanner-samples/labels.json).
+ * Hand-checked labels of the Scanner's test and training photos (real/labels.json in the
+ * tithies-scanner-trainer repo).
  *
  * Format 2 (written by the labelling mode):
  *   { "IMG_0001.jpg": { "width": 4000, "height": 3000, "checked": true, "cards": [
