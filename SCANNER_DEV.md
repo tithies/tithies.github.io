@@ -41,9 +41,22 @@
 
 - 36 photos of empty surfaces are in `scanner-samples/backgrounds/`, for the generator.
 
-**In progress (the user):** labelling batch 2 and the first 19 in the Labels view, then downloading `labels.json` into `scanner-samples/`.
+**Labelled (2026-11-20):** all 70 photos, 619 cards with checked corners (`scanner-samples/labels.json`).
+- **Split:** `split.json` holds 33 test photos (the first 19 plus 1 in 4 of batch 2 by hash; 199 scored cards) and 37 training photos (312 scored cards). Photos in a subfolder named `test…` are always test photos.
+- **Shared prints:** the same decks appear in several photos, so test and training photos share prints. `eval.py` also reports the test prints that appear in no training photo.
 
-**Next** (agreed in principle; plan it first):
+**Measured offline** (`scanner-train/eval.py`, the page's pipeline: detector decode, warp both ways, recognizer):
+- **Test photos, current models:** 98.5 % found (196 / 199), 23 extra shapes (16 with the cleanup), corners off by 1.9 % of the card height, 96 % named right (191 / 199). The gallery was the 250 labelled prints plus 357 other pictures; the owned list wasn't available yet.
+- **Training photos** (not trained on yet): 91.7 % found. The misses are concentrated in the batch-2 weak spots, e.g. 0 / 7 on the far binder page `201024215`.
+- **Wrong names on found cards** score 0.45–0.53, so they show orange.
+
+**Built since:**
+- **Cleanup on the page** (`cleanup.ts`, "Drop bad shapes", default on): it drops an outline around two better-named neighbours, or a second outline of one card. Test photos: 23 → 16 extra shapes, no card lost.
+- **Generated scenes** for the weak spots: tight rows, offset stacks in hand, far binder pages, narrow fans, wrappers and bags.
+- **Real photos in training:** `train.py --init --real` (25 % of batches) and `train_recog.py --init --real` (20 % real cut-outs). The real test photos are measured each epoch for information only.
+- README section 8 has the commands for the 4070 PC.
+
+**Next:** the user runs README section 8 on the 4070 (`fetch_real.py`, baseline `eval.py`, both fine-tunes, exports, `eval.py` again). Then the new models are loaded on the page and the test photos rescanned. The first plan, for reference:
 1. **Test / training split:** the first 19 photos plus 1 in 4 of the others, chosen from a hash of the file name, so it never changes. Test photos never go into training.
 2. **`scanner-train/eval.py`:**
    - it runs the exported detector and recognizer on the labelled test photos and gives the page's numbers: found (IoU ≥ 0.5), extra shapes, name and print right;
