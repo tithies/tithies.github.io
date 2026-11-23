@@ -1,3 +1,41 @@
+What's left for you:
+1. Push the trainer repo (fd153dc). You'd already pushed the restructure.
+2. On the PC, before deleting the old folders:
+   - clone again, set it up and run python -m trainer fetch;
+   - add v2's weights from its old runs:
+python -m trainer release v2 --add-weights --detector <old folder>\runs\20261120-204839 --recognizer <old folder>\runs-recog\20261121-005659
+git add models
+git commit -m "Models v2: weights"
+git push
+     <old folder> is the one whose runs\ holds them: probably the older scanner-train folder where v2 was trained.
+   - check that python -m trainer evaluate v2 matches the numbers in models\README.md, then delete the old folders.
+3. Push tithies whenever you want: 4 commits, the last one the line in SCANNER_DEV.md about the stored weights.
+
+
+
+Your steps:
+1. Push the trainer repo. The Tithies push can wait, since it's a release.
+2. On the PC:
+git pull
+pip install -r requirements.txt
+python -m trainer fetch --every-print
+python -m trainer evaluate v2 --gallery every-print --formats --save
+python -m trainer evaluate v2 --gallery mine --save
+git add models
+git commit -m "Models v2: measured against every print"
+git push
+   The fetch takes about 4 hours and 11 GB, and can be stopped and run again.
+3. Then together:
+   - The format: int8 at 384 dimensions looks likely (about 40 MB for every print).
+   - A v3 recognizer: only if names drop by more than about 1 point. It would get its own plan first.
+4. To publish:
+   - create a Hugging Face account named tithies with a neutral e-mail (the name was free today), and a public model repo card-scanner;
+   - on the PC: hf auth login, python -m trainer index v2, then python -m trainer publish v2.
+
+
+
+
+
 remove ignore proxy in comparator and move the options to a button that opens a popover to configure them. Display it above the decks directly. Also, move the button that refreshes the decks and collection directly above the decks as well. The few notes can be move and simplified to take less space
 
 add a global setting to ignore basic lands (default true) when starting a selling runs. There should be a checkbox also in moxfield popup to override it for the run (default to the current global setting value), and it is displayed under "advanced settings" that needs to be clicked to expand it
