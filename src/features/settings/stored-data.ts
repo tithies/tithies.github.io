@@ -3,7 +3,8 @@
  * - IndexedDB ("tithies", see src/lib/db.ts): the F2F caches (shared), and for each account its
  *   synced decks, collection snapshot and Selling runs. `clearStoredData` empties any of these.
  * - The Scanner prototype (src/features/scanner/store.ts): reference vectors of prints
- *   ("tithies-scanner" database) and its downloaded model (Cache Storage), shared by every account.
+ *   ("tithies-scanner" database), and its models and every-print index (Cache Storage,
+ *   published.ts), shared by every account.
  * - Extension storage (chrome.storage.local) and the dashboard's localStorage: settings and
  *   preferences only. `resetAllSettings` empties both, so every setting falls back to its default.
  */
@@ -16,6 +17,7 @@ import { sendMessage } from '@/lib/messaging';
 import { clearCaches } from '@/features/f2f-buylist/runner';
 import { clearChangeLog, measureChangeLog } from '@/lib/changes/log';
 import { clearScannerData, measureScannerData } from '@/features/scanner/store';
+import { measurePublished } from '@/features/scanner/published';
 
 
 /** The groups of IndexedDB data the user can clear: the shared F2F cache, the change log (every account's), or one account's data. */
@@ -62,7 +64,7 @@ export async function measureStoredData(accountKey: AccountKey | null): Promise<
     tableSize(db.f2fCache),
     db.meta.bulkGet(['bulkRates', 'f2fSets']).then((rows) => rows.reduce((sum, r) => sum + (r ? jsonSize(r) : 0), 0)),
     measureChangeLog().then((m) => m.bytes),
-    measureScannerData().then((m) => m.bytes),
+    Promise.all([measureScannerData(), measurePublished()]).then(([m, files]) => m.bytes + files),
     accountKey ? accountData(accountKey).measure() : Promise.resolve({ decks: 0, collection: 0, runs: 0 }),
   ]);
   return { f2fCache: lookups + f2fMeta, changeLog: changes, scanner, ...own };

@@ -12,7 +12,7 @@
 - **Engines:** OpenCV.js 4.12 and onnxruntime-web 1.31.1 on WebGPU, in a sandboxed iframe.
 - **Detection:** a trained detector (`card-detector.onnx`), plus the first classic passes (contours, lines, binder grid), still selectable.
 - **Recognition:** a fine-tuned DINOv2-small (`card-recognizer.onnx`), or DINOv2-small as downloaded.
-- **Matching:** against the owned prints (the reference set, built in the browser).
+- **Matching:** against every print, from an index made by the trainer and published with the models on Hugging Face ("only my prints" is a filter on it). The reference set built in the browser from the owned prints stays, as the developer path.
 - **Cleanup:** bad shapes are dropped once the cards are named.
 - **Labelling mode:** it makes the labelled photos that measure and train the models.
 - **Training kit:** the private repo `tithies-scanner-trainer`, cloned next to this one. It holds the code, the labelled photos and the model versions (`models/vN`). The training runs on the user's PC.
@@ -45,6 +45,11 @@
   - 12 extra shapes, all orange (0.46–0.59).
 - **Training photos:** the weak spots (fans, offset stacks, binder pages from further away, piles, sleeves at an angle) are mostly training photos now, so the test set measures them little.
 
+**Every print** (phase 1, built 2026-11-23; not measured against every print yet, see `SCANNER_PLAN.md`):
+- **Same numbers as the trainer:** with an index of the owned collection (int8, 384 dimensions), the page's results on the 33 test photos equal `evaluate v2 --format i8-384`, photo for photo. Against the collection, every format holds the same scores; the best scores move by at most 0.0013 in int8-384 and 0.016 at 128 dimensions.
+- **Search** (a card is 2 searches: upright and turned): 105,000 rows on WebGPU take 34 ms for 4 cards, 45 ms for 8 and 124 ms for 16, against 1.3 s for 4 cards on the CPU in Chrome.
+- **Opening:** the page is ready 7–9 s after a reload, models started and index open (small index).
+
 ---
 
 ## 2. How it works
@@ -59,7 +64,8 @@
 3. **Name it** (`models.ts`, `engine/features.ts`, `match.ts`):
    - each cut-out goes to 224 × 224, the card padded to 161 px wide on grey (the ImageNet mean);
    - the model's `pooler_output` gives the vector ("padded · CLS", the method kept);
-   - the vector is compared by cosine with the reference set, brute force; the better side up wins;
+   - the vector is compared by cosine with the every-print index (in a worker, on WebGPU) or the reference set built here, brute force; the better side up wins;
+   - all the cards of a photo are named in one search (`Namer` in `pipeline.ts`);
    - the top 5 and the margin to the first other name are kept.
 4. **Cleanup** (`cleanup.ts`, "Drop bad shapes", on by default):
    - a shape covering two or more better-named shapes (coverage ≥ 0.8) goes;
@@ -67,7 +73,26 @@
    - The dropped shapes go to `rejected`, with the reason `spanning` or `double`.
 5. **Confidence per model** (`confidence` in `pipeline.ts`): the tuned model is "sure" from 0.6 with a margin of 0.08, and "review" from 0.4. DINOv2 keeps 0.5 / 0.05 / 0.3.
 
-**Reference set** (`reference.ts`, `store.ts`):
+**Every-print index** (`index-file.ts`, `print-index.ts`, `search-*.ts`, `gpu-search.ts`):
+- **Made** by `python -m trainer index vN` in the trainer repo, with version N's recognizer and the page's exact preparation. It only goes with its own recognizer: the page uses it only when the running recognizer's SHA-256 is the one in its manifest.
+- **Files:**
+  - `index-<date>.bin`: every print's vector (int8 with a scale per row, or f16 / f32; 384 dimensions, or fewer by PCA);
+  - `prints-<date>.json.gz`: the print of each vector (Scryfall id, face, name, set, number, language, artwork group, finishes);
+  - `manifest.json`: the version, dates, and every file's SHA-256 and size.
+- **What's in it:** the paper cards of Scryfall's `default_cards`, without tokens, emblems, art series, or prints with only a placeholder picture. That's about 105,000 pictures with the backs of double-faced cards.
+- **Search:** the page keeps the prints; a worker keeps the vectors.
+  - It runs on WebGPU (one dispatch for up to 32 queries, the top 5 picked in JavaScript), checked against the CPU path when the index opens.
+  - Otherwise it runs on the CPU. JavaScript does about 0.3–0.6 billion multiply-adds a second, which is about 1.3 s for 4 cards over every print in Chrome.
+  - "Only my prints" masks the same rows: the collection's prints by id, else by set, number and face.
+- **The tests** check the TypeScript search against the trainer's own results (`tests/fixtures/scanner-index`, written by `python -m trainer index --fixture`).
+
+**Published files** (`published.ts`):
+- **Where:** the public Hugging Face model repo `tithies/card-scanner`, written by `python -m trainer publish vN`. It holds both models and the index under `vN/`, plus the root `manifest.json`.
+- **Checks:** the page reads the manifest at most once a day ("Check for update" forces it). Files are downloaded at the manifest's commit (its `X-Repo-Commit` header).
+- **Storage:** each file goes into Cache Storage under its SHA-256 (checked), so a new index alone doesn't download the models again. Files the installed manifest no longer lists are removed.
+- **Developer path:** dropping `manifest.json` with its index and prints files (and the models, if wanted) installs them the same way.
+
+**Reference set built here** (`reference.ts`, `store.ts`), the developer path for models without an index:
 - **What's in it:** the owned prints of the synced collection. Their Scryfall `normal` pictures are fetched politely (4 at a time, at most 10 a second), not kept. The vectors go to IndexedDB `tithies-scanner` → `refs`.
 - **Rows:**
   - keyed per model (`MODEL_KEY` for DINOv2, `tuned|<size>|<hash>|<runs>#<id>` for the tuned model), so models never mix;
@@ -76,10 +101,11 @@
 - **Placeholders:** a non-English print Scryfall only has a placeholder of (the English picture under a "Localized image not available" box) gets the picture of the English print with the same set and number (`pictureStandIns`, recorded in the row's `picture`).
 - **Building it** takes 15–20 minutes for 3,910 pictures, and resumes where it stopped.
 
-**Models on the page** (`model-cache.ts`):
-- **DINOv2-small** is downloaded from Hugging Face at a pinned revision (Xenova's export, 88.5 MB).
-- **The detector and the tuned recognizer** are dropped on the photos box. Any `.onnx` is the detector; a name with "recognizer" is the recognizer.
-- **Storage:** all three are kept in Cache Storage `tithies-scanner-models`, and the page selects the dropped ones on open.
+**Models on the page** (`model-cache.ts`, `published.ts`), three sources:
+- **Published:** the version's two models, downloaded with the index. They're used and started on open when they're here.
+- **Dropped files:** the detector and the tuned recognizer dropped on the photos box. Any `.onnx` is the detector; a name with "recognizer" is the recognizer.
+- **DINOv2-small:** downloaded from Hugging Face at a pinned revision (Xenova's export, 88.5 MB), with the dropped detector.
+- **Storage:** everything is kept in Cache Storage `tithies-scanner-models`.
 
 **Other files:**
 
@@ -88,7 +114,7 @@
 | `protocol.ts`, `engine-client.ts` | The messages to the engine and their types |
 | `geometry.ts` | Quads: IoU, coverage, area, ordering |
 | `labels.ts`, `score.ts` | `labels.json` and the scoring of scans against it |
-| `store.ts` | The Dexie database: reference rows, metadata, label drafts |
+| `store.ts` | The Dexie database: reference rows, metadata (also the installed manifest and the last check), label drafts |
 | `ui/` | The page: `ScannerPage` (state and options), `PhotoView`, `CardsTable`, `ResultsTable` (scores), `LabelEditor`, `LabelsTable` and `PrintPicker` (labelling) |
 | `lines.ts`, `phash.ts`, `engine/detect.ts` | The classic detection passes and the pHash baseline |
 
@@ -179,14 +205,18 @@ Format 2:
 - **Training** happens on the user's Windows PC (RTX 4070, 12 GB), from the trainer repo:
   - I change the code there and commit (neutral identity); the user pushes, pulls on the PC, trains;
   - `python -m trainer release vN` makes `models/vN` (both `.onnx` files and their PyTorch weights in Git LFS, logs, evaluation), which the user commits and pushes; `--from vN` fine-tunes from those weights.
-- **New models on the page:**
-  1. `git pull` the trainer repo;
-  2. drop `models/vN/card-detector.onnx` and `card-recognizer.onnx` on the photos box. Files over 50 MB go through the browser tool in parts;
-  3. "Build the reference set" again for the new recognizer.
+- **A new version on the page:**
+  - **Published:** after `python -m trainer index vN` and `publish vN` on the PC, the page offers "Update" (or "Check for update" first).
+  - **Before publishing:**
+    1. `git pull` the trainer repo;
+    2. drop `models/vN/index/manifest.json`, `index-*.bin` and `prints-*.json.gz` on the photos box;
+    3. drop the two models too. Files over 50 MB go through the browser tool in parts.
+  - **A small index of the collection to try the page:** `python -m trainer index v2 --gallery owned --out work/index/v2-owned`. It's never published: `publish` refuses it.
+  - **Without an index:** "Built here (my prints)", then "Build the reference set" for the new recognizer.
 - **Photos:** a new batch is stripped of its metadata (`python -m trainer photos strip`: GPS, motion-photo video; pixels unchanged), labelled on the page, and committed in the trainer repo's `photos/`. `photos/owned-prints.json` is read from the page's reference set, so the evaluation uses the same gallery.
 - **Running the page:**
   1. build (`npm run build:win` copies it to the Windows folder Chrome loads) and reload the extension;
-  2. open `dashboard.html#/collection/scanner`, "Start the model", build the reference set if needed;
+  2. open `dashboard.html#/collection/scanner`; the published models start by themselves, dropped ones with "Start the model";
   3. drop photos (full camera resolution) with `labels.json` to get the scores table.
   - "Copy results JSON" copies every result without pixels.
   - "Keep debug layers" (off by default) keeps the edge maps and rejected shapes, which use a lot of memory over many photos.
@@ -221,9 +251,12 @@ Format 2:
 - the model weights and an index are data, so they can be downloaded on first use;
 - WebGPU when the browser offers it; WASM otherwise, slower.
 
-**Scryfall:**
-- polite use: one bulk file, pictures at about 8–10 a second, a generic client name;
-- their image-use and rate rules are **not verified yet**: their API docs couldn't be read from the dev machine (HTTP 403). Check them before publishing anything derived (phase 1).
+**Scryfall** (their API docs, read 2026-11-23 with curl; the browser tool and WebFetch get HTTP 403):
+- polite use: one bulk file, pictures at about 8–10 a second, a generic client name (`User-Agent` and `Accept` on API calls);
+- their data and images are free "for the primary purpose of creating additional Magic software";
+- no paywall, no implied endorsement, no new games;
+- "You may not simply repackage, republish, or proxy Scryfall data. Your software must create additional value": the published index is part of a free scanner, and its model card says where everything comes from;
+- images: no cropping of the copyright or artist line, no distortion or colour changes when shown.
 
 **Recognition limits:**
 - **Same-art reprints:** only the set symbol and the bottom line differ (phase 3, or the user picks).

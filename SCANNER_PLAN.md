@@ -18,6 +18,41 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, in or
 
 **Goal:** recognize any card, not only the owned ones. The Scanner is for adding cards to the collection, so mostly cards that aren't in it yet.
 
+**Status (2026-11-23): built, waiting for the measure on the PC.**
+- **Decided with the user:**
+  - Hugging Face hosts the files (`tithies/card-scanner`, under a `tithies` account with a neutral e-mail);
+  - the index carries the print list;
+  - every print by default, with "only my prints" as a filter and no tie-breaker;
+  - cards only: no tokens, emblems or art series.
+- **Built in the trainer:**
+  - `fetch --every-print`;
+  - `evaluate --gallery every-print | mine --formats --save`;
+  - `index vN` (with `--update` and `--fixture`);
+  - `publish vN`, which refuses an index that isn't every-print.
+- **Built in the extension:**
+  - `published.ts` (manifest, download, storage by SHA-256, daily check, developer drop);
+  - `index-file.ts`, the search worker with WebGPU (`gpu-search.ts`);
+  - "Only my prints", and Settings → Stored data;
+  - tests against the trainer's fixture.
+- **Checked:** page = `evaluate` with a small index of the collection; search speed; opening time (`SCANNER_DEV.md` section 1).
+- **Left, in order:**
+  1. **PC:**
+     - `git pull`, then `python -m trainer fetch --every-print` (about 4 h, 11 GB);
+     - then `evaluate v2 --gallery every-print --formats --save` and `evaluate v2 --gallery mine --save`;
+     - commit and push `models/v2/eval-*.json`.
+  2. **Choose** the format (the smallest within about 0.5 point of f32), and whether a v3 is needed (names down by more than about 1 point). A v3 gets its own plan-mode round. It needs v2's weights in `models/v2` first (`release v2 --add-weights`).
+  3. **PC:** `python -m trainer index v2 --format <chosen>`, then commit and push `models/v2/index`.
+  4. **The user:**
+     - create the Hugging Face account `tithies` (neutral e-mail) and the public model repo `card-scanner`;
+     - `hf auth login`, then `python -m trainer publish v2`.
+  5. **Page:**
+     - "Download" from Hugging Face;
+     - the 33 test photos give `evaluate v2 --gallery every-print --format <chosen>`'s numbers;
+     - opening time with the full index.
+  6. **One update:** when Scryfall adds prints, `index v2 --update`, then `publish v2`; the page picks it up.
+
+The steps below are the original plan, kept for the details.
+
 **Today:**
 - **Reference set:** the page builds it in the browser from the owned prints: 3,910 pictures, about 15–20 minutes per model (`reference.ts`), stored in IndexedDB.
 - **Search:** brute force over those vectors (`match.ts`, `search-index.ts`).
@@ -157,9 +192,9 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, in or
 ---
 
 ## Open decisions, in one place
-1. **Phase 1:** where the public files live (Hugging Face recommended).
-2. **Phase 1:** licences and Scryfall's terms for the published index.
-3. **Phase 1:** match against every print only, or keep "my prints"; owned prints as a tie-breaker.
+1. ~~Phase 1: where the public files live~~: Hugging Face (2026-11-23).
+2. ~~Phase 1: licences and Scryfall's terms~~: read 2026-11-23 (`SCANNER_DEV.md` section 7); the model card says where everything comes from.
+3. ~~Phase 1: what to match against~~: every print, "only my prints" as a filter, no tie-breaker.
 4. **Phase 2:** the default language of scanned cards.
 5. **Phase 2:** keep or drop the classic detection passes.
 6. **Optional, any time:** a Claude vision second opinion on low-confidence cards, with the user's own API key (photos would leave the browser, and it costs per photo). Not planned.

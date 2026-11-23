@@ -1,13 +1,13 @@
 /**
  * One photo through the prototype: decode (phone orientation applied), optionally shrink it (to
  * find the smallest card size that still works), detect the cards, then for each card take its
- * features (upright and turned 180°) and search the reference set with every method. Each
- * method keeps the way up whose best hit scores higher.
+ * features (upright and turned 180°) and name them (a Namer: the reference set built from the collection with every
+ * method, or the every-print index). Each method keeps the way up whose best hit scores higher.
  */
 import type { ScannerEngine } from './engine-client';
 import { cleanupShapes, type CleanupReason } from './cleanup';
 import { boundingBox, centroid, quadSize, type Box, type Quad } from './geometry';
-import { nameMargin } from './match';
+import { nameMargin, type Hit } from './match';
 import { ALL_METHODS } from './models';
 import type { CardFeatures, CardSource, DetectOptions, RejectedShape } from './protocol';
 import type { PrintInfo } from './reference';
@@ -101,14 +101,45 @@ export function nameCard(index: RefIndex | null, f: Pick<CardFeatures, 'upright'
   return byMethod;
 }
 
-/** Names cards at corners placed by hand, in a photo already loaded in the engine (full-resolution pixels). */
-export async function nameQuads(engine: ScannerEngine, photoId: string, quads: readonly Quad[], index: RefIndex | null): Promise<{ crop: ImageBitmap; heightPx: number; byMethod: Record<string, MethodResult> }[]> {
-  const out = [];
-  for (let g = 0; g < quads.length; g += CARD_GROUP) {
-    const res = await engine.call({ type: 'cardFeatures', photoId, quads: quads.slice(g, g + CARD_GROUP) });
-    for (const f of res.cards) out.push({ crop: f.crop, heightPx: f.heightPx, byMethod: nameCard(index, f) });
+/**
+ * What names cards: the reference set built from the collection (every method, searched here), or the every-print
+ * index (padded · CLS, searched in the search worker). One call names many cards (the search reads the index once).
+ */
+export interface Namer {
+  /** Pictures it names against. */
+  size: number;
+  /** Its prints (the labelling mode's print picker). */
+  prints: readonly PrintInfo[];
+  name(cards: readonly Pick<CardFeatures, 'upright' | 'turned'>[]): Promise<Record<string, MethodResult>[]>;
+}
+
+/** The reference set built from the collection (reference.ts). */
+export function refNamer(index: RefIndex): Namer {
+  return { size: index.size, prints: index.prints, name: async (cards) => cards.map((f) => nameCard(index, f)) };
+}
+
+/** Queries of each card, upright then turned, to search: [upright 0, turned 0, upright 1, …]. */
+export const sideQueries = (cards: readonly Pick<CardFeatures, 'upright' | 'turned'>[], method: string) => cards.flatMap((f) => [f.upright.vectors[method], f.turned.vectors[method]]);
+
+/** Hits of [upright, turned] pairs → each card's result, keeping the way up whose best hit scores higher (as nameCard). */
+export function pairResults(hits: readonly Hit[][], prints: readonly PrintInfo[]): MethodResult[] {
+  const out: MethodResult[] = [];
+  for (let i = 0; i + 1 < hits.length; i += 2) {
+    const up = hits[i];
+    const down = hits[i + 1];
+    const turned = (down[0]?.score ?? -Infinity) > (up[0]?.score ?? -Infinity);
+    const h = turned ? down : up;
+    out.push({ candidates: h.map((x) => ({ ...prints[x.index], score: x.score })), margin: nameMargin(h, (j) => prints[j].name), turned });
   }
   return out;
+}
+
+/** Names cards at corners placed by hand, in a photo already loaded in the engine (full-resolution pixels). */
+export async function nameQuads(engine: ScannerEngine, photoId: string, quads: readonly Quad[], namer: Namer | null): Promise<{ crop: ImageBitmap; heightPx: number; byMethod: Record<string, MethodResult> }[]> {
+  const feats: CardFeatures[] = [];
+  for (let g = 0; g < quads.length; g += CARD_GROUP) feats.push(...(await engine.call({ type: 'cardFeatures', photoId, quads: quads.slice(g, g + CARD_GROUP) })).cards);
+  const named = namer?.size ? await namer.name(feats) : feats.map(() => ({}));
+  return feats.map((f, i) => ({ crop: f.crop, heightPx: f.heightPx, byMethod: named[i] }));
 }
 
 let nextPhoto = 1;
@@ -116,7 +147,7 @@ let nextPhoto = 1;
 export async function scanPhoto(
   engine: ScannerEngine,
   file: File,
-  index: RefIndex | null,
+  namer: Namer | null,
   opts: ScanOptions,
   onProgress?: (done: number, total: number) => void,
 ): Promise<ScannedPhoto> {
@@ -139,6 +170,7 @@ export async function scanPhoto(
     const t2 = performance.now();
     const ordered = readingOrder(det.cards);
     const cards: ScannedCard[] = [];
+    const feats: CardFeatures[] = [];
     for (let g = 0; g < ordered.length; g += CARD_GROUP) {
       const group = ordered.slice(g, g + CARD_GROUP);
       const tc = performance.now();
@@ -146,14 +178,25 @@ export async function scanPhoto(
       const each = (performance.now() - tc) / group.length;
       group.forEach((c, k) => {
         const f = res.cards[k];
-        cards.push({ n: g + k + 1, quad: c.quad, box: boundingBox(c.quad), source: c.source, shapeScore: c.score, heightPx: f.heightPx, crop: f.crop, byMethod: nameCard(index, f), ms: each });
+        feats.push(f);
+        cards.push({ n: g + k + 1, quad: c.quad, box: boundingBox(c.quad), source: c.source, shapeScore: c.score, heightPx: f.heightPx, crop: f.crop, byMethod: {}, ms: each });
       });
       onProgress?.(cards.length, ordered.length);
+    }
+    // Every card of the photo named in one search; its time shared among them.
+    const tn = performance.now();
+    if (namer?.size && feats.length) {
+      const named = await namer.name(feats);
+      const each = (performance.now() - tn) / feats.length;
+      cards.forEach((c, i) => {
+        c.byMethod = named[i];
+        c.ms += each;
+      });
     }
     const t3 = performance.now();
     // Bad shapes go once named: an outline around neighbours, a second outline of one card.
     const drop =
-      opts.cleanup !== false && index?.size
+      opts.cleanup !== false && namer?.size
         ? cleanupShapes(cards.map((c) => ({ quad: c.quad, score: c.byMethod[CLEANUP_METHOD]?.candidates[0]?.score ?? 0, name: c.byMethod[CLEANUP_METHOD]?.candidates[0]?.name })))
         : new Map<number, CleanupReason>();
     const kept = cards.filter((_, i) => !drop.has(i)).map((c, k) => ({ ...c, n: k + 1 }));

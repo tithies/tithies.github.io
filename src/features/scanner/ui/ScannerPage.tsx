@@ -7,13 +7,15 @@ import { downloadText } from '@/lib/ui/download';
 import { ScannerEngine } from '../engine-client';
 import { cacheDetector, cachedDetector, cachedRecognizer, cacheRecognizer, isModelCached, loadModelFile } from '../model-cache';
 import { ALL_METHODS, DINO_FILE } from '../models';
-import { confidence, disposePhoto, nameQuads, photoToJson, scanPhoto, type Recognizer, type ScannedPhoto } from '../pipeline';
+import { confidence, disposePhoto, nameQuads, photoToJson, refNamer, scanPhoto, type Namer, type Recognizer, type ScannedPhoto } from '../pipeline';
+import { openPrintIndex, printIndexNamer, setOwnedOnly, type PrintIndex } from '../print-index';
+import { checkLatest, downloadPublished, installDropped, installedFiles, missingFiles, readFile, sha256Hex, type Installed, type LatestCheck } from '../published';
 import type { DetectMethod, EngineInfo } from '../protocol';
 import { buildReferences, ownedPrints, type BuildProgress, type PrintInfo } from '../reference';
 import type { ScoredPhoto } from '../score';
 import type { Quad } from '../geometry';
 import { draftFromScan, fromMatch, newLabelId, parseLabels, photoChecked, sameName, serializeLabels, turnQuad, type CardMatchView, type LabelCard, type Labels, type PhotoLabels } from '../labels';
-import { buildIndex, searchIndex, type RefIndex } from '../search-index';
+import { buildIndex, type RefIndex } from '../search-index';
 import { orderCorners } from '../geometry';
 import { currentRefs, dropOtherTuned, labelDrafts, labelsDownloadedAt, markLabelsDownloaded, MODEL_KEY, saveLabelDraft, tunedModelKey } from '../store';
 import { CardsTable } from './CardsTable';
@@ -45,6 +47,13 @@ const withIds = (l: PhotoLabels): PhotoLabels => ({ ...l, cards: l.cards.map((c)
 
 const mb = (bytes: number) => `${Math.round(bytes / 1e6)} MB`;
 
+/** Where the models come from: the published files (Hugging Face, or dropped with their manifest), files dropped on
+ * the page (developer path), or the downloaded DINOv2 (with a dropped detector, if any). */
+type ModelSource = 'published' | 'dropped' | 'dino';
+/** What cards are named against: the every-print index, only the owned prints of it, or the reference set built here. */
+type MatchAgainst = 'every' | 'mine' | 'built';
+const sourceLabel = (s: ModelSource, v?: string) => (s === 'published' ? `published ${v ?? ''}`.trim() : s === 'dropped' ? 'dropped files' : 'DINOv2');
+
 /**
  * Hidden prototype page (dashboard.html#/collection/scanner): phase 0 of SCANNER_DEV.md. It
  * starts the engine, builds the reference set from the current account's prints, scans photos
@@ -56,13 +65,29 @@ export function ScannerPage() {
   const [info, setInfo] = useState<EngineInfo | null>(null);
   const [engineError, setEngineError] = useState<string | null>(null);
   const [backend, setBackend] = useState<string | null>(null);
-  const [detector, setDetector] = useState<{ size: number; backend: string } | null>(null);
+  const [detector, setDetector] = useState<{ size: number; backend: string; from: string } | null>(null);
   const [detectMethod, setDetectMethod] = useState<DetectMethod>('classic');
   const [modelThreshold, setModelThreshold] = useState<number>(0.2);
   const [modelCached, setModelCached] = useState<boolean | null>(null);
-  /** Which recognition model: the downloaded DINOv2, or a tuned one dropped on the page (card-recognizer.onnx). */
+  /** Which recognition model: the downloaded DINOv2, or a tuned one (published, or dropped on the page: card-recognizer.onnx). */
   const [recognizer, setRecognizer] = useState<Recognizer>('dino');
+  const [modelSource, setModelSource] = useState<ModelSource>('dino');
   const [tunedCached, setTunedCached] = useState(false);
+  /** The running recognizer's SHA-256: the every-print index only goes with its own. */
+  const [recognizerSha, setRecognizerSha] = useState<string | null>(null);
+  /** The published files installed here, and what Hugging Face has (checked at most once a day). */
+  const [installed, setInstalled] = useState<Installed | null>(null);
+  const installedRef = useRef(installed);
+  installedRef.current = installed;
+  const [publishedModels, setPublishedModels] = useState(false);
+  const [latest, setLatest] = useState<LatestCheck | null>(null);
+  const [checking, setChecking] = useState(false);
+  /** The every-print index as opened, and as searched (with the "only my prints" mask). */
+  const [printBase, setPrintBase] = useState<PrintIndex | null>(null);
+  const [printIndex, setPrintIndex] = useState<PrintIndex | null>(null);
+  const [matchAgainst, setMatchAgainst] = useState<MatchAgainst>('every');
+  const openedAt = useRef(performance.now());
+  const [readyIn, setReadyIn] = useState<number | null>(null);
   /** The running model's vectors key (store.ts): the reference set is read and built for it. */
   const [modelKey, setModelKey] = useState<string>(MODEL_KEY);
   const [busy, setBusy] = useState<Busy>(null);
@@ -113,26 +138,29 @@ export function ScannerPage() {
       .then(({ engine, info }) => {
         if (cancelled) return engine.dispose();
         engineRef.current = engine;
-        // A card detector dropped on the page earlier is loaded again.
-        void cachedDetector().then(async (bytes) => {
-          if (!bytes || cancelled) return;
-          const r = await engine.call({ type: 'loadDetector', bytes }, [bytes]);
-          setDetector(r);
-          setDetectMethod('model');
-        }).catch((e: Error) => setError(`The saved card detector didn't load: ${e.message}`));
+        // The published models when they're here, else the files dropped earlier, else DINOv2.
+        void (async () => {
+          const inst = (await installedFiles()) ?? null;
+          const pub = !!inst && !(await missingFiles(inst.manifest, ['detector', 'recognizer'])).length;
+          const tuned = !!(await cachedRecognizer());
+          if (cancelled) return;
+          setInstalled(inst);
+          setPublishedModels(pub);
+          setTunedCached(tuned);
+          const source: ModelSource = pub ? 'published' : tuned ? 'dropped' : 'dino';
+          setModelSource(source);
+          setRecognizer(source === 'dino' ? 'dino' : 'tuned');
+          await loadDetectorFor(engine, source, inst);
+          if (source === 'published' && !cancelled) await loadModel('published');
+        })().catch((e: Error) => setError(`The saved models didn't load: ${e.message}`));
         // Prototype tuning from the console: await scannerEngine.call({ type: 'bench', ep: 'webgpu', opt: 'all', runs: 5 })
         (window as unknown as { scannerEngine?: ScannerEngine }).scannerEngine = engine;
         setInfo(info);
       })
       .catch((e: Error) => !cancelled && setEngineError(e.message));
     isModelCached(DINO_FILE).then(setModelCached, () => setModelCached(false));
-    // A tuned recognition model dropped earlier is the one to start.
-    cachedRecognizer().then((b) => {
-      if (b && !cancelled) {
-        setTunedCached(true);
-        setRecognizer('tuned');
-      }
-    }, () => undefined);
+    // What Hugging Face has (from the last check when it's less than a day old).
+    void checkLatest().then((l) => !cancelled && setLatest(l));
     return () => {
       cancelled = true;
       buildAbort.current?.abort();
@@ -161,11 +189,55 @@ export function ScannerPage() {
     };
   }, [modelKey]);
 
+  // The installed every-print index: its prints here, its vectors in the search worker.
+  useEffect(() => {
+    if (!installed) return;
+    let cancelled = false;
+    let opened: PrintIndex | null = null;
+    openPrintIndex(installed).then(
+      (idx) => {
+        opened = idx;
+        if (cancelled) idx?.client.dispose();
+        else setPrintBase(idx);
+      },
+      (e: Error) => !cancelled && setError(`The every-print index didn't open: ${e.message}`),
+    );
+    return () => {
+      cancelled = true;
+      opened?.client.dispose();
+      setPrintBase(null);
+    };
+  }, [installed]);
+  // "Only my prints": the same index, limited to the collection's prints.
+  useEffect(() => {
+    if (!printBase) return setPrintIndex(null);
+    if (matchAgainst === 'mine' && !prints) return;
+    let cancelled = false;
+    setOwnedOnly(printBase, matchAgainst === 'mine' ? prints : null).then(
+      (v) => !cancelled && setPrintIndex(v),
+      (e: Error) => setError(e.message),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [printBase, matchAgainst, prints]);
+
+  /** The every-print index goes with the running recognizer (the one that made its vectors). */
+  const indexFits = !!printIndex && !!recognizerSha && recognizerSha === printIndex.installed.manifest.files.recognizer.sha256;
+  const namer = useMemo<Namer | null>(() => {
+    if (matchAgainst !== 'built' && printIndex && indexFits) return printIndexNamer(printIndex);
+    return index?.size ? refNamer(index) : null;
+  }, [matchAgainst, printIndex, indexFits, index]);
+  const namerRef = useRef(namer);
+  namerRef.current = namer;
+  // How long the page took to be ready to scan (models started, index open).
+  useEffect(() => {
+    if (readyIn === null && backend && detector && (!installed || printIndex)) setReadyIn(performance.now() - openedAt.current);
+  }, [backend, detector, installed, printIndex, readyIn]);
+
   // Object URLs and bitmaps are freed when photos go.
   const photosRef = useRef(photos);
   photosRef.current = photos;
-  const indexRef = useRef(index);
-  indexRef.current = index;
 
   // Prototype debugging from the console: names the card under a hand-placed quad (full-photo
   // pixels, clockwise from the card's top-left), to tell detection failures from matching ones:
@@ -174,9 +246,9 @@ export function ScannerPage() {
     (window as unknown as { scannerDebug?: unknown }).scannerDebug = {
       identifyQuad: async (fileName: string, corners: [number, number][]) => {
         const engine = engineRef.current;
-        const idx = indexRef.current;
+        const nm = namerRef.current;
         const p = photosRef.current.find((x) => x.file.name === fileName);
-        if (!engine || !idx?.size || !p) throw new Error('Engine, reference set or photo missing');
+        if (!engine || !nm?.size || !p) throw new Error('Engine, reference set or photo missing');
         const bitmap = await createImageBitmap(p.file, { imageOrientation: 'from-image' });
         const photoId = `debug-${Date.now()}`;
         await engine.call({ type: 'loadPhoto', photoId, bitmap }, [bitmap]);
@@ -185,14 +257,8 @@ export function ScannerPage() {
           const { cards } = await engine.call({ type: 'cardFeatures', photoId, quads: [quad] });
           const f = cards[0];
           f.crop.close();
-          return Object.fromEntries(
-            ALL_METHODS.map((m) => {
-              const up = searchIndex(idx, f.upright, m.id, 5);
-              const down = searchIndex(idx, f.turned, m.id, 5);
-              const hits = (down[0]?.score ?? -1) > (up[0]?.score ?? -1) ? down : up;
-              return [m.id, hits.map((h) => `${idx.prints[h.index].name} (${idx.prints[h.index].set} #${idx.prints[h.index].cn}) ${h.score.toFixed(3)}`)];
-            }),
-          );
+          const [byMethod] = await nm.name([f]);
+          return Object.fromEntries(Object.entries(byMethod).map(([m, r]) => [m, r.candidates.map((c) => `${c.name} (${c.set} #${c.cn}) ${c.score.toFixed(3)}`)]));
         } finally {
           await engine.call({ type: 'releasePhoto', photoId });
         }
@@ -221,26 +287,87 @@ export function ScannerPage() {
     }
   }, []);
 
-  const loadModel = (which: 'dino' | 'tuned' = recognizer) =>
-    run(which === 'tuned' ? 'Loading the tuned recognition model…' : `Loading ${DINO_FILE.label}…`, async () => {
+  /** The detector of a model source: the published one, else the one dropped on the page (DINOv2 has none of its own). */
+  const loadDetectorFor = async (engine: ScannerEngine, source: ModelSource, inst: Installed | null) => {
+    const bytes = source === 'published' && inst ? await readFile(inst.manifest.files.detector) : await cachedDetector();
+    if (!bytes) return setDetector(null);
+    const r = await engine.call({ type: 'loadDetector', bytes }, [bytes]);
+    setDetector({ ...r, from: source === 'published' ? `published ${inst?.manifest.version}` : 'dropped file' });
+    setDetectMethod('model');
+  };
+
+  const loadModel = (which: ModelSource = modelSource) =>
+    run(which === 'dino' ? `Loading ${DINO_FILE.label}…` : `Loading the recognition model (${sourceLabel(which, installedRef.current?.manifest.version)})…`, async () => {
       const engine = engineRef.current!;
       let bytes: ArrayBuffer;
       let key = MODEL_KEY;
-      if (which === 'tuned') {
+      let sha: string | null = null;
+      if (which === 'published') {
+        const inst = installedRef.current ?? (await installedFiles());
+        const pub = inst ? await readFile(inst.manifest.files.recognizer) : null;
+        if (!inst || !pub) throw new Error('The published recognition model is not downloaded');
+        bytes = pub;
+        key = tunedModelKey(pub);
+        sha = inst.manifest.files.recognizer.sha256;
+      } else if (which === 'dropped') {
         const tuned = await cachedRecognizer();
         if (!tuned) throw new Error('No tuned model: drop card-recognizer.onnx on the photos box');
         bytes = tuned;
         key = tunedModelKey(tuned);
+        sha = await sha256Hex(tuned);
       } else {
         bytes = await loadModelFile(DINO_FILE, (done, total) => setBusy({ label: `Downloading ${DINO_FILE.label} (${mb(done)} of ${mb(total)})…`, progress: (100 * done) / total }));
         setModelCached(true);
       }
       setBusy({ label: 'Starting the model…' });
+      // The bytes move to the engine: the key and hash are taken first.
       const r = await engine.call({ type: 'loadModel', bytes }, [bytes]);
       setBackend(r.backend);
-      setRecognizer(which);
+      setModelSource(which);
+      setRecognizer(which === 'dino' ? 'dino' : 'tuned');
       setModelKey(key);
+      setRecognizerSha(sha);
     });
+
+  /** Another model source: its detector, then its recognizer if a model was running. */
+  const switchSource = async (which: ModelSource) => {
+    const engine = engineRef.current;
+    setModelSource(which);
+    setRecognizer(which === 'dino' ? 'dino' : 'tuned');
+    if (!engine) return;
+    try {
+      await loadDetectorFor(engine, which, installedRef.current);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    if (backend || which === 'published') await loadModel(which);
+  };
+
+  /** Downloads what the latest published version needs, installs it, then runs its models. */
+  const downloadFiles = async () => {
+    const l = latest;
+    if (!l?.manifest || !l.commit) return;
+    let ok = false;
+    await run('Downloading the Scanner files…', async () => {
+      await downloadPublished(l.manifest!, l.commit!, {
+        onProgress: (done, total) => setBusy({ label: `Downloading the Scanner files (${mb(done)} of ${mb(total)})…`, progress: (100 * done) / total }),
+      });
+      setInstalled((await installedFiles()) ?? null);
+      setPublishedModels(true);
+      ok = true;
+    });
+    if (ok) await switchSource('published');
+  };
+  const checkNow = async () => {
+    setChecking(true);
+    try {
+      const l = await checkLatest({ force: true });
+      setLatest(l);
+      if (l.error) setError(`Checking Hugging Face: ${l.error}`);
+    } finally {
+      setChecking(false);
+    }
+  };
 
   // The build has its own state: photos can be scanned meanwhile (against the prints done when the page opened).
   const buildRefs = async () => {
@@ -270,7 +397,7 @@ export function ScannerPage() {
         for (const [i, p] of list.entries()) {
           setBusy({ label: `Scanning ${p.file.name} (${i + 1} of ${list.length})…` });
           try {
-            const scan = await scanPhoto(engine, p.file, index, { scale: Number(scale), maxSide, debug, method: detectMethod, modelThreshold, cleanup }, (done, total) =>
+            const scan = await scanPhoto(engine, p.file, namer, { scale: Number(scale), maxSide, debug, method: detectMethod, modelThreshold, cleanup }, (done, total) =>
               setBusy({ label: `Scanning ${p.file.name} (${i + 1} of ${list.length}): card ${done} of ${total}…`, progress: (100 * done) / total }),
             );
             setPhotos((ps) =>
@@ -286,17 +413,28 @@ export function ScannerPage() {
         }
       });
     },
-    [index, scale, maxSide, debug, detectMethod, modelThreshold, recognizer, cleanup, run],
+    [namer, scale, maxSide, debug, detectMethod, modelThreshold, recognizer, cleanup, run],
   );
 
   const addFiles = async (files: File[]) => {
+    // Published files dropped with their manifest (developer path): installed as if downloaded.
+    if (files.some((f) => f.name.toLowerCase() === 'manifest.json')) {
+      await run('Installing the dropped Scanner files…', async () => {
+        const m = await installDropped(files);
+        const inst = (await installedFiles()) ?? null;
+        setInstalled(inst);
+        setPublishedModels(!!inst && !(await missingFiles(inst.manifest, ['detector', 'recognizer'])).length);
+        setNotice(m ? `Installed ${m.version}'s ${m.gallery} index of ${m.created.slice(0, 10)} (${m.count.toLocaleString()} pictures).` : null);
+      });
+      files = files.filter((f) => f.name.toLowerCase() !== 'manifest.json' && !/\.(onnx|bin|gz)$/i.test(f.name));
+    }
     const tuned = files.find((f) => /recogni[sz]er.*\.onnx$/i.test(f.name));
     if (tuned && engineRef.current) {
       const bytes = await tuned.arrayBuffer();
       await cacheRecognizer(bytes);
       await dropOtherTuned(tunedModelKey(bytes));
       setTunedCached(true);
-      await loadModel('tuned');
+      await loadModel('dropped');
     }
     const onnx = files.find((f) => f.name.toLowerCase().endsWith('.onnx') && f !== tuned);
     if (onnx && engineRef.current) {
@@ -305,11 +443,11 @@ export function ScannerPage() {
         const bytes = await onnx.arrayBuffer();
         await cacheDetector(bytes);
         const r = await engine.call({ type: 'loadDetector', bytes }, [bytes]);
-        setDetector(r);
+        setDetector({ ...r, from: 'dropped file' });
         setDetectMethod('model');
       });
     }
-    const json = files.find((f) => f.name.toLowerCase().endsWith('.json') && f.name.toLowerCase() !== 'card-detector.json');
+    const json = files.find((f) => f.name.toLowerCase().endsWith('.json') && !/^card-(detector|recognizer)\.json$/i.test(f.name));
     if (json) {
       try {
         const parsed = parseLabels(await json.text());
@@ -340,11 +478,11 @@ export function ScannerPage() {
   const resultsJson = useMemo(
     () =>
       JSON.stringify(
-        { engine: info, backend, references: index?.size ?? 0, method, photos: scanned.map(photoToJson) },
+        { engine: info, backend, models: sourceLabel(modelSource, installed?.manifest.version), against: matchAgainst, references: namer?.size ?? 0, method, photos: scanned.map(photoToJson) },
         null,
         1,
       ),
-    [info, backend, index, method, scanned],
+    [info, backend, modelSource, installed, matchAgainst, namer, method, scanned],
   );
   const eta = build && build.done > 0 ? ((Date.now() - build.startedAt) / build.done) * (build.total - build.done - build.failed) : null;
   const ready = !!info && !!backend;
@@ -411,7 +549,7 @@ export function ScannerPage() {
         await engine.call({ type: 'loadPhoto', photoId: id, bitmap }, [bitmap]);
         editPhoto.current = { url: p.url, id };
       }
-      return nameQuads(engine, editPhoto.current!.id, quads, indexRef.current);
+      return nameQuads(engine, editPhoto.current!.id, quads, namerRef.current);
     });
     editQueue.current = job.catch(() => undefined);
     setNaming((n) => n + 1);
@@ -435,7 +573,7 @@ export function ScannerPage() {
     }
     const have = matchesRef.current[file];
     const todo = cur.cards.filter((c) => c.quad && !have?.has(c.id!));
-    if (!todo.length || !indexRef.current?.size) return;
+    if (!todo.length || !namerRef.current?.size) return;
     nameAt(
       file,
       todo.map((c) => c.quad!),
@@ -580,65 +718,113 @@ export function ScannerPage() {
               {info ? `OpenCV ${info.opencv} · onnxruntime ${info.ort} · WebGPU ${info.webgpu ? 'available' : 'not available'}` : engineError ? 'Not started' : 'Starting…'}
             </Text>
             <Text size="sm">
-              Recognition: {recognizer === 'tuned' ? 'tuned model (card-recognizer.onnx)' : DINO_FILE.label}:{' '}
-              {backend ? `running on ${backend === 'webgpu' ? 'WebGPU' : 'the CPU'}` : recognizer === 'tuned' || modelCached ? 'not started' : `not downloaded (${mb(DINO_FILE.bytes)})`}
+              Recognition: {modelSource === 'dino' ? DINO_FILE.label : `tuned model (${sourceLabel(modelSource, installed?.manifest.version)})`}:{' '}
+              {backend ? `running on ${backend === 'webgpu' ? 'WebGPU' : 'the CPU'}` : modelSource !== 'dino' || modelCached ? 'not started' : `not downloaded (${mb(DINO_FILE.bytes)})`}
             </Text>
             <SegmentedControl
               size="xs"
-              value={recognizer}
-              onChange={(v) => {
-                const which = v as 'dino' | 'tuned';
-                setRecognizer(which);
-                if (backend) void loadModel(which);
-              }}
+              value={modelSource}
+              onChange={(v) => void switchSource(v as ModelSource)}
               data={[
+                { value: 'published', label: `Published${installed ? ` ${installed.manifest.version}` : ''}`, disabled: !publishedModels },
+                { value: 'dropped', label: 'Dropped files', disabled: !tunedCached },
                 { value: 'dino', label: 'DINOv2 (download)' },
-                { value: 'tuned', label: 'Tuned (card-recognizer.onnx)', disabled: !tunedCached },
               ]}
               disabled={!!busy}
             />
             <Text size="sm">
               Card detector:{' '}
-              {detector ? `trained model loaded (input ${detector.size} px, on ${detector.backend === 'webgpu' ? 'WebGPU' : 'the CPU'})` : 'none: drop card-detector.onnx (from the scanner trainer) on the photos box'}
+              {detector ? `trained model loaded (${detector.from}, input ${detector.size} px, on ${detector.backend === 'webgpu' ? 'WebGPU' : 'the CPU'})` : 'none: download the Scanner files, or drop card-detector.onnx (from the scanner trainer) on the photos box'}
             </Text>
             <Group>
               <Button size="xs" onClick={() => void loadModel()} disabled={!info || !!busy || !!backend}>
-                {recognizer === 'tuned' || modelCached ? 'Start the model' : 'Download and start the model'}
+                {modelSource !== 'dino' || modelCached ? 'Start the model' : 'Download and start the model'}
               </Button>
+              {readyIn !== null && (
+                <Text size="xs" c="dimmed">
+                  Ready {(readyIn / 1000).toFixed(1)} s after opening
+                </Text>
+              )}
             </Group>
           </Stack>
         </Card>
         <Card withBorder>
           <Stack gap={6}>
-            <Text fw={600}>2. Reference set (prints you own)</Text>
-            <Text size="sm">
-              {account ? `${accountLabel(account)}: ` : ''}
-              {prints ? `${prints.length.toLocaleString()} prints in the synced collection` : accountKey ? 'Reading the collection…' : 'No account: sync your collection first'}
-            </Text>
-            <Text size="sm">
-              {index ? `${index.size.toLocaleString()} card pictures have vectors (${index.prints.filter((p) => p.back).length.toLocaleString()} of them back faces)` : '…'}
-            </Text>
-            {build && (
+            <Text fw={600}>2. What cards are named against</Text>
+            <SegmentedControl
+              size="xs"
+              value={matchAgainst}
+              onChange={(v) => setMatchAgainst(v as MatchAgainst)}
+              data={[
+                { value: 'every', label: 'Every print' },
+                { value: 'mine', label: 'Only my prints' },
+                { value: 'built', label: 'Built here (my prints)' },
+              ]}
+            />
+            {matchAgainst !== 'built' ? (
               <>
-                <Progress value={build.total ? (100 * (build.done + build.failed)) / build.total : 100} />
-                <Text size="xs" c="dimmed">
-                  {build.done.toLocaleString()} of {build.total.toLocaleString()} new pictures
-                  {build.failed ? ` · ${build.failed} failed` : ''}
-                  {build.skipped ? ` · ${build.skipped.toLocaleString()} already done` : ''}
-                  {eta !== null && build.done + build.failed < build.total ? ` · about ${Math.ceil(eta / 60000)} min left` : ''}
+                <Text size="sm">
+                  {printIndex
+                    ? `${printIndex.installed.manifest.version} index of ${printIndex.installed.manifest.created.slice(0, 10)}${printIndex.installed.manifest.gallery !== 'every-print' ? ` (${printIndex.installed.manifest.gallery})` : ''}: ${(printIndex.mask ? printIndex.mask.reduce((a, b) => a + b, 0) : printIndex.prints.length).toLocaleString()} of ${printIndex.prints.length.toLocaleString()} pictures · ${printIndex.info.kind}-${printIndex.info.dims} · search on ${printIndex.info.backend === 'webgpu' ? 'WebGPU' : 'the CPU'} · opened in ${(printIndex.ms / 1000).toFixed(1)} s`
+                    : installed
+                      ? 'Opening the index…'
+                      : 'Not downloaded yet'}
                 </Text>
+                {printIndex && backend && !indexFits && (
+                  <Text size="sm" c="orange">
+                    This index goes with {printIndex.installed.manifest.version}'s recognizer, not the one running: cards are named against the reference set built here.
+                  </Text>
+                )}
+                <Text size="xs" c="dimmed">
+                  {latest?.manifest
+                    ? `On Hugging Face: ${latest.manifest.version} index of ${latest.manifest.created.slice(0, 10)}, ${latest.manifest.count.toLocaleString()} pictures (checked ${new Date(latest.at).toLocaleString()})`
+                    : latest?.error
+                      ? `Hugging Face: ${latest.error}`
+                      : 'Not checked on Hugging Face yet'}
+                </Text>
+                <Group>
+                  {latest?.manifest && latest.commit !== installed?.commit && (
+                    <Button size="xs" onClick={() => void downloadFiles()} disabled={!info || !!busy}>
+                      {installed ? 'Update' : 'Download'} ({mb(Object.values(latest.manifest.files).filter((f) => !installed || !Object.values(installed.manifest.files).some((g) => g.sha256 === f.sha256)).reduce((t, f) => t + f.bytes, 0))})
+                    </Button>
+                  )}
+                  <Button size="xs" variant="default" onClick={() => void checkNow()} loading={checking} disabled={!!busy}>
+                    Check for update
+                  </Button>
+                </Group>
+              </>
+            ) : (
+              <>
+                <Text size="sm">
+                  {account ? `${accountLabel(account)}: ` : ''}
+                  {prints ? `${prints.length.toLocaleString()} prints in the synced collection` : accountKey ? 'Reading the collection…' : 'No account: sync your collection first'}
+                </Text>
+                <Text size="sm">
+                  {index ? `${index.size.toLocaleString()} card pictures have vectors (${index.prints.filter((p) => p.back).length.toLocaleString()} of them back faces)` : '…'}
+                </Text>
+                {build && (
+                  <>
+                    <Progress value={build.total ? (100 * (build.done + build.failed)) / build.total : 100} />
+                    <Text size="xs" c="dimmed">
+                      {build.done.toLocaleString()} of {build.total.toLocaleString()} new pictures
+                      {build.failed ? ` · ${build.failed} failed` : ''}
+                      {build.skipped ? ` · ${build.skipped.toLocaleString()} already done` : ''}
+                      {eta !== null && build.done + build.failed < build.total ? ` · about ${Math.ceil(eta / 60000)} min left` : ''}
+                    </Text>
+                  </>
+                )}
+                <Group>
+                  <Button size="xs" onClick={() => void buildRefs()} disabled={!ready || !prints?.length || building}>
+                    {index?.size ? 'Add missing prints' : 'Build the reference set'}
+                  </Button>
+                  {building && (
+                    <Button size="xs" variant="default" onClick={() => buildAbort.current?.abort()}>
+                      Stop
+                    </Button>
+                  )}
+                </Group>
               </>
             )}
-            <Group>
-              <Button size="xs" onClick={() => void buildRefs()} disabled={!ready || !prints?.length || building}>
-                {index?.size ? 'Add missing prints' : 'Build the reference set'}
-              </Button>
-              {building && (
-                <Button size="xs" variant="default" onClick={() => buildAbort.current?.abort()}>
-                  Stop
-                </Button>
-              )}
-            </Group>
           </Stack>
         </Card>
       </Group>
@@ -702,7 +888,7 @@ export function ScannerPage() {
           <Text size="xs" c="dimmed">
             {photos.length} photo{photos.length === 1 ? '' : 's'}
             {labelledPhotos.length ? ` · labels for ${labelledPhotos.length} (${checkedPhotos} checked)` : ' · no labels yet'}
-            {!index?.size ? ' · no reference set yet: cards are found but not named' : ''}
+            {!namer?.size ? ' · nothing to name cards against yet: cards are found but not named' : ''}
           </Text>
         </Stack>
       </Card>
@@ -817,7 +1003,7 @@ export function ScannerPage() {
                   cards={shownLabels.cards}
                   matches={matches[shownFile]}
                   colorOf={colorOf}
-                  prints={index?.prints ?? prints ?? []}
+                  prints={namer?.prints ?? prints ?? []}
                   selected={labelSel}
                   onSelect={setLabelSel}
                   onChange={(id, patch) => editCards(shownFile, (cards) => cards.map((c) => (c.id === id ? { ...c, ...patch } : c)))}

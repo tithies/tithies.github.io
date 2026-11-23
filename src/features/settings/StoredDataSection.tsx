@@ -14,6 +14,7 @@ import { siteOf } from '@/lib/sites/registry';
 import { SettingsSection } from '@/lib/ui/SettingsSection';
 import { SiteIcon } from '@/lib/ui/SiteIcon';
 import { scannerDb } from '@/features/scanner/store';
+import type { Installed } from '@/features/scanner/published';
 import { clearStoredData, measureStoredData, type DataGroup } from './stored-data';
 
 const n = (v: number) => v.toLocaleString('en-CA');
@@ -51,8 +52,9 @@ function useStats(ttlHours: number, keys: AccountKey[]) {
       scannerDb.refs.count(),
       Promise.all(keys.map(accountStats)),
     ]);
+    const scannerFiles = (await scannerDb.meta.get('published'))?.value as Installed | undefined;
     const accounts = Object.fromEntries(keys.map((k, i) => [k, perAccount[i]])) as Record<AccountKey, AccountStats>;
-    return { lookups, fresh, oldest: oldest?.fetchedAt, bulk, sets, changeOps: changes.ops, changeCalls: changes.calls, changesRunning: changes.running, scannerRefs, accounts };
+    return { lookups, fresh, oldest: oldest?.fetchedAt, bulk, sets, changeOps: changes.ops, changeCalls: changes.calls, changesRunning: changes.running, scannerRefs, scannerFiles, accounts };
   }, [ttlHours, keys.join(',')]);
 }
 
@@ -187,9 +189,13 @@ export function StoredDataSection() {
     account: null,
     title: 'Scanner prototype',
     kind: CACHE,
-    details: [`${n(s.scannerRefs)} prints with image vectors`, 'Its image model, once downloaded (about 89 MB)'],
-    effect: 'Shared by every account. The Scanner prototype downloads the model again and makes the vectors again from Scryfall images.',
-    empty: !s.scannerRefs,
+    details: [
+      ...(s.scannerFiles ? [`Its every-print index (${s.scannerFiles.manifest.version}, ${n(s.scannerFiles.manifest.count)} pictures, of ${s.scannerFiles.manifest.created.slice(0, 10)}) and its models`] : []),
+      `${n(s.scannerRefs)} prints with image vectors built here`,
+      'Its image models, once downloaded (about 90 MB each)',
+    ],
+    effect: 'Shared by every account. The Scanner prototype downloads its models and index again, and makes the vectors built here again from Scryfall images.',
+    empty: !s.scannerRefs && !s.scannerFiles,
   };
   const blocks: { account: AccountRow | null; rows: Row[] }[] = [
     { account: null, rows: [shared, changeLog, scanner] },
