@@ -46,6 +46,60 @@ export interface BuildProgress {
 /** Images per engine call: 8 prints × 2 model runs = one batch of 16 pictures (engine/features.ts). */
 const GROUP = 8;
 
+const SCRYFALL_COLLECTION = 'https://api.scryfall.com/cards/collection';
+/** Identifiers per /cards/collection request (Scryfall's limit). */
+const COLLECTION_MAX = 75;
+
+interface ScryfallCard {
+  id: string;
+  set: string;
+  collector_number: string;
+  lang: string;
+  image_status?: string;
+}
+
+async function scryfallCollection(identifiers: object[], signal: AbortSignal, fetchFn: typeof fetch): Promise<ScryfallCard[]> {
+  const out: ScryfallCard[] = [];
+  for (let i = 0; i < identifiers.length; i += COLLECTION_MAX) {
+    // Scryfall asks for 50–100 ms between requests.
+    if (i) await new Promise((r) => setTimeout(r, 120));
+    const res = await fetchFn(SCRYFALL_COLLECTION, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ identifiers: identifiers.slice(i, i + COLLECTION_MAX) }),
+      signal,
+    });
+    if (!res.ok) throw new Error(`Scryfall /cards/collection: HTTP ${res.status}`);
+    out.push(...((await res.json()) as { data: ScryfallCard[] }).data);
+  }
+  return out;
+}
+
+/**
+ * Pictures to use instead of a print's own (print id → the stand-in's id). A non-English print Scryfall has no scan of
+ * shows the English picture under a "Localized image not available" box (image_status "placeholder"), which spoils its
+ * vectors: the English print of the same set and number has the same art without the box. Prints without a language
+ * (read before Tithies kept it) are taken as English. A failed lookup gives no stand-ins (the build goes on as before).
+ */
+export async function pictureStandIns(prints: readonly PrintInfo[], signal: AbortSignal, fetchFn: typeof fetch = fetch): Promise<Map<string, string>> {
+  const standIns = new Map<string, string>();
+  const foreign = prints.filter((p) => p.lang && p.lang !== 'en');
+  if (!foreign.length) return standIns;
+  try {
+    const placeholders = (await scryfallCollection(foreign.map((p) => ({ id: p.scryfallId })), signal, fetchFn)).filter((c) => c.lang !== 'en' && c.image_status === 'placeholder');
+    if (!placeholders.length) return standIns;
+    const english = await scryfallCollection(placeholders.map((c) => ({ set: c.set, collector_number: c.collector_number })), signal, fetchFn);
+    const bySetCn = new Map(english.filter((c) => c.lang === 'en' && c.image_status !== 'placeholder').map((c) => [`${c.set}|${c.collector_number}`, c.id]));
+    for (const c of placeholders) {
+      const id = bySetCn.get(`${c.set}|${c.collector_number}`);
+      if (id) standIns.set(c.id, id);
+    }
+  } catch (e) {
+    if (!signal.aborted) console.warn('Scanner reference: looking up pictures of non-English prints failed', e);
+  }
+  return standIns;
+}
+
 /** One picture to turn into vectors: a print's front, or the back of a double-faced one. */
 interface Job {
   p: PrintInfo;
@@ -61,12 +115,20 @@ export async function buildReferences(
   const modelKey = opts.modelKey ?? MODEL_KEY;
   const have = await currentRefIds(modelKey);
   const noBack = await noBackIds();
+  const standIns = await pictureStandIns(prints, opts.signal);
   const all: Job[] = prints.flatMap((p) => {
     const jobs: Job[] = [{ p, back: false, key: rowKey(modelKey, p.scryfallId, false) }];
     // Two-faced prints: the back picture too, unless Scryfall has none (adventures, split cards).
     if ((p.faces ?? 1) > 1 && !noBack.has(p.scryfallId)) jobs.push({ p, back: true, key: rowKey(modelKey, p.scryfallId, true) });
     return jobs;
   });
+  // Rows made from a picture that now has a stand-in are made again.
+  const standInJobs = all.filter((j) => standIns.has(j.p.scryfallId) && have.has(j.key));
+  const standInRows = await scannerDb.refs.bulkGet(standInJobs.map((j) => j.key));
+  standInJobs.forEach((j, i) => {
+    if (standInRows[i]?.picture !== standIns.get(j.p.scryfallId)) have.delete(j.key);
+  });
+  const picture = (j: Job) => standIns.get(j.p.scryfallId) ?? j.p.scryfallId;
   const todo = all.filter((j) => !have.has(j.key) && scryfallImage(j.p.scryfallId, 'normal'));
   const progress: BuildProgress = { done: 0, total: todo.length, failed: 0, skipped: all.length - todo.length, startedAt: Date.now() };
   opts.onProgress({ ...progress });
@@ -74,7 +136,7 @@ export async function buildReferences(
   const missingBacks: string[] = [];
   const fetchImage = (j: Job) =>
     fetches.add(async () => {
-      const res = await fetch(scryfallImage(j.p.scryfallId, 'normal', j.back ? 'back' : 'front')!, { signal: opts.signal });
+      const res = await fetch(scryfallImage(picture(j), 'normal', j.back ? 'back' : 'front')!, { signal: opts.signal });
       if (res.status === 404 && j.back) {
         missingBacks.push(j.p.scryfallId);
         return null;
@@ -113,7 +175,8 @@ export async function buildReferences(
       await scannerDb.refs.bulkPut(
         ok.map(({ j }, i): RefRow => {
           const { faces: _faces, back: _back, ...print } = j.p;
-          return { ...print, scryfallId: j.key, printId: j.p.scryfallId, back: j.back || undefined, modelKey, vectors: features[i].vectors, phash: features[i].phash, addedAt: now };
+          const pic = standIns.get(j.p.scryfallId);
+          return { ...print, scryfallId: j.key, printId: j.p.scryfallId, back: j.back || undefined, ...(pic ? { picture: pic } : {}), modelKey, vectors: features[i].vectors, phash: features[i].phash, addedAt: now };
         }),
       );
       progress.done += ok.length;

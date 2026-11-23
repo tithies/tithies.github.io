@@ -48,6 +48,8 @@ export interface RefRow {
   setName: string;
   cn: string;
   lang?: string;
+  /** The Scryfall id whose picture made the vectors, when not the print's own (reference.ts: pictureStandIns). */
+  picture?: string;
   /** One normalized vector per variant (models.ts). */
   vectors: Record<string, Float32Array>;
   phash: Uint32Array;
