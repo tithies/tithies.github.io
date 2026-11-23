@@ -113,6 +113,18 @@ async function cached(sha: string): Promise<boolean> {
   return !!(await (await caches.open(MODEL_CACHE)).match(fileKey(sha)));
 }
 
+/**
+ * The latest manifest only brings a new index (the daily refresh, trainer/refresh.py): same detector and recognizer,
+ * another index or prints file. The page downloads those by itself; new models wait for the user.
+ */
+export function indexOnlyUpdate(installed: Installed | null | undefined, latest: LatestCheck | null | undefined): boolean {
+  const m = latest?.manifest;
+  if (!installed || !m || !latest?.commit || latest.commit === installed.commit) return false;
+  const a = installed.manifest.files;
+  const b = m.files;
+  return a.detector.sha256 === b.detector.sha256 && a.recognizer.sha256 === b.recognizer.sha256 && (a.index.sha256 !== b.index.sha256 || a.prints.sha256 !== b.prints.sha256);
+}
+
 /** The manifest's files this browser doesn't have yet. */
 export async function missingFiles(manifest: Manifest, roles: readonly FileRole[] = ROLES): Promise<FileRole[]> {
   const out: FileRole[] = [];

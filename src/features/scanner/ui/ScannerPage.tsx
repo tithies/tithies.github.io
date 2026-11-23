@@ -9,7 +9,7 @@ import { cacheDetector, cachedDetector, cachedRecognizer, cacheRecognizer, isMod
 import { ALL_METHODS, DINO_FILE } from '../models';
 import { confidence, disposePhoto, nameQuads, photoToJson, refNamer, scanPhoto, type Namer, type Recognizer, type ScannedPhoto } from '../pipeline';
 import { openPrintIndex, printIndexNamer, setOwnedOnly, type PrintIndex } from '../print-index';
-import { checkLatest, downloadPublished, installDropped, installedFiles, missingFiles, readFile, sha256Hex, type Installed, type LatestCheck } from '../published';
+import { checkLatest, downloadPublished, indexOnlyUpdate, installDropped, installedFiles, missingFiles, readFile, sha256Hex, type Installed, type LatestCheck } from '../published';
 import type { DetectMethod, EngineInfo } from '../protocol';
 import { buildReferences, ownedPrints, type BuildProgress, type PrintInfo } from '../reference';
 import type { ScoredPhoto } from '../score';
@@ -82,6 +82,10 @@ export function ScannerPage() {
   const [publishedModels, setPublishedModels] = useState(false);
   const [latest, setLatest] = useState<LatestCheck | null>(null);
   const [checking, setChecking] = useState(false);
+  /** A new index alone (same models) downloads by itself: its progress, then the install waiting for the scans to end. */
+  const [indexUpdate, setIndexUpdate] = useState<{ done: number; total: number } | null>(null);
+  const [pendingInstall, setPendingInstall] = useState<Installed | null>(null);
+  const updating = useRef(false);
   /** The every-print index as opened, and as searched (with the "only my prints" mask). */
   const [printBase, setPrintBase] = useState<PrintIndex | null>(null);
   const [printIndex, setPrintIndex] = useState<PrintIndex | null>(null);
@@ -221,6 +225,28 @@ export function ScannerPage() {
       cancelled = true;
     };
   }, [printBase, matchAgainst, prints]);
+
+  // A new index alone (the daily refresh) downloads in the background; it replaces the open one between scans.
+  useEffect(() => {
+    if (updating.current || !latest?.manifest || !latest.commit || !indexOnlyUpdate(installed, latest)) return;
+    updating.current = true;
+    const m = latest.manifest;
+    const total = m.files.index.bytes + m.files.prints.bytes;
+    setIndexUpdate({ done: 0, total });
+    downloadPublished(m, latest.commit, { onProgress: (done, t) => setIndexUpdate({ done, total: t }) })
+      .then(async () => setPendingInstall((await installedFiles()) ?? null))
+      .catch((e: Error) => setError(`Updating the every-print index: ${e.message}`))
+      .finally(() => {
+        updating.current = false;
+        setIndexUpdate(null);
+      });
+  }, [latest, installed]);
+  useEffect(() => {
+    if (pendingInstall && !busy) {
+      setInstalled(pendingInstall);
+      setPendingInstall(null);
+    }
+  }, [pendingInstall, busy]);
 
   /** The every-print index goes with the running recognizer (the one that made its vectors). */
   const indexFits = !!printIndex && !!recognizerSha && recognizerSha === printIndex.installed.manifest.files.recognizer.sha256;
@@ -782,8 +808,15 @@ export function ScannerPage() {
                       ? `Hugging Face: ${latest.error}`
                       : 'Not checked on Hugging Face yet'}
                 </Text>
+                {(indexUpdate || pendingInstall) && (
+                  <Text size="xs" c="dimmed">
+                    {indexUpdate
+                      ? `Updating the every-print index in the background (${mb(indexUpdate.done)} of ${mb(indexUpdate.total)})…`
+                      : 'A newer index is ready: it replaces this one when the scan ends.'}
+                  </Text>
+                )}
                 <Group>
-                  {latest?.manifest && latest.commit !== installed?.commit && (
+                  {latest?.manifest && latest.commit !== installed?.commit && !indexUpdate && !pendingInstall && (
                     <Button size="xs" onClick={() => void downloadFiles()} disabled={!info || !!busy}>
                       {installed ? 'Update' : 'Download'} ({mb(Object.values(latest.manifest.files).filter((f) => !installed || !Object.values(installed.manifest.files).some((g) => g.sha256 === f.sha256)).reduce((t, f) => t + f.bytes, 0))})
                     </Button>

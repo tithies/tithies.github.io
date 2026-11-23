@@ -75,6 +75,11 @@
 
 **Every-print index** (`index-file.ts`, `print-index.ts`, `search-*.ts`, `gpu-search.ts`):
 - **Made** by `python -m trainer index vN` in the trainer repo, with version N's recognizer and the page's exact preparation. It only goes with its own recognizer: the page uses it only when the running recognizer's SHA-256 is the one in its manifest.
+- **Kept current** by the trainer repo's daily GitHub Actions job (`python -m trainer refresh`, 13:17 UTC):
+  - it finds new prints, new scans (a picture URL's timestamp changed) and removed prints, then embeds only those on the CPU; the other rows are kept exactly as published;
+  - it scores the 33 test photos against the new index, and stops when fewer names come out right or more than 2,000 rows would change. A stopped run opens an issue;
+  - checked on a local stand-in for the hub: the refreshed index equals a full rebuild byte for byte.
+  - Only a new model version's first index is made on the PC.
 - **Files:**
   - `index-<date>.bin`: every print's vector (int8 with a scale per row, or f16 / f32; 384 dimensions, or fewer by PCA);
   - `prints-<date>.json.gz`: the print of each vector (Scryfall id, face, name, set, number, language, artwork group, finishes);
@@ -89,6 +94,7 @@
 **Published files** (`published.ts`):
 - **Where:** the public Hugging Face model repo `tithies/card-scanner`, written by `python -m trainer publish vN`. It holds both models and the index under `vN/`, plus the root `manifest.json`.
 - **Checks:** the page reads the manifest at most once a day ("Check for update" forces it). Files are downloaded at the manifest's commit (its `X-Repo-Commit` header).
+- **Updates:** a new index alone (same models' SHA-256: `indexOnlyUpdate`) downloads by itself in the background and replaces the open one when no scan is running. New models wait for the "Update" button.
 - **Storage:** each file goes into Cache Storage under its SHA-256 (checked), so a new index alone doesn't download the models again. Files the installed manifest no longer lists are removed.
 - **Developer path:** dropping `manifest.json` with its index and prints files (and the models, if wanted) installs them the same way.
 
@@ -206,12 +212,12 @@ Format 2:
   - I change the code there and commit (neutral identity); the user pushes, pulls on the PC, trains;
   - `python -m trainer release vN` makes `models/vN` (both `.onnx` files and their PyTorch weights in Git LFS, logs, evaluation), which the user commits and pushes; `--from vN` fine-tunes from those weights.
 - **A new version on the page:**
-  - **Published:** after `python -m trainer index vN` and `publish vN` on the PC, the page offers "Update" (or "Check for update" first).
+  - **Published:** after `python -m trainer index vN` and `publish vN` on the PC, the page offers "Update" (or "Check for update" first). Index updates after that come from the daily job by themselves.
   - **Before publishing:**
     1. `git pull` the trainer repo;
     2. drop `models/vN/index/manifest.json`, `index-*.bin` and `prints-*.json.gz` on the photos box;
     3. drop the two models too. Files over 50 MB go through the browser tool in parts.
-  - **A small index of the collection to try the page:** `python -m trainer index v2 --gallery owned --out work/index/v2-owned`. It's never published: `publish` refuses it.
+  - **A small index of the collection to try the page:** `python -m trainer index v2 --gallery owned --out work/index/v2-owned --no-eval`. It's never published: `publish` refuses it.
   - **Without an index:** "Built here (my prints)", then "Build the reference set" for the new recognizer.
 - **Photos:** a new batch is stripped of its metadata (`python -m trainer photos strip`: GPS, motion-photo video; pixels unchanged), labelled on the page, and committed in the trainer repo's `photos/`. `photos/owned-prints.json` is read from the page's reference set, so the evaluation uses the same gallery.
 - **Running the page:**

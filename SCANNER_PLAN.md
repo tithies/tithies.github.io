@@ -41,7 +41,7 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, in or
      - then `evaluate v2 --gallery every-print --formats --save` and `evaluate v2 --gallery mine --save`;
      - commit and push `models/v2/eval-*.json`.
   2. **Choose** the format (the smallest within about 0.5 point of f32), and whether a v3 is needed (names down by more than about 1 point). A v3 gets its own plan-mode round. It needs v2's weights in `models/v2` first (`release v2 --add-weights`).
-  3. **PC:** `python -m trainer index v2 --format <chosen>`, then commit and push `models/v2/index`.
+  3. **PC:** `python -m trainer index v2 --format <chosen>`. It writes `work/index/v2/` and scores the test photos against it; the index isn't committed (Hugging Face keeps it).
   4. **The user:**
      - create the Hugging Face account `tithies` (neutral e-mail) and the public model repo `card-scanner`;
      - `hf auth login`, then `python -m trainer publish v2`.
@@ -49,7 +49,10 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, in or
      - "Download" from Hugging Face;
      - the 33 test photos give `evaluate v2 --gallery every-print --format <chosen>`'s numbers;
      - opening time with the full index.
-  6. **One update:** when Scryfall adds prints, `index v2 --update`, then `publish v2`; the page picks it up.
+  6. **Daily updates (built 2026-11-23):**
+     - make a fine-grained Hugging Face token for `tithies/card-scanner` and save it as the trainer repo's Actions secret `HF_TOKEN`;
+     - run "Index refresh" once by hand with `dry_run`;
+     - then the daily job keeps the index current, and the page updates it by itself (trainer README section 10).
 
 The steps below are the original plan, kept for the details.
 

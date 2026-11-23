@@ -1,4 +1,4 @@
-import { checkLatest, downloadPublished, fileKey, installDropped, installedFiles, MANIFEST_URL, measurePublished, missingFiles, parseManifest, readFile, sha256Hex, type Manifest } from '@/features/scanner/published';
+import { checkLatest, downloadPublished, fileKey, indexOnlyUpdate, installDropped, installedFiles, MANIFEST_URL, measurePublished, missingFiles, parseManifest, readFile, sha256Hex, type Manifest } from '@/features/scanner/published';
 import { MODEL_CACHE } from '@/features/scanner/model-cache';
 import { scannerDb } from '@/features/scanner/store';
 
@@ -147,5 +147,23 @@ describe('published Scanner files', () => {
     // Models not dropped (the page uses the dropped ones it has): only they are missing.
     expect(await missingFiles(m)).toEqual(['detector', 'recognizer']);
     expect(await installDropped([asFile('index-1.bin')])).toBeNull();
+  });
+});
+
+describe('index-only updates', () => {
+  it('are the ones with the same models and another index', async () => {
+    const files = v1files();
+    const m1 = await manifestFor(files);
+    const installed = { manifest: m1, commit: COMMIT, installedAt: 1 };
+    const m2 = await manifestFor({ ...files, 'index-1.bin': file('index two'), 'prints-1.json.gz': file('prints two') });
+    expect(indexOnlyUpdate(installed, { at: 2, manifest: m2, commit: COMMIT2 })).toBe(true);
+    // The same commit, or nothing new: no update.
+    expect(indexOnlyUpdate(installed, { at: 2, manifest: m1, commit: COMMIT })).toBe(false);
+    expect(indexOnlyUpdate(installed, { at: 2, manifest: m1, commit: COMMIT2 })).toBe(false);
+    // Another recognizer: a new version, for the Update button.
+    const m3 = await manifestFor({ ...files, 'card-recognizer.onnx': file('recognizer v3'), 'index-1.bin': file('index three') });
+    expect(indexOnlyUpdate(installed, { at: 2, manifest: m3, commit: COMMIT2 })).toBe(false);
+    expect(indexOnlyUpdate(undefined, { at: 2, manifest: m2, commit: COMMIT2 })).toBe(false);
+    expect(indexOnlyUpdate(installed, { at: 2, error: 'offline' })).toBe(false);
   });
 });
