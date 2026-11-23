@@ -178,7 +178,7 @@ Format 2:
 
 - **Training** happens on the user's Windows PC (RTX 4070, 12 GB), from the trainer repo:
   - I change the code there and commit (neutral identity); the user pushes, pulls on the PC, trains;
-  - `python -m trainer release vN` makes `models/vN` (both `.onnx` files in Git LFS, logs, evaluation), which the user commits and pushes.
+  - `python -m trainer release vN` makes `models/vN` (both `.onnx` files and their PyTorch weights in Git LFS, logs, evaluation), which the user commits and pushes; `--from vN` fine-tunes from those weights.
 - **New models on the page:**
   1. `git pull` the trainer repo;
   2. drop `models/vN/card-detector.onnx` and `card-recognizer.onnx` on the photos box. Files over 50 MB go through the browser tool in parts;
