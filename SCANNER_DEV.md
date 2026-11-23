@@ -1,12 +1,12 @@
 # Scanner — development notes
 
-**Status (2026-11-20):** prototype page with a trained detector and a fine-tuned recognizer: 98 % of cards named right on the 19 test photos (41 % at the start). A labelling mode makes real training and test data. See "0. Current state and next steps" just below.
+**Status (2026-11-23):** prototype page with a trained detector and a fine-tuned recognizer (v2, trained on generated scenes and 37 labelled photos): on 33 test photos, 99.5 % of cards found and 98.5 % named right, against the owned collection. A labelling mode makes real training and test data. See "0. Current state and next steps" just below.
 **Feature:** you upload one or more photos, and Tithies finds every Magic card in them. It returns a list of the detected cards, each with its position in the photo (so the page can draw an outline around it), the card and its print. You correct the list, then add it to the Moxfield collection or a binder. This is the "Scanner cards" item of `todo-future.txt`.
 **Out of scope:** telling foil from non-foil in a photo. Finish defaults to non-foil and you change it per row.
 
 ---
 
-## 0. Current state and next steps (2026-11-20)
+## 0. Current state and next steps (2026-11-23)
 
 **Built** (hidden page `dashboard.html#/collection/scanner`, on master, not pushed):
 - **Engines:** OpenCV.js 4.12 and onnxruntime-web 1.31.1, WebGPU, in a sandboxed iframe.
@@ -21,13 +21,27 @@
   - recognizer: `crops.py`, `train_recog.py`, `export_recog.py`;
   - training runs on a separate Windows PC (RTX 4070), see "Working method" below.
 
-**Scores on the 19 test photos** (107 cards):
-- names 98 % (105 / 107), prints 96 % (100 / 104);
-- every card found was named right; 2 cards were not found;
-- 12–13 extra shapes, low scores, shown orange.
-- Details under Phase 4.
+**Models v2 (2026-11-21)**, fine-tuned from v1 on the 37 training photos plus the new generated scenes. On the 33 test photos (199 scored cards), against the owned collection (3,910 pictures):
 
-**Batch 2** (51 more photos, now `real/batch2/` in the trainer repo, 2026-11-20): 461 shapes found, 368 green (80 %).
+| | v1 | v2 |
+|---|---|---|
+| Found | 98.5 % (196) | **99.5 % (198)** |
+| Extra shapes (with cleanup) | 16 | **12** |
+| Name right | 97 % (193) | **98.5 % (196)** |
+| Print right | 95.5 % (190) | **96.5 % (192)** |
+| Corner error, labels moved by hand | 3.9 % of card height | **3.1 %** |
+
+- **The page gives exactly the same numbers** as the trainer's `eval.py` (checked 2026-11-23, both models loaded and the v2 reference set rebuilt).
+- **The corner error over all labels** (1.9 % v1, 2.3 % v2) favours v1, whose corners drafted the labels: about half were kept exactly as drafted. On the labels moved by hand, v2 is better. There's no systematic shift.
+- **What's left:**
+  - 1 card missed: Marchesa in a fanned hand (`200435284`);
+  - 2 wrong names, both mostly covered by other cards (Deserter's Disciple 0.54, Static Snare 0.37): orange;
+  - 4 wrong prints of the right name, all same-art reprints (Bonders' Enclave OTC/M3C twice, Sakura-Tribe Elder, Path of Ancestry), the right print within 0.002–0.016: only the bottom line (phase 3) tells them apart;
+  - 12 extra shapes, all orange (0.46–0.59).
+- **Fixed 2026-11-23:** the evaluation gallery lacked 13 owned non-English prints (not in Scryfall's `default_cards`), including the labelled Japanese Soltari Lancer. Two owned prints (Soltari Lancer JA, Bubbling Muck FR) only have a Scryfall placeholder: the English picture under a "Localized image not available" box. The page and `fetch_real.py` now use the English print of the same set and number for those (`pictureStandIns` in `reference.ts`).
+- Logs and evaluations: `results/v1/`, `results/v2/` in the trainer repo.
+
+**Batch 2** (51 more photos, now `real/batch2/` in the trainer repo, 2026-11-20), first scanned with v1: 461 shapes found, 368 green (80 %).
 - **Works well:** table spreads (small cards too), white table in sun, carpet, blanket, bed, binder close-ups, the storage tray.
 - **Struggles:**
 
@@ -45,13 +59,9 @@
 - **Split:** `split.json` holds 33 test photos (the first 19 plus 1 in 4 of batch 2 by hash; 199 scored cards) and 37 training photos (312 scored cards). Photos in a subfolder named `test…` are always test photos.
 - **Shared prints:** the same decks appear in several photos, so test and training photos share prints. `eval.py` also reports the test prints that appear in no training photo.
 
-**Measured offline** (the trainer's `eval.py`, the page's pipeline: detector decode, warp both ways, recognizer):
-- **Test photos, current models, against the owned collection** (3,897 pictures, `owned-prints.json` read from the page's reference set):
-  - 98.5 % found (196 / 199), 23 extra shapes (16 with the cleanup), corners off by 1.9 % of the card height;
-  - 96 % of names right (191 / 199), 94.5 % of prints right (188 / 199).
-  - A small gallery (607 pictures) gave the same names and 96 % prints: the collection's similar reprints cost 3 prints.
-- **Training photos** (not trained on yet): 91.7 % found. The misses are concentrated in the batch-2 weak spots, e.g. 0 / 7 on the far binder page `201024215`.
-- **Wrong names on found cards** score 0.45–0.53, so they show orange.
+**Measured offline with v1** (the trainer's `eval.py`, the page's pipeline: detector decode, warp both ways, recognizer):
+- A small gallery (607 pictures) gave the same names as the owned collection, and 96 % prints: the collection's similar reprints cost 3 prints.
+- **Training photos** (before they were trained on): 91.7 % found. The misses were concentrated in the batch-2 weak spots, e.g. 0 / 7 on the far binder page `201024215`. They can't measure v2, which trained on them.
 
 **Built since:**
 - **Cleanup on the page** (`cleanup.ts`, "Drop bad shapes", default on): it drops an outline around two better-named neighbours, or a second outline of one card. Test photos: 23 → 16 extra shapes, no card lost.
@@ -59,25 +69,19 @@
 - **Real photos in training:** `train.py --init --real` (25 % of batches) and `train_recog.py --init --real` (20 % real cut-outs). The real test photos are measured each epoch for information only.
 - README section 8 has the commands for the 4070 PC.
 
-**Next:** the user runs README section 8 on the 4070 (`fetch_real.py`, baseline `eval.py`, both fine-tunes, exports, `eval.py` again). Then the new models are loaded on the page and the test photos rescanned. The first plan, for reference:
-1. **Test / training split:** the first 19 photos plus 1 in 4 of the others, chosen from a hash of the file name, so it never changes. Test photos never go into training.
-2. **The trainer's `eval.py`:**
-   - it runs the exported detector and recognizer on the labelled test photos and gives the page's numbers: found (IoU ≥ 0.5), extra shapes, name and print right;
-   - recognizer gallery: the labelled prints plus distractors from `data/cards`;
-   - images read with EXIF orientation, like the labels.
-3. **Real photos in training:**
-   - detector: fine-tune from the current `best.pt` on labelled training photos mixed with generated scenes;
-   - recognizer: real cut-outs (warped along the label corners) paired with their clean Scryfall pictures, downloaded by `scryfallId`.
-4. **Generated scenes for the failures above:** fans where only narrow strips show, offset stacks held in hand, binder pages from a distance (small pockets), piles, and tightly touching cards (the shapes that span two cards).
-5. **Cleanup without training:**
-   - drop a shape that contains two cards named better;
-   - of two overlapping outlines named the same print, keep the better one.
-6. **Face-down and unreadable cards in the labels:** while labelling, a card lying face down is named `Card back`, and a visible card nobody can identify `Unknown card` (no set or number, never a guess). Both are ticked "Mostly hidden", so the current scoring neither misses nor counts them.
-   - The training code must still treat it as a card **for the detector**: it is fully visible, unlike a covered card.
-   - It must skip it for recognition.
-   - A proper "face down" field in the labelling mode would be cleaner.
+**Next (to choose, 2026-11-23):** the test photos are near the ceiling against the owned collection, so the next gains are elsewhere:
+1. **Phase 1, every print:** the scanner is for adding cards, which aren't in the collection yet. First measure: `eval.py` with a gallery of every paper print (~100k pictures, a few hours of downloads), which shows how names and prints hold up among all reprints; then the index, its hosting and the download.
+2. **Phase 3, the bottom line:** reading the set code and number, for same-art reprints. It matters more among every print.
+3. **Phase 2, the real page:** corrections and export to Moxfield.
+4. **More photos of the weak spots as test photos** (`real/test-…/`): fans, offset stacks, far binder pages, piles. The weak spots are mostly in the training photos now, so the test set barely measures them.
 
-Later: phase 1 (every print), phase 2 (the real page and Moxfield export), phase 3 (bottom line, for same-art reprints).
+The first plan (done, for reference):
+1. Test / training split (`split.json`, never changes).
+2. `eval.py`: the page's pipeline offline, on the labelled test photos.
+3. Real photos in training (detector and recognizer).
+4. Generated scenes for the batch-2 failures.
+5. Cleanup without training (`cleanup.ts`).
+6. Face-down and unreadable cards in the labels: `Card back` / `Unknown card`, ticked "Mostly hidden": the detector counts them as cards, recognition skips them. A proper "face down" field in the labelling mode would be cleaner.
 
 **Working method:**
 - **Training happens on the user's Windows PC** (RTX 4070, 12 GB), from the private repo `tithies-scanner-trainer` (since 2026-11-21; it was `scanner-train/` here, then zips). The user pulls it there; I commit here (neutral identity) and the user pushes.
