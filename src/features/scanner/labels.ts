@@ -1,5 +1,5 @@
 /**
- * Hand-checked labels of the Scanner's test and training photos (real/labels.json in the
+ * Hand-checked labels of the Scanner's test and training photos (photos/labels.json in the
  * tithies-scanner-trainer repo).
  *
  * Format 2 (written by the labelling mode):

@@ -1,5 +1,5 @@
 /**
- * Drops bad shapes once the cards are named (the same rule as eval.py in the tithies-scanner-trainer repo, measured on
+ * Drops bad shapes once the cards are named (the same rule as trainer/evaluate.py in the tithies-scanner-trainer repo, measured on
  * the labelled photos: 23 → 16 extra shapes on the test photos, no card lost):
  * - a shape covering two or more shapes that are named better: one outline around neighbours;
  * - of two outlines of one card (named the same, and overlapping, or one mostly inside the other),

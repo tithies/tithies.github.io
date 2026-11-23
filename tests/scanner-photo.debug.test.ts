@@ -2,7 +2,7 @@
  * Detection on a real photo, in Node (no browser): for tuning the Scanner prototype.
  * Skipped unless SCANNER_PHOTO names a PNG, e.g. one of the labelled photos of the
  * tithies-scanner-trainer repo:
- *   SCANNER_PHOTO=../tithies-scanner-trainer/real/Untitled2.png npx vitest run tests/scanner-photo.debug.test.ts
+ *   SCANNER_PHOTO=../tithies-scanner-trainer/photos/batch1/Untitled2.png npx vitest run tests/scanner-photo.debug.test.ts
  * Writes <photo>.debug.png into the system's temp folder (scanner-debug/): cards found in green
  * (dashed blue: inferred from the binder grid), line quads in orange, the 40 longest lines in
  * blue; and <photo>.debug.txt with the cards found.
