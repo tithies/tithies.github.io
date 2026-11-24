@@ -1,5 +1,5 @@
-import { Alert, Anchor, Button, Checkbox, Divider, Group, Modal, Paper, SimpleGrid, Stack, Text, Title, Tooltip } from '@mantine/core';
-import { IconAlertTriangle, IconArrowsDiff, IconPlayerStop, IconRefresh } from '@tabler/icons-react';
+import { Alert, Button, Group, Modal, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { IconAlertTriangle, IconPlayerStop, IconRefresh } from '@tabler/icons-react';
 import { useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router';
 import { useActivity } from '@/lib/activity';
@@ -9,25 +9,22 @@ import { useRecentExports } from '@/lib/export/client';
 import { ExportDialog } from '@/lib/export/ui/ExportDialog';
 import { ExportProgressModal, RecentExportsModal } from '@/lib/export/ui/ExportProgress';
 import { accountLabel } from '@/lib/accounts/types';
-import { DeckTreePicker } from '@/lib/decks/DeckTreePicker';
-import { BoardCheckboxes, boardCopies } from '@/lib/decks/BoardCheckboxes';
-import { cancelSync, useCollectionMeta, useDeckData, useDecks, useDecksMeta, useFolderUrl, useSyncState } from '@/lib/decks/hooks';
+import { boardCopies } from '@/lib/decks/BoardCheckboxes';
+import { DecksPanel } from '@/lib/decks/DecksPanel';
+import { cancelSync, useCollectionMeta, useDeckData, useDecks, useDecksMeta, useSyncState } from '@/lib/decks/hooks';
 import { StartError, useStartSync } from '@/lib/decks/StartSync';
 import { SyncProgress } from '@/lib/decks/SyncProgress';
 import { GettingStarted } from '@/lib/ui/GettingStarted';
 import { useInitialSync } from '@/lib/ui/InitialSync';
-import { markDecksSeen } from '@/lib/decks/sync';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
-import { accountData } from '@/lib/accounts/data';
 import { AccountHint } from '@/lib/ui/AccountHint';
 import type { AccountKey } from '@/lib/accounts/types';
 import type { SiteProvider } from '@/lib/sites/provider';
-import type { CollectionMeta, DeckRow } from '@/lib/decks/types';
-import { timeAgo } from '@/lib/format';
+import type { DeckRow } from '@/lib/decks/types';
 import { siteOf } from '@/lib/sites/registry';
 import { Stat } from '@/lib/ui/Stat';
 import { compareDecksToCollection } from '../compare';
-import { useComparisonConfig, type ComparisonConfig } from '../config';
+import { useComparisonConfig } from '../config';
 import { comparisonFiltersFromParams, comparisonSortFromParams, writeComparisonParams } from '../filtering';
 import { ComparisonTable } from './ComparisonTable';
 
@@ -79,89 +76,6 @@ function FirstSync({ decks }: { decks: DeckRow[] }) {
         )}
       </Group>
     </GettingStarted>
-  );
-}
-
-function OptionsCard({
-  config,
-  update,
-  boards,
-  decksSyncedAt,
-  collection,
-}: {
-  config: ComparisonConfig;
-  update: (p: Partial<ComparisonConfig>) => void;
-  boards: Map<string, number>;
-  decksSyncedAt?: number;
-  collection?: CollectionMeta | null;
-}) {
-  const { key, site } = usePageAccount();
-  const sync = useSyncState(key);
-  const { start, error, starting, clearError } = useStartSync(site.type, key);
-  const switchTo = useSwitchTo(site);
-  const running = sync?.status === 'running' || starting;
-
-  return (
-    <Paper withBorder p="md" radius="md">
-      <Stack gap="sm">
-        <Title order={4}>Options</Title>
-        <BoardCheckboxes boards={boards} ignoredBoards={config.ignoredBoards} onChange={(ignoredBoards) => update({ ignoredBoards })} site={site} />
-        <Checkbox
-          label="Ignore proxies"
-          description="Proxy copies are left out on both sides"
-          checked={config.ignoreProxies}
-          onChange={(e) => update({ ignoreProxies: e.currentTarget.checked })}
-        />
-        <Divider />
-        <Text size="xs" c="dimmed">
-          Decks synced {decksSyncedAt ? timeAgo(decksSyncedAt) : 'never'} · Collection read {collection ? timeAgo(collection.fetchedAt) : 'never'}
-          {collection?.lastRead?.mode === 'changes' && (
-            <>
-              {' '}
-              (only what changed: {collection.lastRead.changed.toLocaleString('en-CA')} {collection.lastRead.changed === 1 ? 'entry' : 'entries'} in{' '}
-              {collection.lastRead.pages === 1 ? '1 request' : `${collection.lastRead.pages} requests`}; every page read {collection.fullReadAt ? timeAgo(collection.fullReadAt) : 'never'})
-            </>
-          )}
-          {collection?.lastRead?.mode === 'full' && (
-            <>
-              {' '}
-              (every page{collection.lastRead.why ? `: ${collection.lastRead.why}` : ''})
-            </>
-          )}
-          {collection && (
-            <>
-              {' · '}
-              <Tooltip
-                label="Compare usually reads only what changed in your collection since the last read (Moxfield lists entries by last change), and every page when its totals don't match. This reads every page now."
-                multiline
-                w={300}
-              >
-                <Anchor component="button" type="button" size="xs" disabled={running} onClick={() => void start(true, true)}>
-                  Read every page
-                </Anchor>
-              </Tooltip>
-            </>
-          )}
-        </Text>
-        <SyncProgress state={sync} site={site} onSwitch={switchTo} />
-        {error && <StartError error={error} type={site.type} onCancelled={clearError} />}
-        <Group gap="xs">
-          {/* During a decks-only sync this joins it: the collection is read right after the decks. */}
-          <Button leftSection={<IconArrowsDiff size={16} />} loading={running && sync?.withCollection} onClick={() => void start(true)}>
-            Compare
-          </Button>
-          {running && (
-            <Button variant="subtle" color="gray" leftSection={<IconPlayerStop size={16} />} onClick={() => void cancelSync(site.type)}>
-              Cancel
-            </Button>
-          )}
-        </Group>
-        <Text size="xs" c="dimmed">
-          Compare first syncs decks (only new or changed ones are read), then reads what changed in your collection (every page once a week, or when
-          something was deleted). Options and deck choices apply instantly.
-        </Text>
-      </Stack>
-    </Paper>
   );
 }
 
@@ -231,11 +145,9 @@ export function ComparisonPage() {
   const { deckCards, collection, loaded } = useDeckData(key, version);
 
   const deckById = useMemo(() => new Map((decks ?? []).map((d) => [d.id, d])), [decks]);
-  const folderUrl = useFolderUrl(decks, decksMeta?.folders, site);
   // The comparison only needs deck ids; names are looked up at render time.
   const deckIdsKey = (decks ?? []).map((d) => d.id).join(',');
   const stableDecks = useMemo(() => decks ?? [], [deckIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const excluded = useMemo(() => new Set(config?.excludedDeckIds ?? []), [config?.excludedDeckIds]);
   const boards = useMemo(() => boardCopies(deckCards), [deckCards]);
 
   const collectionAt = collectionMeta?.fetchedAt;
@@ -245,7 +157,6 @@ export function ComparisonPage() {
         ? compareDecksToCollection(stableDecks, deckCards, collection, {
             excludedDeckIds: config.excludedDeckIds,
             ignoredBoards: config.ignoredBoards,
-            ignoreProxies: config.ignoreProxies,
           })
         : null,
     [config, loaded, collectionAt, stableDecks, deckCards, collection],
@@ -294,44 +205,28 @@ export function ComparisonPage() {
     );
   }
 
-  const newDecks = decks.filter((d) => d.isNew);
   const s = result?.summary;
 
   return (
     <Stack>
       {header}
       <AccountHint type={site.type} />
-      <SimpleGrid cols={{ base: 1, lg: 2 }}>
-        <Paper withBorder p="md" radius="md">
-          <Stack gap="xs">
-            <Group justify="space-between">
-              <Title order={4}>Decks</Title>
-              {newDecks.length > 0 && (
-                <Group gap={6}>
-                  <Text size="xs" c="green">
-                    {newDecks.length} new deck{newDecks.length === 1 ? '' : 's'} (included)
-                  </Text>
-                  <Anchor size="xs" component="button" type="button" onClick={() => void markDecksSeen(accountData(key))}>
-                    Mark as seen
-                  </Anchor>
-                </Group>
-              )}
-            </Group>
-            <DeckTreePicker
-              decks={decks}
-              excluded={excluded}
-              onChange={(next) => update({ excludedDeckIds: [...next].filter((id) => deckById.has(id)) })}
-              siteLabel={site.label}
-              folderUrl={folderUrl}
-            />
-          </Stack>
-        </Paper>
-        <OptionsCard config={config} update={update} boards={boards} decksSyncedAt={decksMeta.lastSuccessAt} collection={collectionMeta} />
-      </SimpleGrid>
+      <Paper withBorder p="md" radius="md">
+        <DecksPanel
+          accountKey={key}
+          site={site}
+          decks={decks}
+          decksMeta={decksMeta}
+          collection={collectionMeta}
+          boards={boards}
+          choices={config}
+          onChange={update}
+        />
+      </Paper>
 
       {!collectionMeta ? (
         <Paper withBorder p="lg" radius="md">
-          <Text c="dimmed">Click “Compare” to read your collection and compare it with the selected decks.</Text>
+          <Text c="dimmed">Click “Sync decks and collection” to read your collection and compare it with the selected decks.</Text>
         </Paper>
       ) : (
         <>

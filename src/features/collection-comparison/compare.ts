@@ -4,6 +4,7 @@
  * French Talisman is the French print). Deck cards have no Language field, so a collection copy is
  * matched by its print too, even when its Language field says otherwise (that copy gets a warning).
  * Deck copies are summed over every included deck: each physical copy is expected to live in one deck.
+ * Proxy copies are left out on both sides (counted in the summary).
  */
 import type { DeckCardsRow, DeckRow } from '@/lib/decks/types';
 import { copyKey } from '@/lib/cards/prints';
@@ -79,7 +80,6 @@ export interface ComparisonRow {
 export interface CompareOptions {
   excludedDeckIds: readonly string[];
   ignoredBoards: readonly string[];
-  ignoreProxies: boolean;
 }
 
 export interface CompareSummary {
@@ -99,6 +99,7 @@ export interface CompareSummary {
   unassignedCopies: number;
   /** Rows with at least one other-print hint. */
   hinted: number;
+  /** Proxy copies left out (always, on both sides). */
   proxiesSkipped: { decks: number; collection: number };
   /** Collection copies for MTGO / Arena. */
   nonPaperSkipped: number;
@@ -168,7 +169,7 @@ export function compareDecksToCollection(
     }
     for (const c of row.cards) {
       if (ignoredBoards.has(c.board) || c.qty <= 0 || !c.card.set || !c.card.cn) continue;
-      if (opts.ignoreProxies && c.isProxy) {
+      if (c.isProxy) {
         summary.proxiesSkipped.decks += c.qty;
         continue;
       }
@@ -194,7 +195,7 @@ export function compareDecksToCollection(
       summary.nonPaperSkipped += e.qty;
       continue;
     }
-    if (opts.ignoreProxies && e.isProxy) {
+    if (e.isProxy) {
       summary.proxiesSkipped.collection += e.qty;
       continue;
     }

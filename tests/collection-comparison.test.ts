@@ -67,7 +67,7 @@ const deckRow = (id: string): DeckRow => ({
 });
 const cardsRow = (deckId: string, cards: DeckCard[]): DeckCardsRow => ({ deckId, v: 1, updatedAt: 'x', fetchedAt: 0, cards });
 
-const OPTS: CompareOptions = { excludedDeckIds: [], ignoredBoards: ['maybeboard'], ignoreProxies: true };
+const OPTS: CompareOptions = { excludedDeckIds: [], ignoredBoards: ['maybeboard'] };
 
 const DECKS = [deckRow('a'), deckRow('b'), deckRow('c')];
 const CARDS = [
@@ -167,10 +167,6 @@ describe('compareDecksToCollection', () => {
 
     const noSide = compareDecksToCollection(DECKS, CARDS, COLLECTION, { ...OPTS, ignoredBoards: ['maybeboard', 'sideboard'] });
     expect(byKey(noSide.rows, 'neo|5|nonFoil|en')).toMatchObject({ kind: 'unassigned', diff: 2 });
-
-    const proxies = compareDecksToCollection(DECKS, CARDS, COLLECTION, { ...OPTS, ignoreProxies: false });
-    expect(byKey(proxies.rows, 'lea|1|nonFoil|en|match')).toMatchObject({ kind: 'match', copies: 1 }); // 1 proxy in a deck, 1 proxy owned
-    expect(proxies.summary.proxiesSkipped).toEqual({ decks: 0, collection: 0 });
   });
 
   it('counts each collection row once and reports decks without cards', () => {
@@ -183,7 +179,7 @@ describe('compareDecksToCollection', () => {
 
 describe('Comparator config and filters', () => {
   it('defaults and repairs stored config field by field', () => {
-    expect(DEFAULT_COMPARISON_CONFIG).toEqual({ showMissing: true, showUnassigned: false, showMatched: false, ignoreProxies: true, ignoredBoards: ['maybeboard'], excludedDeckIds: [] });
+    expect(DEFAULT_COMPARISON_CONFIG).toEqual({ showMissing: true, showUnassigned: false, showMatched: false, ignoredBoards: ['maybeboard'], excludedDeckIds: [] });
     expect(parseComparisonConfig({ showMissing: false, ignoredBoards: 'oops', excludedDeckIds: ['a'] })).toEqual({
       ...DEFAULT_COMPARISON_CONFIG,
       showMissing: false,

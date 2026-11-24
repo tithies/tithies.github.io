@@ -67,7 +67,6 @@ export function freeCopies(
   const { rows, summary: compared } = compareDecksToCollection(decks, deckCards, sellable, {
     excludedDeckIds: opts.excludedDeckIds,
     ignoredBoards: opts.ignoredBoards,
-    ignoreProxies: true,
   });
   // Both rows of a print carry its totals: one is enough.
   const prints = new Map<string, { deckQty: number; collectionQty: number; decks: DeckUse[] }>();

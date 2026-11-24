@@ -134,7 +134,7 @@ export default defineBackground(() => {
   onMessage('controlRun', async ({ data }) => {
     const before = await findRun(data.runId);
     const ok = await controlRun(data.runId, data.action);
-    // A check cancelled while its collection is read: stop the read too, unless it also syncs decks (a Compare joined it).
+    // A check cancelled while its collection is read: stop the read too, unless it also syncs decks (a deck sync joined it).
     if (ok && data.action === 'cancel' && before?.status === 'fetching_collection') {
       for (const job of Object.values(syncJobs)) {
         const s = job.activeState;

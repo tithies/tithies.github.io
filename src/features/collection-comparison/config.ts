@@ -11,8 +11,6 @@ export const comparisonConfigSchema = z.object({
   showUnassigned: z.boolean().default(false).catch(false),
   /** Prints with as many copies in decks as in the collection. */
   showMatched: z.boolean().default(false).catch(false),
-  /** Leave proxy copies out on both sides. */
-  ignoreProxies: z.boolean().default(true).catch(true),
   /** Deck boards left out (a board type never seen before counts by default). */
   ignoredBoards: z.array(z.string()).default(['maybeboard']).catch(['maybeboard']),
   /** Decks left out. Stored as exclusions so newly detected decks are included by default. */

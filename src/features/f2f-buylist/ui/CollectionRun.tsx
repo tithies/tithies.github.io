@@ -82,7 +82,7 @@ export function CollectionReadProgress({ run, size = 'sm' }: { run: Run; size?: 
         : `Reading your ${site.label} collection…`
       : mine.phase === 'connecting'
         ? `Connecting to ${site.label}…`
-        : 'Syncing decks first (a Compare joined the read)…';
+        : 'Syncing decks first (a deck sync joined the read)…';
   return (
     <Stack gap={4}>
       {size === 'lg' && (

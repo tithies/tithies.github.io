@@ -102,7 +102,7 @@ function accountRows(a: AccountRow, s: AccountStats): Row[] {
       title: `${site.label} collection`,
       kind: synced(site.label),
       details: [s.collectionMeta ? `${n(s.collectionMeta.entries)} rows (${n(s.collectionMeta.copies)} copies), read ${ago(s.collectionMeta.fetchedAt)}` : `${n(s.collection)} rows`],
-      effect: `Read again the next time you click "Compare". Your collection on ${site.label} is not touched.`,
+      effect: `Read again the next time you click "Sync decks and collection". Your collection on ${site.label} is not touched.`,
       empty: !s.collection && !s.collectionMeta,
       blocked: syncBlock,
     },

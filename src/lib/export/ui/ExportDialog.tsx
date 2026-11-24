@@ -484,7 +484,7 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
                       <List size="sm" spacing={2}>
                         <List.Item>cards “Missing from collection” you export would become owned: they wouldn't be missing any more;</List.Item>
                         <List.Item>cards “Not in any deck” you export would be added once more: the collection would then have them twice;</List.Item>
-                        <List.Item>the next “Compare” would show the collection as it is after the export.</List.Item>
+                        <List.Item>the next “Sync decks and collection” would show the collection as it is after the export.</List.Item>
                       </List>
                       <Checkbox checked={sameUnderstood} onChange={(e) => setSameUnderstood(e.currentTarget.checked)} label="I want to change the collection I'm comparing" />
                     </Stack>

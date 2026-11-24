@@ -24,16 +24,31 @@ function runningLabel(s: SyncState, label: string): string {
   }
 }
 
+/** The last finished (or cancelled) sync in one line: when, decks read, requests. */
+export function lastSyncText(state: SyncState, siteLabel: string): string {
+  const d = state.decks;
+  return [
+    `${state.status === 'cancelled' ? 'Sync cancelled' : 'Last sync'}${state.finishedAt ? ` ${timeAgo(state.finishedAt)}` : ''}`,
+    d && `${d.fetched} deck${d.fetched === 1 ? '' : 's'} read (${d.added} added, ${d.changed} changed, ${d.removed} removed)`,
+    `${state.requests} ${siteLabel} request${state.requests === 1 ? '' : 's'}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 /** Live state of the background sync (progress, rate-limit waits, last result or error). */
 export function SyncProgress({
   state,
   site,
   onSwitch,
+  lastLine = true,
 }: {
   state: SyncState | null | undefined;
   site: Pick<SiteProvider, 'label'>;
   /** "Switch Tithies to …" after a sync stopped because the site is logged in as someone else. */
   onSwitch?: (who: SiteIdentity) => void;
+  /** Show the line about the last finished sync (false: the page shows `lastSyncText` elsewhere; decks that failed are still shown). */
+  lastLine?: boolean;
 }) {
   if (!state) return null;
 
@@ -97,13 +112,15 @@ export function SyncProgress({
   }
 
   const d = state.decks;
+  const showLast = lastLine || state.status === 'cancelled';
+  if (!showLast && !d?.failed.length) return null;
   return (
     <Stack gap={2}>
-      <Text size="xs" c="dimmed">
-        {state.status === 'cancelled' ? 'Sync cancelled' : 'Last sync'} {state.finishedAt ? timeAgo(state.finishedAt) : ''}
-        {d ? ` · ${d.fetched} deck${d.fetched === 1 ? '' : 's'} read (${d.added} added, ${d.changed} changed, ${d.removed} removed)` : ''} · {state.requests} {site.label} request
-        {state.requests === 1 ? '' : 's'}
-      </Text>
+      {showLast && (
+        <Text size="xs" c="dimmed">
+          {lastSyncText(state, site.label)}
+        </Text>
+      )}
       {d && d.failed.length > 0 && (
         <Text size="xs" c="orange">
           {d.failed.length} deck{d.failed.length === 1 ? '' : 's'} couldn't be read ({d.failed.map((f) => f.name).slice(0, 3).join(', ')}

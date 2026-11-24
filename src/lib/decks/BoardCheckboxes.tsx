@@ -13,6 +13,9 @@ export function boardCopies(deckCards: readonly DeckCardsRow[]): Map<string, num
   return m;
 }
 
+/** The boards offered: the base ones, and any other a deck uses. */
+export const boardsShown = (boards: Map<string, number>): string[] => [...boards.keys()].filter((b) => BASE_BOARDS.includes(b) || (boards.get(b) ?? 0) > 0);
+
 export function BoardCheckboxes({
   boards,
   ignoredBoards,
@@ -28,7 +31,7 @@ export function BoardCheckboxes({
   label?: string;
 }) {
   const ignored = new Set(ignoredBoards);
-  const keys = [...boards.keys()].filter((b) => BASE_BOARDS.includes(b) || (boards.get(b) ?? 0) > 0).sort((a, b) => site.boardOrder(a) - site.boardOrder(b));
+  const keys = boardsShown(boards).sort((a, b) => site.boardOrder(a) - site.boardOrder(b));
   const toggle = (b: string, count: boolean) => onChange(count ? ignoredBoards.filter((x) => x !== b) : [...ignored, b]);
   return (
     <Stack gap={6}>

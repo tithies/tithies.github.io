@@ -316,7 +316,7 @@ export class AccountSyncJob {
     const steps = () => (withDecks() ? 2 : 0) + (job.state.withCollection ? 1 : 0);
     const step = (i: number, done: number, total: number) => ({ ...tally.report(i, done, total), step: withDecks() ? i + 1 : 1, steps: steps() });
     try {
-      // Decks first, then the collection; work joined meanwhile (a "Compare" during a collection read) is done after.
+      // Decks first, then the collection; work joined meanwhile (a "Sync decks and collection" during a collection read) is done after.
       let decksDone = false;
       let collectionDone = false;
       for (;;) {
@@ -339,7 +339,7 @@ export class AccountSyncJob {
           await this.patch(job, { decks, current: undefined, requests: client.requests });
           continue;
         }
-        // Read at this point: a "Compare" may have joined a decks-only sync meanwhile.
+        // Read at this point: a "Sync decks and collection" may have joined a decks-only sync meanwhile.
         if (job.state.withCollection && !collectionDone) {
           tally.expect(2, collectionPages());
           await this.patch(job, { phase: 'collection', done: 0, total: 1, overall: step(2, 0, 0), message: undefined });
