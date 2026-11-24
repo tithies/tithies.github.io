@@ -61,7 +61,8 @@ export function UpdateCheckButton() {
   const failed = state?.ok === false;
   const latest = state?.latest;
   const newer = latest && compareVersions(latest.version, current) > 0 ? latest : undefined;
-  const when = now - checkedAt < 45_000 ? 'just now' : timeAgo(checkedAt, now);
+  // "3 min ago": the bottom of the menu has no room for "Update checked 13 minutes ago".
+  const when = now - checkedAt < 45_000 ? 'just now' : timeAgo(checkedAt, now).replace(/\bminutes?\b/, 'min');
   const label = checking
     ? 'Checking for updates…'
     : !checkedAt
@@ -110,7 +111,7 @@ export function UpdateCheckButton() {
         rightSection={<IconRefresh size={16} className={checking ? 'ti-spin' : undefined} />}
         aria-label={`${label}. Check for updates now`}
       >
-        <Text span size="xs">
+        <Text span size="xs" truncate>
           {label}
         </Text>
       </Button>
