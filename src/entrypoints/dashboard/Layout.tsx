@@ -50,7 +50,7 @@ export function Layout() {
               </Group>
               <Group gap={4} wrap="nowrap">
                 <Tooltip label={scheme === 'dark' ? 'Light theme' : 'Dark theme'}>
-                  <ActionIcon variant="default" size="lg" onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')} aria-label="Toggle color scheme">
+                  <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')} aria-label="Toggle color scheme">
                     {scheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
                   </ActionIcon>
                 </Tooltip>
