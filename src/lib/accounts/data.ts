@@ -79,7 +79,7 @@ export async function setNickname(key: AccountKey, nickname: string | null): Pro
 
 export const getInitialSyncDismissed = async (): Promise<AccountKey[]> => (await getMeta<AccountKey[]>('initialSyncDismissed')) ?? [];
 
-/** Remembers (or forgets) that the user doesn't want the header to offer this account's initial sync. */
+/** Remembers (or forgets) that the user doesn't want the menu to offer this account's initial sync. */
 export async function setInitialSyncDismissed(key: AccountKey, dismissed: boolean): Promise<void> {
   await db.transaction('rw', db.meta, async () => {
     const cur = await getInitialSyncDismissed();
@@ -246,7 +246,7 @@ export class AccountData {
       await db.accountMeta.where('accountKey').equals(this.key).delete();
       await db.accounts.delete(this.key);
       if ((await db.meta.get('currentAccount'))?.value === this.key) await db.meta.delete('currentAccount');
-      // Back as new: the header offers its initial sync again.
+      // Back as new: the menu offers its initial sync again.
       await setInitialSyncDismissed(this.key, false);
     });
   }

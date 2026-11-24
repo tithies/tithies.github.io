@@ -1,26 +1,11 @@
 import { useEffect, useState } from 'react';
 
-/** Fallback height of the AppShell header (see Layout.tsx), used if Mantine's CSS variable can't be read. */
-const FALLBACK_APP_HEADER_HEIGHT = 56;
-
-/**
- * The table header pins right below the AppShell header. Mantine publishes that height as a CSS
- * variable, but as an expression ("calc(3.5rem * 1)"), so let the browser resolve it on a probe.
- */
-function appHeaderHeight(parent: HTMLElement): number {
-  const probe = document.createElement('div');
-  probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;width:0;height:var(--app-shell-header-height, 0px)';
-  parent.appendChild(probe);
-  const px = probe.getBoundingClientRect().height;
-  probe.remove();
-  return px > 0 ? px : FALLBACK_APP_HEADER_HEIGHT;
-}
-
 /** Scroll-driven animations (Chrome 115+). Without them the header just scrolls away. */
 const supported = () => typeof CSS !== 'undefined' && CSS.supports('animation-timeline', 'scroll()');
 
 /**
- * Keeps a mantine-datatable's header visible while the page scrolls past the top of the table.
+ * Keeps a mantine-datatable's header visible, at the top of the window, while the page scrolls
+ * past the top of the table.
  *
  * Plain `position: sticky` can't do it: the table sits in its own horizontal scroll container,
  * and that container becomes the sticky reference. So the real `<thead>` is moved down by a CSS
@@ -29,9 +14,9 @@ const supported = () => typeof CSS !== 'undefined' && CSS.supports('animation-ti
  * in the table, so column widths, horizontal scrolling and sort clicks keep working.
  *
  * The script only describes the animation's range, in page-scroll pixels: from the moment the
- * table's top reaches the app header to the moment the header would hit the last row. That range
- * changes with layout, not with scrolling, so it is recomputed on resize and when the table or
- * the page height changes.
+ * table's top reaches the top of the window to the moment the header would hit the last row.
+ * That range changes with layout, not with scrolling, so it is recomputed on resize and when the
+ * table or the page height changes.
  *
  * Attach the returned ref to an element that wraps the DataTable. It is a callback ref, so it also
  * works when the table only mounts after a loading state.
@@ -48,7 +33,7 @@ export function useStickyTableHeader<T extends HTMLElement = HTMLDivElement>() {
       const table = thead?.parentElement;
       if (!thead || !table) return;
       const room = Math.max(table.offsetHeight - thead.offsetHeight, 0);
-      const from = Math.max(table.getBoundingClientRect().top + window.scrollY - appHeaderHeight(root), 0);
+      const from = Math.max(table.getBoundingClientRect().top + window.scrollY, 0);
       root.style.setProperty('--ti-stick-from', `${Math.round(from)}px`);
       root.style.setProperty('--ti-stick-to', `${Math.round(from + room)}px`);
       root.style.setProperty('--ti-stick-room', `${room}px`);

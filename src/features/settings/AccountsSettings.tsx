@@ -94,7 +94,7 @@ export function AccountsSettings() {
       <Paper withBorder radius="md">
         {accounts.length === 0 ? (
           <Text p="md" size="sm" c="dimmed">
-            No account yet. Log in to Moxfield in this browser: the header's Initial sync button adds the account and reads its decks and collection.
+            No account yet. Log in to Moxfield in this browser: the menu's Initial sync button adds the account and reads its decks and collection.
             "Check selling prices" on your Moxfield collection adds it too.
           </Text>
         ) : (

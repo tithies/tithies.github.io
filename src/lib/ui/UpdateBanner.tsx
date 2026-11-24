@@ -5,7 +5,7 @@ import { compareVersions, downloadUrl, RELEASE_PAGE_URL, updateCheckItem } from 
 import { useUpdateState } from './UpdateCheck';
 
 /**
- * Banner shown on every dashboard page when a newer Tithies is published. The header's
+ * Banner shown on every dashboard page when a newer Tithies is published. The menu's
  * UpdateCheckButton runs the checks; this shows their stored result.
  */
 export function UpdateBanner() {

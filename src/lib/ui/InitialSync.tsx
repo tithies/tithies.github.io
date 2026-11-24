@@ -1,5 +1,5 @@
 /**
- * The initial sync of new accounts, offered from the dashboard header: a button while Tithies
+ * The initial sync of new accounts, offered from the dashboard menu: a button while Tithies
  * knows of an account whose decks and collection were never read (logged in on the site but not in
  * Tithies yet, added by a selling check, or no account at all), and the prompt it opens. The
  * account menu, the hints and Settings → Accounts open the same prompt.
@@ -26,7 +26,7 @@ import { SiteIcon } from './SiteIcon';
 export type InitialSyncTarget = { type: SiteType; identity: SiteIdentity } | { accountKey: AccountKey };
 
 interface InitialSyncContext {
-  /** What the header offers now, most relevant first. */
+  /** What the menu offers now, most relevant first. */
   candidates: InitialSyncCandidate[];
   /** Opens the prompt: for every candidate, or for one account (even one the user said "Not now" to). */
   open(target?: InitialSyncTarget): void;
@@ -319,7 +319,7 @@ function CandidateCard({
         )}
         {running ? (
           <Text size="xs" c="dimmed">
-            You can close this window or leave the page: the sync goes on in the background (see “Running” in the header).
+            You can close this window or leave the page: the sync goes on in the background (see “Running” in the menu).
           </Text>
         ) : null}
         <Group justify="flex-end">
@@ -369,7 +369,7 @@ function CandidateCard({
           </Button>
         ) : (
           <Tooltip
-            label={`Tithies stops offering it in the header. ${c.kind === 'unknown' ? 'The account menu still lists it.' : 'Settings → Accounts still has it.'}`}
+            label={`Tithies stops offering it in the menu. ${c.kind === 'unknown' ? 'The account menu still lists it.' : 'Settings → Accounts still has it.'}`}
             multiline
             w={260}
           >
@@ -398,7 +398,7 @@ function CandidateCard({
   );
 }
 
-/** Header: while some account needs its initial sync. */
+/** Menu: while some account needs its initial sync. */
 export function InitialSyncButton() {
   const { candidates, open } = useInitialSync();
   if (!candidates.length) return null;
@@ -413,27 +413,19 @@ export function InitialSyncButton() {
           ? `${accountLabel(c.account)}'s ${missingOf(c.setup)} never been read`
           : `Log in to ${site}, then read your decks and collection`;
   return (
-    <Tooltip label={tip} multiline w={260} withinPortal>
-      <Button variant="light" color="teal" size="compact-md" leftSection={c.kind === 'none' ? <IconInfoCircle size={16} /> : <IconUserPlus size={16} />} onClick={() => open()} maw={260}>
-        {c.kind === 'none' && candidates.length === 1 ? (
-          <>
-            <Text span inherit visibleFrom="sm">
-              Add your {site} account
-            </Text>
-            <Text span inherit hiddenFrom="sm">
-              Add account
-            </Text>
-          </>
-        ) : (
-          <>
-            <Text span inherit visibleFrom="sm">
-              Initial sync ·&nbsp;
-            </Text>
-            <Text span inherit truncate>
-              {candidates.length > 1 ? `${candidates.length} accounts` : nameOf(c)}
-            </Text>
-          </>
-        )}
+    <Tooltip label={tip} multiline w={260} withinPortal position="right">
+      <Button
+        variant="light"
+        color="teal"
+        size="compact-md"
+        fullWidth
+        justify="flex-start"
+        leftSection={c.kind === 'none' ? <IconInfoCircle size={16} /> : <IconUserPlus size={16} />}
+        onClick={() => open()}
+      >
+        <Text span inherit truncate>
+          {c.kind === 'none' && candidates.length === 1 ? `Add your ${site} account` : `Initial sync · ${candidates.length > 1 ? `${candidates.length} accounts` : nameOf(c)}`}
+        </Text>
       </Button>
     </Tooltip>
   );

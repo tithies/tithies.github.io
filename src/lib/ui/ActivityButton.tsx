@@ -8,7 +8,7 @@ import { JobProgress } from './JobProgress';
 
 const ICON = { export: IconListDetails, run: IconHistory, sync: IconArrowsDiff } as const;
 
-/** Header button, only there while something runs in the background: lists each job and links to it. */
+/** Menu button, only there while something runs in the background: lists each job and links to it. */
 export function ActivityButton() {
   const items = useActivity();
   const { key: current, accounts, switchTo } = useCurrentAccount();
@@ -24,13 +24,10 @@ export function ActivityButton() {
   };
 
   return (
-    <Popover opened={opened} onChange={(o) => !o && close()} position="bottom-end" width="min(360px, calc(100vw - 24px))" shadow="md" withArrow>
+    <Popover opened={opened} onChange={(o) => !o && close()} position="bottom-start" width="min(360px, calc(100vw - 24px))" shadow="md" withArrow>
       <Popover.Target>
-        <Button variant="light" size="compact-md" leftSection={<Loader size={14} />} onClick={toggle} aria-label="Running in the background">
-          <Text span inherit visibleFrom="sm">
-            Running ·&nbsp;
-          </Text>
-          {items.length}
+        <Button variant="light" size="compact-md" fullWidth justify="flex-start" leftSection={<Loader size={14} />} onClick={toggle} aria-label="Running in the background">
+          Running · {items.length}
         </Button>
       </Popover.Target>
       <Popover.Dropdown>

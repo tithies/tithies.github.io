@@ -7,7 +7,7 @@ import { CHECK_EVERY_MS, compareVersions, getLatestRelease, RELEASE_PAGE_URL, up
 
 /** A manual check spins the icon at least this long, so a fast answer still shows it happened. */
 const MIN_SPIN_MS = 600;
-/** How often the header refreshes "… ago" and sees whether the automatic check is due. */
+/** How often the menu refreshes "… ago" and sees whether the automatic check is due. */
 const TICK_MS = 60_000;
 
 /** The stored update-check state, kept current: a check or a dismissed banner in any tab updates it. */
@@ -26,7 +26,7 @@ export function useUpdateState(): UpdateCheckState | null {
 }
 
 /**
- * Header: when Tithies last looked for a new version, with a refresh icon; a click looks now.
+ * Menu: when Tithies last looked for a new version, with a refresh icon; a click looks now.
  * It also runs the automatic check (every CHECK_EVERY_MS while a dashboard page is open); the
  * banner (UpdateBanner) shows what it finds.
  */
@@ -78,6 +78,7 @@ export function UpdateCheckButton() {
       multiline
       w={280}
       withinPortal
+      position="right"
       label={
         <Stack gap={2}>
           <Text size="xs">
@@ -101,11 +102,13 @@ export function UpdateCheckButton() {
         size="sm"
         px="xs"
         fw={400}
+        fullWidth
+        justify="space-between"
         onClick={() => void checkNow()}
         rightSection={<IconRefresh size={16} className={checking ? 'ti-spin' : undefined} />}
         aria-label={`${label}. Check for updates now`}
       >
-        <Text span size="xs" c={failed ? 'orange' : newer ? 'blue' : 'dimmed'} visibleFrom="sm">
+        <Text span size="xs" c={failed ? 'orange' : newer ? 'blue' : 'dimmed'}>
           {label}
         </Text>
       </Button>

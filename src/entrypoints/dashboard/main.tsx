@@ -16,7 +16,7 @@ const theme = createTheme({
   primaryColor: 'blue',
   colors: {
     // Darker than Mantine's default, slightly cool. Text 0–3, borders 4, hover 5, inputs 6,
-    // cards and header 7, menu 8, page background 9 (see dashboard.css).
+    // cards 7, menu 8, page background 9 (see dashboard.css).
     dark: ['#d3d5da', '#b6b9c0', '#8d919a', '#6c707a', '#373a42', '#2b2e35', '#22252b', '#1a1c21', '#141619', '#0c0d10'],
   },
   defaultRadius: 'md',

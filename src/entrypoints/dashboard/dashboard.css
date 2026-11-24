@@ -1,9 +1,8 @@
-/* Depth: page background darkest, header and menu a bit lighter, cards lightest (they use
+/* Depth: page background darkest, menu a bit lighter, cards lightest (they use
    --mantine-color-body), each with its own shadow. */
 :root {
   --ti-canvas: #f1f3f5;
   --ti-navbar: #f8f9fa;
-  --ti-header-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 14px rgba(16, 24, 40, 0.06);
   --ti-navbar-shadow: 1px 0 10px rgba(16, 24, 40, 0.04);
   --ti-card-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 14px rgba(16, 24, 40, 0.05);
   --ti-art-opacity: 0.1;
@@ -25,7 +24,6 @@
 [data-mantine-color-scheme='dark'] {
   --ti-canvas: var(--mantine-color-dark-9);
   --ti-navbar: var(--mantine-color-dark-8);
-  --ti-header-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.03), 0 4px 18px rgba(0, 0, 0, 0.6);
   --ti-navbar-shadow: 4px 0 18px rgba(0, 0, 0, 0.4);
   --ti-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025), 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.35);
   --ti-art-opacity: 0.16;
@@ -45,7 +43,7 @@ body {
   content: '';
   position: fixed;
   z-index: -1;
-  top: var(--app-shell-header-offset, 0px);
+  top: 0;
   left: var(--app-shell-navbar-offset, 0px);
   right: 0;
   bottom: 0;
@@ -54,12 +52,6 @@ body {
   opacity: var(--ti-art-opacity);
   -webkit-mask: radial-gradient(circle closest-side, #000 72%, transparent);
   mask: radial-gradient(circle closest-side, #000 72%, transparent);
-}
-/* Same colour as the menu; above it, so its shadow falls on it. */
-.mantine-AppShell-header {
-  z-index: calc(var(--app-shell-header-z-index, 100) + 2);
-  background: var(--ti-navbar);
-  box-shadow: var(--ti-header-shadow);
 }
 .mantine-AppShell-navbar {
   background: var(--ti-navbar);
@@ -121,8 +113,8 @@ body {
 }
 
 /* Glass: in the page content (and in dialogs, popovers and tooltips, which are portaled to the
-   body), opaque surfaces let the page background through at --ti-glass. The header and the menu
-   keep theirs. Each rule mixes the colour Mantine would paint with transparent, so light/dark
+   body), opaque surfaces let the page background through at --ti-glass. The menu keeps
+   its own. Each rule mixes the colour Mantine would paint with transparent, so light/dark
    themes, colours, variants and states keep working (Mantine 9's light variants are solid
    colours too; transparent ones stay transparent).
    postcss-preset-mantine turns light-dark() into a second rule prefixed with
@@ -288,7 +280,7 @@ body .mantine-Menu-item:where(:hover, :focus, [data-menu-active]):where(:not(:di
 .ti-num {
   font-variant-numeric: tabular-nums;
 }
-/* A row of a list to pick from (the Exports window, the header "Running" list): tinted on hover. */
+/* A row of a list to pick from (the Exports window, the menu's "Running" list): tinted on hover. */
 .ti-pick-row {
   display: block;
   width: 100%;
@@ -342,7 +334,7 @@ body .mantine-Menu-item:where(:hover, :focus, [data-menu-active]):where(:not(:di
   outline-offset: 2px;
 }
 
-/* Header update check: the refresh icon turns while a check runs. */
+/* Menu update check: the refresh icon turns while a check runs. */
 @keyframes ti-spin {
   to {
     transform: rotate(360deg);

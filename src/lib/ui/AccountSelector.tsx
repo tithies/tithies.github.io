@@ -33,7 +33,7 @@ function AccountName({ account }: { account: AccountRow }) {
 }
 
 /**
- * Header: the account every page shows, with its site icon, and the other accounts to switch to.
+ * Top of the menu: the account every page shows, with its site icon, and the other accounts to switch to.
  * Accounts appear here once Tithies has acted as them (a run started from the site, a sync…).
  * Picking an account logged in on the site but not in Tithies yet opens its initial-sync prompt.
  */
@@ -47,9 +47,9 @@ export function AccountSelector() {
   const liveLabel = (a: AccountRow) => `Logged in on ${siteOf(a.type).label} right now`;
 
   return (
-    <Menu position="bottom-end" width={290} withinPortal shadow="md">
+    <Menu position="bottom-start" width={290} withinPortal shadow="md">
       <Menu.Target>
-        <Button variant="default" size="sm" px="xs" rightSection={<IconChevronDown size={14} />} aria-label="Account" maw={260}>
+        <Button variant="default" size="sm" px="xs" fullWidth justify="space-between" rightSection={<IconChevronDown size={14} />} aria-label="Account">
           {account ? (
             <Group gap={8} wrap="nowrap" style={{ minWidth: 0 }}>
               <SiteIcon type={account.type} size={18} />
@@ -86,8 +86,8 @@ export function AccountSelector() {
         ) : (
           <Menu.Item disabled>
             <Text size="xs" c="dimmed">
-              Log in to Moxfield in this browser: Tithies offers to add the account and read its decks and collection (the Initial sync button up
-              here). A selling check started from your Moxfield collection adds it too.
+              Log in to Moxfield in this browser: Tithies offers to add the account and read its decks and collection (the Initial sync button in
+              this menu). A selling check started from your Moxfield collection adds it too.
             </Text>
           </Menu.Item>
         )}

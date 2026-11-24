@@ -1,6 +1,7 @@
-import { ActionIcon, AppShell, Burger, Divider, Group, NavLink, Text, Title, Tooltip, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
+import { ActionIcon, AppShell, Burger, Divider, Group, NavLink, Stack, Text, Title, Tooltip, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconArrowsDiff, IconCards, IconCash, IconHistory, IconListDetails, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
+import { useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { AccountSelector } from '@/lib/ui/AccountSelector';
@@ -26,49 +27,50 @@ const NAV = [
 ];
 
 export function Layout() {
-  const [opened, { toggle }] = useDisclosure();
+  const [opened, { toggle, close }] = useDisclosure();
   const { pathname } = useLocation();
   const { setColorScheme } = useMantineColorScheme();
   const scheme = useComputedColorScheme('dark');
   const { key: accountKey, loading } = useCurrentAccount();
+  // Phones: the menu covers the page, so going to a page closes it.
+  useEffect(close, [pathname]);
 
   return (
-    // The initial-sync prompt of new accounts, opened from the header and from pages.
+    // The initial-sync prompt of new accounts, opened from the menu and from pages.
     <InitialSyncProvider>
-      <AppShell header={{ height: 56 }} navbar={{ width: 220, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="md">
-        <AppShell.Header>
-          <Group h="100%" px="md" justify="space-between">
-            <Group gap="sm">
-              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+      {/* No header: the logo, the account and the app's buttons sit at the top of the menu, so pages get the whole height. */}
+      <AppShell navbar={{ width: 220, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="md">
+        <AppShell.Navbar p="xs">
+          <MenuArt />
+          <AppShell.Section>
+            <Group justify="space-between" wrap="nowrap" px={4} pt={2} pb="xs">
               <Group gap={8} wrap="nowrap">
-                <img src={iconUrl} width={38} height={38} alt="" />
+                <img src={iconUrl} width={34} height={34} alt="" />
                 <Title order={3}>Tithies</Title>
               </Group>
-              <Text c="dimmed" size="sm" visibleFrom="sm">
-                Moxfield × Face to Face Games
-              </Text>
+              <Group gap={4} wrap="nowrap">
+                <Tooltip label={scheme === 'dark' ? 'Light theme' : 'Dark theme'}>
+                  <ActionIcon variant="default" size="lg" onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')} aria-label="Toggle color scheme">
+                    {scheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+                  </ActionIcon>
+                </Tooltip>
+                <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Close the menu" />
+              </Group>
             </Group>
-            <Group gap="sm" wrap="nowrap">
+            <Stack gap={6}>
+              <AccountSelector />
               <InitialSyncButton />
               <ActivityButton />
               <UpdateCheckButton />
-              <AccountSelector />
-              <Tooltip label={scheme === 'dark' ? 'Light theme' : 'Dark theme'}>
-                <ActionIcon variant="default" size="lg" onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')} aria-label="Toggle color scheme">
-                  {scheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
-                </ActionIcon>
-              </Tooltip>
-            </Group>
-          </Group>
-        </AppShell.Header>
-        <AppShell.Navbar p="xs">
-          <MenuArt />
+            </Stack>
+            <Divider my="sm" />
+          </AppShell.Section>
           <AppShell.Section grow>
             {/* A section is a heading (small, bold, uppercase, with its icon) over its links; a line separates sections. */}
             {NAV.map((section, i) => (
               <div key={section.label}>
                 {i > 0 && <Divider my="sm" />}
-                <Group gap={6} px="sm" pt={i ? 0 : 6} pb={6} wrap="nowrap" c="dimmed">
+                <Group gap={6} px="sm" pb={6} wrap="nowrap" c="dimmed">
                   <section.icon size={14} stroke={2.2} />
                   <Text size="xs" fw={700} tt="uppercase" style={{ letterSpacing: '0.07em' }}>
                     {section.label}
@@ -107,6 +109,12 @@ export function Layout() {
           </AppShell.Section>
         </AppShell.Navbar>
         <AppShell.Main>
+          {/* Phones: the menu is hidden, this opens it. */}
+          <Group gap={8} wrap="nowrap" mb="sm" hiddenFrom="sm">
+            <Burger opened={opened} onClick={toggle} size="sm" aria-label="Open the menu" />
+            <img src={iconUrl} width={28} height={28} alt="" />
+            <Title order={4}>Tithies</Title>
+          </Group>
           <UpdateBanner />
           {/* Every page remounts when the account changes: no state of one account survives into another's view. */}
           {!loading && <Outlet key={accountKey ?? 'none'} />}

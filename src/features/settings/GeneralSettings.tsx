@@ -23,7 +23,7 @@ export function GeneralSettings() {
             ]}
           />
           <Text size="xs" c="dimmed">
-            The button at the top right switches between dark and light too.
+            The button at the top of the menu switches between dark and light too.
           </Text>
         </Stack>
       </Paper>

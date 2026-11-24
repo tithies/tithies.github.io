@@ -117,7 +117,7 @@ export function ComparisonPage() {
   const { config, update } = useComparisonConfig(key);
   // The "Likely wrong print" card toggles the table's filter of the same name (kept in the URL).
   const [params, setParams] = useSearchParams();
-  // The export shown in its own window (`?export=<id>`, also opened from the header's "Running" list).
+  // The export shown in its own window (`?export=<id>`, also opened from the menu's "Running" list).
   const recentExports = useRecentExports(key);
   const [pickingExport, setPickingExport] = useState(false);
   const viewedExport = Number(params.get('export')) || null;

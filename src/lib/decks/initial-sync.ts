@@ -1,6 +1,6 @@
 /**
  * The initial sync of an account: its deck list, every deck's cards and its whole collection,
- * read once so every feature has them (later syncs only read what changed). The dashboard header
+ * read once so every feature has them (later syncs only read what changed). The dashboard menu
  * offers it whenever Tithies meets an account that hasn't had it; "Not now" is remembered per
  * account (see `setInitialSyncDismissed`). No React here: the background worker uses it too.
  */
@@ -46,7 +46,7 @@ export async function initialSyncStateOf(key: AccountKey): Promise<InitialSyncSt
   return { known: true, needed: !isSetUp(setup) && !dismissed.includes(key), running: setup.running };
 }
 
-/** An account the header offers to read for the first time. */
+/** An account the menu offers to read for the first time. */
 export type InitialSyncCandidate =
   /** Logged in on the site in an open tab, not in Tithies yet. */
   | { kind: 'unknown'; type: SiteType; key: AccountKey; identity: SiteIdentity }
@@ -67,7 +67,7 @@ export interface CandidateInput {
 }
 
 /**
- * What the header offers, most relevant first: the current account when it was never read, the
+ * What the menu offers, most relevant first: the current account when it was never read, the
  * accounts logged in that Tithies doesn't know, the other logged-in accounts never read; with no
  * account and nobody logged in, the site itself. Never an account whose sync runs, or that the
  * user said "Not now" to.
@@ -92,5 +92,5 @@ export function initialSyncCandidates({ accounts, currentKey, live, setups, dism
   return out;
 }
 
-/** Same candidate (the header's list changes under an open prompt). */
+/** Same candidate (the menu's list changes under an open prompt). */
 export const candidateId = (c: InitialSyncCandidate): string => c.key ?? `none:${c.type}`;
