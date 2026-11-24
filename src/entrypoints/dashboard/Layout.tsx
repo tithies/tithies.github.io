@@ -1,4 +1,4 @@
-import { ActionIcon, AppShell, Burger, Divider, Group, NavLink, Stack, Text, Title, Tooltip, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
+import { ActionIcon, AppShell, Box, Burger, Divider, Group, NavLink, Stack, Text, Title, Tooltip, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconArrowsDiff, IconCards, IconCash, IconHistory, IconListDetails, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
 import { useEffect } from 'react';
@@ -58,7 +58,10 @@ export function Layout() {
               </Group>
             </Group>
             <Stack gap={6} mb="md">
-              <AccountSelector />
+              {/* The account band spans the menu's whole width (past its padding). */}
+              <Box mx="-xs">
+                <AccountSelector />
+              </Box>
               <InitialSyncButton />
               <ActivityButton />
             </Stack>

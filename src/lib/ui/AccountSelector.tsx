@@ -49,7 +49,26 @@ export function AccountSelector() {
   return (
     <Menu position="bottom-start" width={290} withinPortal shadow="md">
       <Menu.Target>
-        <Button variant="default" size="sm" px="xs" fullWidth justify="space-between" rightSection={<IconChevronDown size={14} />} aria-label="Account">
+        <Button
+          variant="default"
+          size="sm"
+          fullWidth
+          justify="space-between"
+          className="ti-account-well"
+          // A dark band sunk into the menu, no border, taller than a button (its inner shadows: dashboard.css).
+          vars={() => ({
+            root: {
+              '--button-bg': 'var(--ti-well)',
+              '--button-hover': 'var(--ti-well-hover)',
+              '--button-bd': 'none',
+              '--button-radius': '0',
+              '--button-height': '52px',
+              '--button-padding-x': '22px',
+            },
+          })}
+          rightSection={<IconChevronDown size={14} />}
+          aria-label="Account"
+        >
           {account ? (
             <Group gap={8} wrap="nowrap" style={{ minWidth: 0 }}>
               <SiteIcon type={account.type} size={18} />
