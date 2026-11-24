@@ -352,3 +352,92 @@ describe('Moxfield binder search (reads)', () => {
     expect(res).toMatchObject({ ok: true, kind: 'binderPage', totalCopies: 2, entries: [{ id: 'e1', binderId: 'DOQNN', qty: 2 }] });
   });
 });
+
+describe('Moxfield deck writes', () => {
+  const answer = (status: number, body = '{}') => new Response(body, { status });
+  const IMPORT_DECK: SiteMutation = { site: 'moxfield', op: 'importDeck', deckId: 'dk1', publicId: 'pubDeck_22charsXXXXXX', version: 7, importText: '1 Sol Ring (C21) 263' };
+
+  it("builds Moxfield's own folder, deck, import and add requests, with the deck's id and version as headers", () => {
+    expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: ' Collection / By set ' })).toEqual({
+      method: 'POST',
+      url: 'https://api2.moxfield.com/v1/deck-folders',
+      json: { name: 'Collection/By set' },
+    });
+    expect(buildMoxMutation({ site: 'moxfield', op: 'createDeck', name: ' Final Fantasy - Rare ', visibility: 'private', folderId: 'rng9V', importText: '2 Cloud (FIN) 1 *F*' })).toEqual({
+      method: 'POST',
+      url: 'https://api2.moxfield.com/v3/decks',
+      json: { name: 'Final Fantasy - Rare', format: 'none', visibility: 'private', importText: '2 Cloud (FIN) 1 *F*', pricingProvider: 'tcgplayer', usePrefPrintings: false, deckFolderId: 'rng9V' },
+    });
+    expect(buildMoxMutation(IMPORT_DECK)).toEqual({
+      method: 'POST',
+      url: 'https://api2.moxfield.com/v3/decks/dk1/import',
+      headers: { 'x-public-deck-id': 'pubDeck_22charsXXXXXX', 'x-deck-version': '7' },
+      json: { importText: '1 Sol Ring (C21) 263', replaceAll: false, pricingProvider: 'tcgplayer', usePrefPrintings: false },
+    });
+    expect(buildMoxMutation({ site: 'moxfield', op: 'addDeckCard', deckId: 'dk1', publicId: 'pubDeck', version: 8, cardId: 'Yl7l6', quantity: 3, finish: 'foil' })).toEqual({
+      method: 'POST',
+      url: 'https://api2.moxfield.com/v2/decks/dk1/cards/mainboard',
+      headers: { 'x-public-deck-id': 'pubDeck', 'x-deck-version': '8' },
+      json: { cardId: 'Yl7l6', quantity: 3, finish: 'foil', usePrefPrinting: false },
+    });
+    // The change log shows the headers too.
+    expect(describeMoxMutation(IMPORT_DECK)).toMatchObject({ headers: { 'x-deck-version': '7' } });
+  });
+
+  it('refuses malformed deck writes', () => {
+    const bad: unknown[] = [
+      { site: 'moxfield', op: 'createDeckFolder', name: 'Final Fantasy: Rare' },
+      { site: 'moxfield', op: 'createDeckFolder', name: 'A//B' },
+      { site: 'moxfield', op: 'createDeckFolder', name: '  ' },
+      { site: 'moxfield', op: 'createDeck', name: '', visibility: 'private', importText: '' },
+      { site: 'moxfield', op: 'createDeck', name: 'x', visibility: 'secret', importText: '' },
+      { site: 'moxfield', op: 'createDeck', name: 'x\ny', visibility: 'private', importText: '' },
+      { site: 'moxfield', op: 'createDeck', name: 'x', visibility: 'private', importText: 'x'.repeat(300_000) },
+      { site: 'moxfield', op: 'createDeck', name: 'x', visibility: 'private', importText: '', folderId: '../x' },
+      { ...IMPORT_DECK, version: -1 },
+      { ...IMPORT_DECK, version: '7' },
+      { ...IMPORT_DECK, deckId: 'a/b' },
+      { site: 'moxfield', op: 'addDeckCard', deckId: 'dk1', publicId: 'p', version: 1, cardId: 'c', quantity: 100, finish: 'foil' },
+      { site: 'moxfield', op: 'addDeckCard', deckId: 'dk1', publicId: 'p', version: 1, cardId: 'c', quantity: 1, finish: 'gold' },
+    ];
+    for (const b of bad) expect(buildMoxMutation(b)).toBeNull();
+  });
+
+  it('sends the deck headers over the session’s, and reads what each answer says about the folder or deck', async () => {
+    const seen: { url: string; init?: { headers?: Record<string, string> } }[] = [];
+    const reply = (body: string) => async (url: string, init?: { method: string; headers?: Record<string, string> }) => (seen.push({ url, init }), answer(200, body));
+    expect(await runMoxRequest({ kind: 'mutate', op: IMPORT_DECK }, reply('{"id":"dk1","publicId":"pubDeck_22charsXXXXXX","version":8}'))).toMatchObject({
+      ok: true,
+      deck: { id: 'dk1', version: 8 },
+    });
+    expect(seen[0].init?.headers).toEqual({ 'x-public-deck-id': 'pubDeck_22charsXXXXXX', 'x-deck-version': '7' });
+    expect(
+      await runMoxRequest({ kind: 'mutate', op: { site: 'moxfield', op: 'createDeckFolder', name: 'By set' } }, reply('{"id":"rng9V","name":"By set"}')),
+    ).toMatchObject({ ok: true, folder: { id: 'rng9V', path: 'By set' } });
+    const create: SiteMutation = { site: 'moxfield', op: 'createDeck', name: 'D', visibility: 'private', importText: '' };
+    expect(await runMoxRequest({ kind: 'mutate', op: create }, reply('{"isSuccessful":true,"publicId":"newDeckPublicId","errors":[]}'))).toMatchObject({
+      ok: true,
+      deck: { publicId: 'newDeckPublicId' },
+    });
+    // No deck said: not a success (its outcome is unknown). The site saying it failed: a failure.
+    expect(await runMoxRequest({ kind: 'mutate', op: create }, reply('{}'))).toMatchObject({ ok: false, code: 'parse' });
+    expect(await runMoxRequest({ kind: 'mutate', op: create }, reply('{"isSuccessful":false,"errors":["Name taken"]}'))).toMatchObject({ ok: false, message: expect.stringContaining('Name taken') });
+    // An added card's answer has no deck: its version comes from the header, as Moxfield's app reads it.
+    const add: SiteMutation = { site: 'moxfield', op: 'addDeckCard', deckId: 'dk1', publicId: 'p', version: 1, cardId: 'c', quantity: 1, finish: 'nonFoil' };
+    expect(await runMoxRequest({ kind: 'mutate', op: add }, async () => new Response('{"card":{}}', { status: 200, headers: { 'x-deck-version': '2' } }))).toMatchObject({ ok: true, deck: { version: 2 } });
+    expect(await runMoxRequest({ kind: 'mutate', op: add }, reply('{"card":{}}'))).toMatchObject({ ok: true, deck: {} });
+    // An import's row errors are kept.
+    expect(await runMoxRequest({ kind: 'mutate', op: IMPORT_DECK }, reply('{"isSuccessful":true,"errors":["Unknown card"]}'))).toMatchObject({ imported: { errors: ['Unknown card'] } });
+  });
+
+  it('never replays a deck change’s own headers from the page’s requests', async () => {
+    const session = new MoxPageSession();
+    session.noteRequest({ authorization: bearer(ALICE.userId, ALICE.userName), 'x-public-deck-id': 'other', 'x-deck-version': '3', 'x-moxfield-version': '1' });
+    const doFetch = vi.fn(async () => answer(200));
+    await session.api({ req: { kind: 'mutate', op: REMOVE } }, doFetch);
+    const [, headers] = doFetch.mock.calls[0] as unknown as [string, Record<string, string>];
+    expect(headers['x-public-deck-id']).toBeUndefined();
+    expect(headers['x-deck-version']).toBeUndefined();
+    expect(headers['x-moxfield-version']).toBe('1');
+  });
+});

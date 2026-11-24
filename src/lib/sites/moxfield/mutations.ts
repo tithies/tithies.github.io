@@ -5,7 +5,8 @@
  *
  * Endpoints were read from Moxfield's own web app (2026-11-16): see the tithies-f2f-api memory.
  */
-import type { BinderVisibility, DescribedRequest, ImportAnswer, SiteBinder, SiteMutation } from '@/lib/sites/types';
+import type { DeckFolder } from '@/lib/decks/types';
+import type { BinderVisibility, DeckAnswer, DescribedRequest, ImportAnswer, SiteBinder, SiteMutation } from '@/lib/sites/types';
 import { MOX_API_ORIGIN } from './constants';
 import { MOX_CSV_HEADER } from './csv';
 import { MOX_ENGLISH_ID, MOX_LANGUAGE_BY_ID } from './languages';
@@ -19,17 +20,47 @@ export const MAX_IMPORT_CSV = 2_000_000;
 /** Most copies added in one addCard. */
 export const MAX_ADD_QUANTITY = 10_000;
 
+/** Most copies of a card added to a deck in one addDeckCard (Moxfield's own "add card" caps it at 99). */
+export const MAX_DECK_ADD_QUANTITY = 99;
+/** Largest deck import text sent in one request (characters; a deck shows at most 1,000 cards). */
+export const MAX_DECK_TEXT = 200_000;
+/** Longest deck name Tithies sends. */
+export const MAX_DECK_NAME = 200;
+/** Longest folder path Tithies sends. */
+export const MAX_FOLDER_PATH = 200;
+
+/**
+ * One folder name: letters, numbers, spaces and hyphens, as Moxfield's own folder form accepts
+ * (`/^[a-zA-Z0-9\s-]+$/`, read from its web app 2026-11-24; Tithies takes plain spaces only). A
+ * path joins names with "/" (a folder in a folder).
+ */
+export const FOLDER_NAME = /^[a-zA-Z0-9 -]+$/;
+export const validFolderPath = (path: string) => {
+  const t = path.trim();
+  return t.length > 0 && t.length <= MAX_FOLDER_PATH && t.split('/').every((seg) => seg.trim() !== '' && FOLDER_NAME.test(seg));
+};
+/** Deck names: any text but control characters. */
+const validDeckName = (name: string) => name.trim().length > 0 && name.length <= MAX_DECK_NAME && !/[\u0000-\u001f\u007f]/.test(name);
+const isVersion = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1e9;
+
 const VISIBILITIES: readonly BinderVisibility[] = ['private', 'unlisted', 'public'];
 const FINISHES = new Set(['nonFoil', 'foil', 'etched']);
 const isId = (s: unknown): s is string => typeof s === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(s);
 
-/** What the page sends: a JSON body, a CSV file (multipart form, field "file"), or nothing. */
+/**
+ * What the page sends: a JSON body, a CSV file (multipart form, field "file"), or nothing.
+ * `headers`: a deck change's own (Moxfield's `X-Public-Deck-ID` and `X-Deck-Version`, lowercase).
+ */
 export interface BuiltMutation {
   method: 'POST' | 'PUT' | 'DELETE';
   url: string;
+  headers?: { 'x-public-deck-id': string; 'x-deck-version': string };
   json?: unknown;
   file?: { field: 'file'; name: string; type: 'text/csv'; text: string };
 }
+
+/** The headers every change of a deck sends (as Moxfield's own deck editor does). */
+const deckHeaders = (publicId: string, version: number) => ({ 'x-public-deck-id': publicId, 'x-deck-version': String(version) });
 
 /** Validates a write (it crosses the page boundary) and builds its request; null when it is not one Tithies makes. */
 export function buildMoxMutation(raw: unknown): BuiltMutation | null {
@@ -88,17 +119,91 @@ export function buildMoxMutation(raw: unknown): BuiltMutation | null {
         },
       };
     }
+    case 'createDeckFolder': {
+      // Moxfield's own CREATE_FOLDER (2026-11-24): the full path as the name.
+      const name = typeof m.name === 'string' ? m.name.trim() : '';
+      if (!validFolderPath(name)) return null;
+      return { method: 'POST', url: `${MOX_API_ORIGIN}/v1/deck-folders`, json: { name: name.split('/').map((seg) => seg.trim()).join('/') } };
+    }
+    case 'createDeck': {
+      // Moxfield's own CREATE_DECK (2026-11-24), with only what a plain deck needs.
+      const name = typeof m.name === 'string' ? m.name.trim() : '';
+      if (!validDeckName(name) || !VISIBILITIES.includes(m.visibility as BinderVisibility)) return null;
+      if (typeof m.importText !== 'string' || m.importText.length > MAX_DECK_TEXT) return null;
+      if (m.folderId !== undefined && !isId(m.folderId)) return null;
+      return {
+        method: 'POST',
+        url: `${MOX_API_ORIGIN}/v3/decks`,
+        json: {
+          name,
+          format: 'none',
+          visibility: m.visibility,
+          importText: m.importText,
+          pricingProvider: 'tcgplayer',
+          usePrefPrintings: false,
+          ...(m.folderId ? { deckFolderId: m.folderId } : {}),
+        },
+      };
+    }
+    case 'importDeck': {
+      // Moxfield's own IMPORT_TEXT (2026-11-24), keeping the exact prints asked for. It adds to what
+      // is there; `replaceAll: true` would empty every board, not only the mainboard (verified 2026-11-24).
+      if (!isId(m.deckId) || !isId(m.publicId) || !isVersion(m.version)) return null;
+      if (typeof m.importText !== 'string' || m.importText.length > MAX_DECK_TEXT) return null;
+      return {
+        method: 'POST',
+        url: `${MOX_API_ORIGIN}/v3/decks/${m.deckId}/import`,
+        headers: deckHeaders(m.publicId, m.version),
+        json: { importText: m.importText, replaceAll: false, pricingProvider: 'tcgplayer', usePrefPrintings: false },
+      };
+    }
+    case 'addDeckCard': {
+      // Moxfield's own ADD_CARD_TO_BOARD (2026-11-24), into the mainboard.
+      const q = m.quantity;
+      if (!isId(m.deckId) || !isId(m.publicId) || !isVersion(m.version) || !isId(m.cardId)) return null;
+      if (!Number.isInteger(q) || (q as number) < 1 || (q as number) > MAX_DECK_ADD_QUANTITY || !FINISHES.has(m.finish as string)) return null;
+      return {
+        method: 'POST',
+        url: `${MOX_API_ORIGIN}/v2/decks/${m.deckId}/cards/mainboard`,
+        headers: deckHeaders(m.publicId, m.version),
+        json: { cardId: m.cardId, quantity: q, finish: m.finish, usePrefPrinting: false },
+      };
+    }
     default:
       return null;
   }
 }
 
-/** The request as the change log shows it (same URL and body as sent; auth stays in the page). */
+/** The request as the change log shows it (same URL, headers of its own and body as sent; auth stays in the page). */
 export function describeMoxMutation(op: SiteMutation): DescribedRequest | null {
   const b = buildMoxMutation(op);
   if (!b) return null;
   const body = b.file ? b.file.text : b.json !== undefined ? JSON.stringify(b.json, null, 2) : '';
-  return { method: b.method, url: b.url, body };
+  return { method: b.method, url: b.url, ...(b.headers ? { headers: { ...b.headers } } : {}), body };
+}
+
+/** A createDeckFolder answer: `{ id, name }` (Moxfield's own folder form reads `data.id`, `data.name`). */
+export function folderFromAnswer(raw: unknown): DeckFolder | null {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  if (!r || !isId(r.id)) return null;
+  return { id: r.id as string, path: typeof r.name === 'string' ? r.name.trim() : '' };
+}
+
+/**
+ * What a deck write's answer says about the deck (tolerant: `{ isSuccessful, publicId, errors }`
+ * for a create, read from Moxfield's app; the deck itself, or `{ deck }`, for the other changes).
+ * `failed`: the site said it didn't make it (`isSuccessful: false`), with its errors.
+ */
+export function deckFromAnswer(raw: unknown): { deck: DeckAnswer; failed: boolean; errors: string[] } {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const inner = r.deck && typeof r.deck === 'object' ? (r.deck as Record<string, unknown>) : null;
+  const pick = (k: string) => r[k] ?? inner?.[k];
+  const deck: DeckAnswer = {};
+  if (isId(pick('id'))) deck.id = pick('id') as string;
+  if (isId(pick('publicId'))) deck.publicId = pick('publicId') as string;
+  if (isVersion(pick('version'))) deck.version = pick('version') as number;
+  const errors = Array.isArray(r.errors) ? r.errors.slice(0, 200).map((e) => (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 300)) : [];
+  return { deck, failed: r.isSuccessful === false, errors };
 }
 
 /** The binder a createBinder answer describes (tolerant: Moxfield's answer shape isn't documented). */

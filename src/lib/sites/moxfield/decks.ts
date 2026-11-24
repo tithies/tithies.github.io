@@ -121,8 +121,12 @@ function entryCopies(row: any): any[] {
  * `GET /v3/decks/all/{publicId}` → every card of every board. Entries have the same shape as
  * collection rows, so `normalizeEntry` reads them. The top-level `tokens` list (tokens the deck's
  * cards make, added by Moxfield) is not a board and is ignored.
+ *
+ * Also what a change of the deck must send: its internal `id` and `version` (Moxfield's deck
+ * editor sends them as headers). `tooBig`: Moxfield's `isTooBeaucoup` (verified 2026-11-24 on a
+ * deck of 1,000+ cards: the API then lists exactly 1,000, the rest are kept but not shown).
  */
-export function normalizeDeckCards(raw: any): { lastUpdatedAt: string; cards: DeckCard[] } {
+export function normalizeDeckCards(raw: any): { lastUpdatedAt: string; cards: DeckCard[]; id?: string; version?: number; tooBig: boolean } {
   const cards: DeckCard[] = [];
   const boards = raw?.boards && typeof raw.boards === 'object' ? raw.boards : {};
   for (const [board, data] of Object.entries<any>(boards)) {
@@ -135,5 +139,7 @@ export function normalizeDeckCards(raw: any): { lastUpdatedAt: string; cards: De
       }
     }
   }
-  return { lastUpdatedAt: str(raw?.lastUpdatedAtUtc), cards };
+  const id = str(raw?.id);
+  const version = Number.isInteger(raw?.version) && raw.version >= 0 ? (raw.version as number) : undefined;
+  return { lastUpdatedAt: str(raw?.lastUpdatedAtUtc), cards, ...(id ? { id } : {}), ...(version !== undefined ? { version } : {}), tooBig: raw?.isTooBeaucoup === true };
 }

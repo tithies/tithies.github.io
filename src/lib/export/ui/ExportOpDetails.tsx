@@ -7,7 +7,7 @@ import { MOX_CONDITION_NAMES, MOX_LANGUAGE_NAMES, toMoxCsv } from '@/lib/sites/m
 import { isEnglish, langBadge, langLabel } from '@/lib/cards/languages';
 import { downloadText } from '@/lib/ui/download';
 import { Stat } from '@/lib/ui/Stat';
-import type { ExportDetails, RemovedEntry, VerifyDiff } from '../types';
+import { isDeckTarget, type ExportDetails, type RemovedEntry, type VerifyDiff } from '../types';
 
 const n = (v: number) => v.toLocaleString('en-CA');
 const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
@@ -35,6 +35,7 @@ export function removedAsCsv(removed: readonly RemovedEntry[]): string {
 
 function DiffTable({ title, rows, color }: { title: string; rows: VerifyDiff[]; color: string }) {
   if (!rows.length) return null;
+  const decks = rows.some((d) => d.deck);
   return (
     <Stack gap={4}>
       <Text size="sm" fw={600} c={color}>
@@ -43,6 +44,7 @@ function DiffTable({ title, rows, color }: { title: string; rows: VerifyDiff[]; 
       <Table withRowBorders={false} verticalSpacing={2} fz="xs">
         <Table.Thead>
           <Table.Tr>
+            {decks && <Table.Th>Deck</Table.Th>}
             <Table.Th>Card</Table.Th>
             <Table.Th>Print</Table.Th>
             <Table.Th ta="right">Expected</Table.Th>
@@ -51,13 +53,14 @@ function DiffTable({ title, rows, color }: { title: string; rows: VerifyDiff[]; 
         </Table.Thead>
         <Table.Tbody>
           {rows.slice(0, 200).map((d) => (
-            <Table.Tr key={`${d.key}|${d.outside ? 'o' : 'i'}`}>
+            <Table.Tr key={`${d.deck ?? ''}|${d.key}|${d.outside ? 'o' : 'i'}`}>
+              {decks && <Table.Td>{d.deck}</Table.Td>}
               <Table.Td>
                 {d.name}
                 {d.outside ? (
                   <Text span size="xs" c="dimmed">
                     {' '}
-                    (outside the binder)
+                    ({d.board ? `in the ${d.board}` : 'outside the binder'})
                   </Text>
                 ) : null}
               </Table.Td>
@@ -89,28 +92,49 @@ export function ExportOpDetails({ op }: { op: ChangeOp }) {
   const site = siteOf(op.site);
   const v = d.verify;
   const date = new Date(op.startedAt).toISOString().slice(0, 10);
+  const toDecks = isDeckTarget(d.target);
+  const decks = d.decks ?? [];
+  const targetLinks = toDecks
+    ? [
+        ...(d.folder
+          ? [
+              <Anchor key="f" href={site.deckFolderUrl(d.folder.id)} target="_blank" size="xs">
+                Open the folder “{d.folder.path}” on {site.label}
+              </Anchor>,
+            ]
+          : []),
+        ...decks.slice(0, d.folder ? 3 : 5).map((x) => (
+          <Anchor key={x.publicId} href={site.deckUrl(x.publicId)} target="_blank" size="xs">
+            Open the deck “{x.name}”{x.created ? ' (new)' : ''}
+          </Anchor>
+        )),
+        ...(decks.length > (d.folder ? 3 : 5) ? [`…and ${n(decks.length - (d.folder ? 3 : 5))} more decks`] : []),
+        ...(decks.length ? ['Tithies shows them after the next deck sync'] : []),
+      ]
+    : [
+        d.binder ? (
+          <Anchor key="b" href={site.binderUrl(d.binder.publicId)} target="_blank" size="xs">
+            Open the binder “{d.binder.name}” on {site.label}
+          </Anchor>
+        ) : (
+          <Anchor key="c" href={site.collectionUrl} target="_blank" size="xs">
+            Open the collection on {site.label}
+          </Anchor>
+        ),
+      ];
   return (
     <Stack gap="sm">
       <SimpleGrid cols={{ base: 1, sm: 3 }}>
-        <Stat
-          label="Target"
-          lines={[
-            d.binder ? (
-              <Anchor key="b" href={site.binderUrl(d.binder.publicId)} target="_blank" size="xs">
-                Open the binder “{d.binder.name}” on {site.label}
-              </Anchor>
-            ) : (
-              <Anchor key="c" href={site.collectionUrl} target="_blank" size="xs">
-                Open the collection on {site.label}
-              </Anchor>
-            ),
-          ]}
-        >
+        <Stat label="Target" lines={targetLinks}>
           <Text size="sm" fw={600}>
             {d.targetLabel}
           </Text>
         </Stat>
-        <Stat label="Added" value={plural(d.add.copies, 'copy', 'copies')} lines={[plural(d.add.prints, 'print'), 'Near Mint, English']} />
+        <Stat
+          label="Added"
+          value={plural(d.add.copies, 'copy', 'copies')}
+          lines={[plural(d.add.prints, 'print'), toDecks ? (decks.length > 1 ? `In the mainboard of ${plural(decks.length, 'deck')}` : 'In the mainboard') : 'Near Mint, each in its language']}
+        />
         <Stat
           label="Deleted first"
           value={d.removed.length ? plural(d.removed.reduce((s, r) => s + r.qty, 0), 'copy', 'copies') : 'Nothing'}
@@ -144,7 +168,9 @@ export function ExportOpDetails({ op }: { op: ChangeOp }) {
           <Alert color="teal" variant="light" icon={<IconCircleCheck size={18} />} p="xs">
             {v.scope === 'binder'
               ? `Checked after the export: all ${plural(v.expectedCopies, 'copy', 'copies')} are in the binder, and nothing else in it changed.`
-              : `Checked after the export: all ${plural(v.expectedCopies, 'copy', 'copies')} are in the collection, and nothing else in it changed.`}
+              : v.scope === 'decks'
+                ? `Checked after the export: all ${plural(v.expectedCopies, 'copy', 'copies')} are in the mainboard${decks.length > 1 ? ` of the ${n(decks.length)} decks` : ''}, and nothing else in ${decks.length > 1 ? 'them' : 'it'} changed.`
+                : `Checked after the export: all ${plural(v.expectedCopies, 'copy', 'copies')} are in the collection, and nothing else in it changed.`}
           </Alert>
         ) : (
           <Alert color="orange" variant="light" icon={<IconAlertTriangle size={18} />} p="xs" title="The check after the export found differences">
@@ -161,7 +187,7 @@ export function ExportOpDetails({ op }: { op: ChangeOp }) {
         )
       ) : op.status === 'running' || op.calls === 0 ? null : (
         <Text size="sm" c="dimmed">
-          Not checked: the collection couldn't be read again after the export.
+          Not checked: the {toDecks ? 'decks' : 'collection'} couldn't be read again after the export.
         </Text>
       )}
 

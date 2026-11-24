@@ -1,7 +1,7 @@
 import { Alert, Checkbox, List, Stack, Text, TextInput } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import type { SiteProvider } from '@/lib/sites/provider';
-import type { ExportPlan } from '../types';
+import { isDeckTarget, type ExportPlan } from '../types';
 import { plural, targetTitle } from './PreviewStep';
 
 /** One export to confirm, in the order they run. */
@@ -26,7 +26,18 @@ export const typedAll = (targets: readonly ConfirmTarget[], typed: Readonly<Reco
 function whatItDoes(t: ConfirmTarget, accounts: number): string {
   const p = t.plan;
   const del = destructive(t) ? `delete ${plural(p.remove.copies, 'copy', 'copies')}, then add ` : 'add ';
-  return `${del}${plural(p.add.copies, 'copy', 'copies')} to ${targetTitle(t, accounts)}`;
+  const decks = p.decks && p.decks.length > 1 ? ` (${plural(p.decks.length, 'deck')})` : '';
+  return `${del}${plural(p.add.copies, 'copy', 'copies')} to ${targetTitle(t, accounts)}${decks}`;
+}
+
+/** "binders and collection", "decks", "collection and decks"… what the targets change (binder cards are collection cards). */
+function scopeOf(targets: readonly ConfirmTarget[], accounts: number): string {
+  const kinds = targets.map((t) => t.plan.target.kind);
+  const binders = kinds.some((k) => k === 'newBinder' || k === 'binder');
+  const collection = binders || kinds.includes('collection');
+  const decks = targets.some((t) => isDeckTarget(t.plan.target));
+  const parts = [binders ? 'binders' : null, collection ? (accounts > 1 ? 'collections' : 'collection') : null, decks ? 'decks' : null].filter((x): x is string => !!x);
+  return parts.length === 3 ? `${parts[0]}, ${parts[1]} and ${parts[2]}` : parts.join(' and ');
 }
 
 export interface ConfirmStepProps {
@@ -50,9 +61,8 @@ export function ConfirmStep({ site, targets, sameName, understood, setUnderstood
   const anyDestructive = targets.some(destructive);
   const names = [...new Set(targets.map((t) => t.name))];
   const accounts = names.length;
-  const onlyCollections = targets.every((t) => t.plan.target.kind === 'collection');
   const whose = names.length === 1 ? `${names[0]}'s` : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}'s`;
-  const scope = onlyCollections ? (names.length === 1 ? 'collection' : 'collections') : names.length === 1 ? 'binders and collection' : 'binders and collections';
+  const scope = scopeOf(targets, names.length);
   return (
     <Stack>
       <Alert color={anyDestructive ? 'red' : 'blue'} variant="light" icon={<IconAlertTriangle size={18} />} title="Nothing has been changed yet">
@@ -69,12 +79,12 @@ export function ConfirmStep({ site, targets, sameName, understood, setUnderstood
                 </List.Item>
               ))}
             </List>
-            <Text size="sm">{site.label} has no undo; the Change log will keep what is deleted, as a CSV to import back.</Text>
+            <Text size="sm">{site.label} has no undo; the Change log will keep what is deleted, to import it back.</Text>
           </Stack>
         ) : (
           <Text size="sm">
             When you click the button below, Tithies will change <b>{targets[0].name}</b> on {site.label}: it will {whatItDoes(targets[0], 1)}.{' '}
-            {site.label} has no undo; the Change log will keep what is deleted, as a CSV to import back.
+            {site.label} has no undo; the Change log will keep what is deleted, to import it back.
           </Text>
         )}
       </Alert>

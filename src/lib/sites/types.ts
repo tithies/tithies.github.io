@@ -64,12 +64,32 @@ export type SiteMutation =
    * own "add to collection" does; into a binder when `binderId` is given. `languageId`: the
    * Language field (Moxfield's id).
    */
-  | { site: 'moxfield'; op: 'addCard'; cardId: string; quantity: number; finish: Finish; languageId: string; binderId?: string };
+  | { site: 'moxfield'; op: 'addCard'; cardId: string; quantity: number; finish: Finish; languageId: string; binderId?: string }
+  /** A deck folder; `name` is its full path ("Parent/Child" makes it in Parent). */
+  | { site: 'moxfield'; op: 'createDeckFolder'; name: string }
+  /** A new deck (format "none"), its mainboard from Moxfield's deck import text, in a folder when `folderId` is given. */
+  | { site: 'moxfield'; op: 'createDeck'; name: string; visibility: BinderVisibility; folderId?: string; importText: string }
+  /**
+   * Import text added to a deck's mainboard (never Moxfield's `replaceAll`: it empties every board,
+   * verified 2026-11-24). `version`: the deck's, as last read.
+   */
+  | { site: 'moxfield'; op: 'importDeck'; deckId: string; publicId: string; version: number; importText: string }
+  /** One card into a deck's mainboard by its card id (an exact print in one language). */
+  | { site: 'moxfield'; op: 'addDeckCard'; deckId: string; publicId: string; version: number; cardId: string; quantity: number; finish: Finish };
+
+/** What a deck write says about the deck: its ids, and its version once changed (when the site says). */
+export interface DeckAnswer {
+  id?: string;
+  publicId?: string;
+  version?: number;
+}
 
 /** A write as it is sent, for the change log (never any auth header). */
 export interface DescribedRequest {
   method: string;
   url: string;
+  /** Headers of its own (a deck's id and version), never auth. */
+  headers?: Record<string, string>;
   /** JSON (pretty), the CSV file, or '' when there is no body. */
   body: string;
 }
@@ -92,13 +112,17 @@ export interface SiteFailure {
 export type SiteSuccess = (
   | { ok: true; kind: 'deckList'; decks: DeckSummary[] }
   | { ok: true; kind: 'deckFolders'; folders: DeckFolder[]; totalPages: number }
-  | { ok: true; kind: 'deck'; lastUpdatedAt: string; cards: DeckCard[] }
+  /** `id`, `version`: what a change of the deck must send; `tooBig`: it holds more cards than the site shows. */
+  | { ok: true; kind: 'deck'; lastUpdatedAt: string; cards: DeckCard[]; id?: string; version?: number; tooBig?: boolean }
   /** `totalCopies`: copies in what is searched (every page), when the site says. */
   | { ok: true; kind: 'collection'; entries: CollectionEntry[]; totalResults: number; totalPages: number; pageSize: number; totalCopies?: number }
   | { ok: true; kind: 'binderPage'; entries: CollectionEntry[]; totalResults: number; totalPages: number; pageSize: number; totalCopies?: number }
   | { ok: true; kind: 'binders'; binders: SiteBinder[] }
-  /** `response`: the start of the answer (change log); `binder`: what a createBinder made; `imported`: what an import says it did. */
-  | { ok: true; kind: 'mutate'; status: number; response: string; binder?: SiteBinder; imported?: ImportAnswer }
+  /**
+   * `response`: the start of the answer (change log); `binder`: what a createBinder made; `imported`:
+   * what an import says it did; `folder`, `deck`: the deck folder or deck a deck write made or changed.
+   */
+  | { ok: true; kind: 'mutate'; status: number; response: string; binder?: SiteBinder; imported?: ImportAnswer; folder?: DeckFolder; deck?: DeckAnswer }
 ) & {
   /** The session the request was made as (see SiteFailure.as). */
   as?: SiteIdentity | null;

@@ -635,12 +635,12 @@ export async function controlRun(runId: number, action: 'pause' | 'resume' | 'ca
   }
 }
 
-/** Settings → "Clear cache": every cached F2F answer (lookups, bulk rates, set list). Runs are kept. */
+/** Settings → "Clear cache": every cached F2F answer (lookups, bulk rates, set list), and Scryfall's set list. Runs are kept. */
 export async function clearCaches() {
   await db.transaction('rw', db.f2fCache, db.meta, async () => {
     await db.f2fCache.clear();
     // Only F2F's own cached rows: meta also holds the Moxfield deck/collection sync state.
-    await db.meta.bulkDelete(['bulkRates', 'f2fSets']);
+    await db.meta.bulkDelete(['bulkRates', 'f2fSets', 'scryfallSets']);
   });
 }
 

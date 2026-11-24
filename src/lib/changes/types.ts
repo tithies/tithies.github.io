@@ -51,6 +51,8 @@ export interface ChangeCall {
   at: number;
   method: string;
   url: string;
+  /** Headers of its own (a deck's id and version), never auth. */
+  headers?: Record<string, string>;
   body: string;
   outcome: ChangeCallOutcome;
   status?: number;

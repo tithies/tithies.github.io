@@ -39,12 +39,15 @@ export interface CollectionResult {
   account: SiteIdentity | null;
 }
 
-/** Session headers worth replaying: the bearer token and Moxfield's own x-* headers. */
+/** Headers of one deck change (its id and version), not of the session: never replayed. */
+const DECK_HEADERS = new Set(['x-public-deck-id', 'x-deck-version']);
+
+/** Session headers worth replaying: the bearer token and Moxfield's own x-* headers (not a deck change's own). */
 export function pickAuthHeaders(h: Headers): Headers | null {
   const out: Headers = {};
   for (const [k, v] of Object.entries(h)) {
     const key = k.toLowerCase();
-    if (key === 'authorization' || key.startsWith('x-')) out[key] = v;
+    if (key === 'authorization' || (key.startsWith('x-') && !DECK_HEADERS.has(key))) out[key] = v;
   }
   return out.authorization ? out : null;
 }

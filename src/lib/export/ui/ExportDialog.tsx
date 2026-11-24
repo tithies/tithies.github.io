@@ -13,12 +13,13 @@ import { cancelExportRead, readExportTarget, startExport, useReadProgress } from
 import { exporterOf } from '../exporters';
 import type { ReadTargetResult } from '../job';
 import { planExport, previewRead } from '../plan';
-import type { ExportItem, ExportPlan, ExportTarget, TargetRead, TargetState } from '../types';
+import { isDeckTarget, type ExportItem, type ExportPlan, type ExportTarget, type TargetRead, type TargetState } from '../types';
 import { ConfirmStep, typedAll, type ConfirmTarget } from './ConfirmStep';
 import { ExportBatchProgress, ExportProgress } from './ExportProgress';
 import { plural, PreviewStep, PreviewTabs, targetTitle, type PreviewTarget } from './PreviewStep';
-import { draftTarget, latestBinders, newDraft, pickState, type TargetDraft } from './targets';
+import { draftTarget, latestBinders, latestDecks, needsDecks, newDraft, pickState, type TargetDraft } from './targets';
 import { TargetForm } from './TargetForm';
+import { useCardFacts } from './useCardFacts';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -82,6 +83,7 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
   const [reading, setReading] = useState<{ accountKey: AccountKey; read: TargetRead; draftId: number | null } | null>(null);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
   const askedBinders = useRef(new Set<AccountKey>());
+  const askedDecks = useRef(new Set<AccountKey>());
   const openedRef = useRef(opened);
   const [understood, setUnderstood] = useState(false);
   const [sameUnderstood, setSameUnderstood] = useState(false);
@@ -108,6 +110,7 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
     setStates({});
     setErrors({});
     askedBinders.current = new Set();
+    askedDecks.current = new Set();
     setDrafts((ds) => {
       const kept = ds.filter((d) => d.accountKey && accounts.some((a) => a.key === d.accountKey));
       return kept.length ? kept : [newDraft(nextId.current++, defaultKey, [], today())];
@@ -144,8 +147,9 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
     return p;
   };
 
-  // Each target's account: its binder list (one request), to pick a binder.
+  // Each target's account: its binder list (one request), to pick a binder; its decks and folders for a deck target.
   const draftAccounts = useMemo(() => [...new Set(drafts.map((d) => d.accountKey).filter((k): k is AccountKey => !!k))], [drafts]);
+  const deckAccounts = useMemo(() => [...new Set(drafts.filter(needsDecks).map((d) => d.accountKey).filter((k): k is AccountKey => !!k))], [drafts]);
   useEffect(() => {
     if (!opened) return;
     for (const key of draftAccounts) {
@@ -153,23 +157,33 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
       askedBinders.current.add(key);
       void doRead(key, { kind: 'binders' }, null);
     }
-  }, [opened, draftAccounts.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+    for (const key of deckAccounts) {
+      if (askedDecks.current.has(key)) continue;
+      askedDecks.current.add(key);
+      void doRead(key, { kind: 'decks' }, null);
+    }
+  }, [opened, draftAccounts.join(','), deckAccounts.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A deck folder target splits the cards by set, rarity and color identity: read from Scryfall once.
+  const facts = useCardFacts(items, opened && drafts.some((d) => d.kind === 'folder'));
+  /** The cards with their groups once read (the plans and the export use these). */
+  const planItems = facts.items ?? items;
 
   const saved = useSavedCollections(draftAccounts);
   const nameOf = (key: AccountKey | null) => {
     const a = accounts.find((x) => x.key === key);
     return a ? accountLabel(a) : '';
   };
-  const targets = drafts.map(draftTarget);
+  const targets = useMemo(() => drafts.map((d) => draftTarget(d, facts.items ?? undefined)), [drafts, facts.items]);
   const targetsKey = JSON.stringify(targets);
   const plans: (ExportPlan | null)[] = useMemo(() => {
     const fresh = new Set(saved.split(','));
     return targets.map((t) => {
       const state = t && exporter ? pickState(states[t.accountKey], previewRead(t)) : null;
       if (!t || !state || !exporter) return null;
-      return planExport(t, items, state, { sourceAccountKey, targetName: nameOf(t.accountKey), limits: exporter.limits, savedCollection: fresh.has(t.accountKey) });
+      return planExport(t, planItems, state, { sourceAccountKey, targetName: nameOf(t.accountKey), limits: exporter.limits, savedCollection: fresh.has(t.accountKey) });
     });
-  }, [targetsKey, states, items, sourceAccountKey, accounts, exporter, saved]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [targetsKey, states, planItems, sourceAccountKey, accounts, exporter, saved]); // eslint-disable-line react-hooks/exhaustive-deps
   // The rules between targets (the same destination twice…), on the targets complete so far.
   const issues = useMemo(() => {
     const at = targets.map((t, i) => (t ? i : -1)).filter((i) => i >= 0);
@@ -217,6 +231,7 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
   });
   const sameAccount = accounts.find((a) => a.key === sourceAccountKey && drafts.some((d) => d.accountKey === a.key));
   const destructive = confirmTargets.some((t) => t.plan.remove.entries.length > 0);
+  const anyDecks = targets.some((t) => t && isDeckTarget(t));
   const canExport = allPlanned && understood && (!sameAccount || sameUnderstood) && typedAll(confirmTargets, typed);
   const several = drafts.length > 1;
 
@@ -229,6 +244,7 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
       await chain.current;
       const ordered = order.map((i) => ({ i, plan: plans[i]! }));
       const res = await startExport(site.type, {
+        // The cards as planned (with their groups for a deck folder target): every plan has the same.
         items: ordered[0].plan.items,
         sourceAccountKey,
         source,
@@ -286,9 +302,14 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
                     sameNoted={drafts.slice(0, i).some((x) => x.accountKey === sourceAccountKey)}
                     liveKeys={liveKeys}
                     binders={d.accountKey ? latestBinders(states[d.accountKey]) : null}
-                    readingBinders={!!reading && reading.draftId == null && reading.accountKey === d.accountKey}
+                    readingBinders={!!reading && reading.draftId == null && reading.read.kind !== 'decks' && reading.accountKey === d.accountKey}
+                    readingDecks={!!reading && reading.draftId == null && reading.read.kind === 'decks' && reading.accountKey === d.accountKey}
+                    decks={d.accountKey ? (latestDecks(states[d.accountKey])?.decks ?? null) : null}
+                    folders={d.accountKey ? (latestDecks(states[d.accountKey])?.folders ?? null) : null}
+                    facts={facts}
+                    maxDeckCards={exporter?.limits.deck?.maxCards ?? 1000}
                     readError={(d.accountKey && errors[d.accountKey]) || null}
-                    onRetry={() => d.accountKey && void doRead(d.accountKey, { kind: 'binders' }, null)}
+                    onRetry={() => d.accountKey && void doRead(d.accountKey, needsDecks(d) ? { kind: 'decks' } : { kind: 'binders' }, null)}
                     readingTarget={readingDraft === d.id ? reading!.read : null}
                     progress={readingDraft === d.id ? progress : null}
                     issues={issues.filter((x) => x.index === i)}
@@ -306,8 +327,9 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
                   </Text>
                 </Group>
                 <Text size="xs" c="dimmed">
-                  Cards will be added Near Mint, each in its language, with their exact set, collector number and finish (Moxfield's CSV import). Nothing is
-                  changed until you confirm, two steps from here.
+                  Cards will be added {anyDecks ? 'to binders and the collection ' : ''}Near Mint, each in its language, with their exact set, collector number and
+                  finish (Moxfield's CSV import){anyDecks ? '; to decks, in the mainboard, as their exact print and finish' : ''}. Nothing is changed until you
+                  confirm, two steps from here.
                 </Text>
               </>
             )}

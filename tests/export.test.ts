@@ -15,6 +15,7 @@ import { moxfieldExporter } from '@/lib/sites/moxfield/export';
 import { MOX_LANGUAGES } from '@/lib/sites/moxfield/languages';
 import { TabTransport } from '@/lib/sites/tab-transport';
 import type { SiteBinder, SiteMutation, SiteResult } from '@/lib/sites/types';
+import type { DeckCard, DeckFolder, DeckSummary } from '@/lib/decks/types';
 import { ALICE, BOB, FakeTabs } from './fake-tabs';
 import { newAccount, resetDb } from './helpers';
 
@@ -281,7 +282,32 @@ describe('Export verification', () => {
   });
 });
 
-/** A fake Moxfield account: binders and a collection, changed by the writes like the real site would. */
+interface FakeDeck {
+  id: string;
+  publicId: string;
+  name: string;
+  folderId?: string;
+  version: number;
+  lastUpdatedAt: string;
+  cards: DeckCard[];
+  tooBig?: boolean;
+}
+const deckCard = (name: string, set: string, cn: string, qty: number, board = 'mainboard', finish: Finish = 'nonFoil'): DeckCard => ({
+  board,
+  qty,
+  finish,
+  isProxy: false,
+  isAlter: false,
+  card: card(name, set, cn),
+});
+/** Adds copies to a deck board (one row per print + finish + card object, like Moxfield). */
+function addDeckCard(d: { cards: DeckCard[] }, c: DeckCard) {
+  const same = d.cards.find((x) => x.board === c.board && x.card.set === c.card.set && x.card.cn === c.card.cn && x.finish === c.finish && x.card.id === c.card.id);
+  if (same) same.qty += c.qty;
+  else d.cards.push(c);
+}
+
+/** A fake Moxfield account: binders, a collection, decks and folders, changed by the writes like the real site would. */
 class FakeMox {
   binders: SiteBinder[] = [];
   entries: CollectionEntry[] = [];
@@ -295,7 +321,52 @@ class FakeMox {
   /** Moxfield's card objects by id, for addCard (one per print and language). */
   catalog = new Map<string, { name: string; set: string; cn: string; lang: string }>();
   failOn?: (op: SiteMutation) => SiteResult | null;
+  /** Decks (with every board's cards) and deck folders. */
+  decks: FakeDeck[] = [];
+  folders: DeckFolder[] = [];
+  /** Deck reads ('deck:<publicId>'). */
+  deckReads: string[] = [];
+  /** A created deck's answer says its id and version (Moxfield's create may only say its publicId). */
+  createSaysVersion = false;
   private n = 0;
+
+  private deckChanged(d: FakeDeck) {
+    d.version++;
+    d.lastUpdatedAt = new Date(Date.UTC(2026, 10, 24) + ++this.n * 1000).toISOString();
+  }
+
+  /** Moxfield's deck import text, one line each ("2 Sol Ring (C21) 263 *F*"), into the mainboard. */
+  private importText(d: FakeDeck, text: string) {
+    for (const line of text.split('\n').filter(Boolean)) {
+      const m = /^(\d+) (.+) \(([A-Z0-9]+)\) (\S+?)( \*F\*| \*E\*)?$/.exec(line);
+      if (!m) throw new Error(`bad line ${line}`);
+      let [set, cn] = [m[3].toLowerCase(), m[4]];
+      if (this.misprint && m[2] === this.misprint.from) ({ set, cn } = this.misprint.to);
+      const finish: Finish = m[5] === ' *F*' ? 'foil' : m[5] === ' *E*' ? 'etched' : 'nonFoil';
+      addDeckCard(d, deckCard(m[2], set, cn, Number(m[1]), 'mainboard', finish));
+    }
+  }
+
+  deckSummary = (d: FakeDeck): DeckSummary => {
+    const count = (b: string) => d.cards.filter((c) => c.board === b).reduce((s, c) => s + c.qty, 0);
+    const folder = this.folders.find((f) => f.id === d.folderId);
+    return {
+      id: d.id,
+      publicId: d.publicId,
+      name: d.name,
+      format: 'none',
+      visibility: 'private',
+      folderPath: folder?.path ?? '',
+      ...(folder ? { folderId: folder.id } : {}),
+      lastUpdatedAt: d.lastUpdatedAt,
+      createdAt: '',
+      mainboardCount: count('mainboard'),
+      sideboardCount: count('sideboard'),
+      maybeboardCount: count('maybeboard'),
+      commanders: [],
+      publicUrl: '',
+    };
+  };
 
   answer = (_as: unknown, { req }: { req: { kind: string; op?: SiteMutation; pageNumber?: number; pageSize?: number; publicId?: string } }): SiteResult => {
     if (req.kind === 'binders') return { ok: true, kind: 'binders', binders: [...this.binders] };
@@ -320,12 +391,57 @@ class FakeMox {
         totalCopies: rows.reduce((s, e) => s + e.qty, 0),
       };
     }
+    if (req.kind === 'deckList') return { ok: true, kind: 'deckList', decks: this.decks.map(this.deckSummary) };
+    if (req.kind === 'deckFolders') return { ok: true, kind: 'deckFolders', folders: [...this.folders], totalPages: 1 };
+    if (req.kind === 'deck') {
+      const d = this.decks.find((x) => x.publicId === req.publicId);
+      if (!d) return { ok: false, status: 404, code: 'http', message: 'Moxfield answered HTTP 404' };
+      this.deckReads.push(`deck:${d.publicId}`);
+      return { ok: true, kind: 'deck', lastUpdatedAt: d.lastUpdatedAt, cards: d.cards.map((c) => ({ ...c, card: { ...c.card } })), id: d.id, version: d.version, ...(d.tooBig ? { tooBig: true } : {}) };
+    }
     if (req.kind !== 'mutate' || !req.op) throw new Error(`unexpected ${req.kind}`);
     const op = req.op;
     this.writes.push(op);
     const fail = this.failOn?.(op);
     if (fail) return fail;
+    const deckOf = (o: { deckId: string; publicId: string; version: number }): FakeDeck | SiteResult => {
+      const d = this.decks.find((x) => x.id === o.deckId && x.publicId === o.publicId);
+      if (!d) return { ok: false, status: 404, code: 'http', message: 'Moxfield answered HTTP 404' };
+      // Like an editor that checks the version it was sent.
+      if (d.version !== o.version) return { ok: false, status: 409, code: 'http', message: 'Moxfield answered HTTP 409' };
+      return d;
+    };
     switch (op.op) {
+      case 'createDeckFolder': {
+        const f = { id: `fo${++this.n}`, path: op.name };
+        this.folders.push(f);
+        return { ok: true, kind: 'mutate', status: 200, response: JSON.stringify({ id: f.id, name: f.path }), folder: f };
+      }
+      case 'createDeck': {
+        const d: FakeDeck = { id: `dk${++this.n}`, publicId: `pubdeck${this.n}`, name: op.name, folderId: op.folderId, version: 0, lastUpdatedAt: '', cards: [] };
+        this.importText(d, op.importText);
+        this.deckChanged(d);
+        this.decks.push(d);
+        return { ok: true, kind: 'mutate', status: 200, response: '{}', deck: this.createSaysVersion ? { id: d.id, publicId: d.publicId, version: d.version } : { publicId: d.publicId } };
+      }
+      case 'importDeck': {
+        const d = deckOf(op);
+        if ('ok' in d) return d;
+        this.importText(d, op.importText);
+        this.deckChanged(d);
+        return { ok: true, kind: 'mutate', status: 200, response: '{}', deck: { id: d.id, publicId: d.publicId, version: d.version } };
+      }
+      case 'addDeckCard': {
+        const d = deckOf(op);
+        if ('ok' in d) return d;
+        const c = this.catalog.get(op.cardId);
+        if (!c) return { ok: false, status: 400, code: 'http', message: 'Moxfield answered HTTP 400' };
+        const dc = deckCard(c.name, c.set, c.cn, op.quantity, 'mainboard', op.finish);
+        addDeckCard(d, { ...dc, card: { ...dc.card, id: op.cardId, lang: c.lang } });
+        this.deckChanged(d);
+        // This answer doesn't say the new version: the next change reads the deck first.
+        return { ok: true, kind: 'mutate', status: 200, response: '{}', deck: {}, imported: { ok: true, count: op.quantity, errors: [] } };
+      }
       case 'createBinder': {
         const b = { id: `nb${++this.n}`, publicId: `pnb${this.n}`, name: op.name, visibility: op.visibility };
         this.binders.push(b);
@@ -872,5 +988,253 @@ describe('Export list', () => {
     expect(exportListReducer(s, { type: 'remove', keys: ['nope'] })).toBe(s);
     expect(exportListReducer(s, { type: 'remove', keys: ['c21|263|nonFoil'] }).size).toBe(1);
     expect(exportListReducer(s, { type: 'clear' }).size).toBe(0);
+  });
+});
+
+const LIMITS = { ...moxfieldExporter.limits, pageSize: 5000 };
+const gitem = (name: string, set: string, cn: string, qty: number, group: NonNullable<ExportItem['group']>): ExportItem => ({ ...item(name, set, cn, qty), group });
+const FF = (rarity: string, colors = 'R') => ({ set: 'fin', setName: 'Final Fantasy', rarity, colors });
+const BLB = { set: 'blb', setName: 'Bloomburrow', rarity: 'rare', colors: 'W' };
+const GROUPED = [gitem('Cloud', 'fin', '1', 2, FF('mythic')), gitem('Tifa', 'fin', '2', 3, FF('rare')), gitem('Aerith', 'fic', '3', 1, FF('rare', 'WG')), gitem('Mabel', 'blb', '4', 4, BLB)];
+
+describe('Deck export plan', () => {
+  const dctx = (over: Partial<PlanContext> = {}): PlanContext => ({ sourceAccountKey: null, targetName: 'alice', limits: LIMITS, ...over });
+  const FOLDER: DeckFolder = { id: 'fo1', path: 'Collection' };
+  const summary = (over: Partial<DeckSummary> = {}): DeckSummary => ({
+    id: 'd1',
+    publicId: 'pd1',
+    name: 'Spare',
+    format: 'none',
+    visibility: 'private',
+    folderPath: '',
+    lastUpdatedAt: 't1',
+    createdAt: '',
+    mainboardCount: 0,
+    sideboardCount: 0,
+    maybeboardCount: 0,
+    commanders: [],
+    publicUrl: '',
+    ...over,
+  });
+  const dstate = (decks: DeckSummary[] = [], cards: Record<string, DeckCard[]> = {}, tooBig = false): TargetState => ({
+    binders: [],
+    read: { kind: 'decks', publicIds: Object.keys(cards) },
+    entries: [],
+    totals: null,
+    decks,
+    folders: [FOLDER],
+    deckCards: Object.fromEntries(Object.entries(cards).map(([k, c]) => [k, { id: 'd1', version: 3, lastUpdatedAt: 't1', tooBig, cards: c }])),
+    readAt: 0,
+  });
+  const NEW_DECK: ExportTarget = { accountKey: A_KEY, kind: 'newDeck', name: 'Spare', visibility: 'private', folderId: 'fo1' };
+
+  it('a new deck: one write with its import text; refused past 1,000 cards', () => {
+    const p = planExport(NEW_DECK, [item('Sol Ring', 'c21', '263', 2), item('Opt', 'xln', '65', 1)], dstate(), dctx());
+    expect(p.blocked).toBeUndefined();
+    expect(previewRead(NEW_DECK)).toEqual({ kind: 'decks' });
+    expect(p.decks).toEqual([expect.objectContaining({ name: 'Spare', existing: null, copies: 3, before: 0, after: 3 })]);
+    expect(p.folder).toEqual({ id: 'fo1', path: 'Collection', create: false });
+    expect(p.writes).toBe(1);
+    expect(p.steps[0]).toBe('Create the private deck “Spare” in the folder “Collection”, with 3 copies (2 prints) in its mainboard');
+    const big = planExport(NEW_DECK, [item('Island', 'dsk', '279', 1001)], dstate(), dctx());
+    expect(big.blocked).toMatch(/would have 1,001 cards: a deck shows at most 1,000/);
+    // A deck of that name in that folder already: a second one would be made.
+    expect(planExport(NEW_DECK, [item('Opt', 'xln', '65', 1)], dstate([summary({ folderId: 'fo1', folderPath: 'Collection' })]), dctx()).warnings[0].text).toMatch(/already has a deck named “Spare”/);
+    expect(planExport({ ...NEW_DECK, folderId: 'gone' }, [item('Opt', 'xln', '65', 1)], dstate(), dctx()).blocked).toMatch(/folder isn't on alice/);
+  });
+
+  it('an existing deck: adds to its mainboard (its cards stay); a deck over 1,000 cards is refused', () => {
+    const t: ExportTarget = { accountKey: A_KEY, kind: 'deck', deckId: 'd1', publicId: 'pd1' };
+    expect(previewRead(t)).toEqual({ kind: 'decks', publicIds: ['pd1'] });
+    const cards = [deckCard('Island', 'dsk', '279', 10), deckCard('Opt', 'xln', '65', 4, 'sideboard')];
+    const state = dstate([summary({ mainboardCount: 10, sideboardCount: 4 })], { pd1: cards });
+    const p = planExport(t, [item('Sol Ring', 'c21', '263', 2)], state, dctx());
+    expect(p.blocked).toBeUndefined();
+    expect(p.remove).toEqual({ entries: [], copies: 0, wholeCollection: false });
+    expect(p.decks![0]).toMatchObject({ before: 14, after: 16 });
+    expect(p.steps[0]).toBe('Add 2 copies (1 print) to the mainboard of “Spare” (its cards stay)');
+    // The digest changes when the deck does.
+    expect(planExport(t, [item('Sol Ring', 'c21', '263', 2)], dstate([summary({ lastUpdatedAt: 't2' })], { pd1: cards }), dctx()).digest).not.toBe(p.digest);
+    expect(planExport(t, [item('Sol Ring', 'c21', '263', 990)], state, dctx()).blocked).toMatch(/1,004 cards \(14 now\)/);
+    expect(planExport(t, [item('Opt', 'xln', '65', 1)], dstate([summary()], { pd1: cards }, true), dctx()).blocked).toMatch(/already has more cards than a deck shows/);
+    expect(planExport({ ...t, deckId: 'x' }, [item('Opt', 'xln', '65', 1)], state, dctx()).blocked).toMatch(/deck isn't on alice/);
+  });
+
+  it('a deck folder: one deck per group; in an existing folder, a group whose deck is there adds to it', () => {
+    const grouping = { '': 'set', 'set:fin': 'rarity' } as const;
+    const nf: ExportTarget = { accountKey: A_KEY, kind: 'newFolder', name: 'By set', parentFolderId: 'fo1', visibility: 'unlisted', grouping };
+    const p = planExport(nf, GROUPED, dstate(), dctx());
+    expect(p.blocked).toBeUndefined();
+    expect(p.folder).toEqual({ id: null, path: 'Collection/By set', create: true });
+    expect(p.decks!.map((d) => [d.name, d.copies])).toEqual([
+      ['Bloomburrow', 4],
+      ['Final Fantasy - Rare', 4],
+      ['Final Fantasy - Mythic', 2],
+    ]);
+    expect(p.writes).toBe(4);
+    expect(p.steps[0]).toBe('Create the folder “Collection/By set” on alice');
+
+    const f: ExportTarget = { accountKey: A_KEY, kind: 'folder', folderId: 'fo1', visibility: 'private', grouping };
+    const there = summary({ id: 'd7', publicId: 'pd7', name: 'final fantasy - rare', folderId: 'fo1', folderPath: 'Collection', mainboardCount: 996 });
+    const q = planExport(f, GROUPED, dstate([there, summary({ id: 'd8', name: 'Bloomburrow' })]), dctx());
+    expect(q.decks!.map((d) => [d.name, d.existing?.id ?? null])).toEqual([
+      ['Bloomburrow', null],
+      ['Final Fantasy - Rare', 'd7'],
+      ['Final Fantasy - Mythic', null],
+    ]);
+    // 996 + 4 = 1,000: still fits; one more doesn't.
+    expect(q.blocked).toBeUndefined();
+    expect(q.decks![1]).toMatchObject({ before: 996, after: 1000 });
+    const r = planExport(f, GROUPED, dstate([{ ...there, mainboardCount: 997 }]), dctx());
+    expect(r.blocked).toMatch(/^“Final Fantasy - Rare” would have 1,001 cards \(997 now\): a deck shows at most 1,000\. Split them into more groups/);
+  });
+
+  it('refuses a folder Moxfield would not take, or cards without their groups', () => {
+    const nf: ExportTarget = { accountKey: A_KEY, kind: 'newFolder', name: 'Final Fantasy: Rares', parentFolderId: null, visibility: 'private', grouping: { '': 'set' } };
+    expect(planExport(nf, GROUPED, dstate(), dctx()).blocked).toMatch(/letters, numbers, spaces and hyphens/);
+    expect(planExport({ ...nf, name: 'collection' }, GROUPED, dstate(), dctx()).blocked).toMatch(/already has a folder “collection”/);
+    expect(planExport({ ...nf, name: 'Spares' }, [item('Opt', 'xln', '65', 1)], dstate(), dctx()).blocked).toMatch(/set, rarity and color identity/);
+    const many = Array.from({ length: 101 }, (_, i) => gitem(`C${i}`, `s${i}`, '1', 1, { set: `s${i}`, setName: `Set ${i}`, rarity: 'rare', colors: 'R' }));
+    expect(planExport({ ...nf, name: 'Spares' }, many, dstate(), dctx()).blocked).toMatch(/101 decks: at most 100/);
+  });
+});
+
+describe('Deck export job', () => {
+  beforeEach(resetDb);
+  const TO_DECK = [item('Sol Ring', 'c21', '263', 2), item('Llanowar Elves', 'dom', '168', 1, 'foil')];
+
+  async function setup() {
+    const acc = await newAccount(ALICE.userId, ALICE.userName);
+    const mox = new FakeMox();
+    const port = new FakeTabs();
+    port.tabs = [{ id: 1, active: true, account: ALICE }];
+    port.answer = mox.answer as never;
+    const job = new ExportJob(moxfieldSite, {
+      createTransport: ({ expect, ...ctl }) => new TabTransport(moxfieldSite, { ...ctl, expect, authWaitMs: 30, pollMs: 5, reloadSettleMs: 0 }, port),
+      clientOptions: async () => ({ intervalMs: 0, jitterMs: 0, maxIntervalMs: 0, rateLimitWaitsMs: [], errorWaitsMs: [], sleep: async () => {} }),
+      lock: new SiteLock(),
+    });
+    return { acc, mox, job };
+  }
+
+  async function exportWith(job: ExportJob, accountKey: never, target: ExportTarget, items: ExportItem[], change?: () => void) {
+    const read = await job.readTarget(accountKey, previewRead(target));
+    if (!read.ok) throw new Error(read.error);
+    const plan = planExport(target, items, read.state, { sourceAccountKey: null, targetName: 'alice', limits: LIMITS });
+    expect(plan.blocked).toBeUndefined();
+    change?.();
+    const res = await job.start({ target, items: plan.items, digest: plan.digest, sourceAccountKey: null, source: 'test', estimate: plan.requests, label: plan.targetLabel });
+    if (!res.ok) throw new Error(res.error);
+    await job.finished;
+    const op = (await getOp(res.opId))!;
+    return { op, details: op.details as ExportDetails, calls: await opCalls(res.opId), plan };
+  }
+
+  const mainboard = (d: FakeDeck) =>
+    d.cards
+      .filter((c) => c.board === 'mainboard')
+      .map((c) => `${c.qty} ${c.card.name} ${c.card.set} ${c.finish}${c.card.lang !== 'en' ? ` ${c.card.lang}` : ''}`)
+      .sort();
+
+  it('creates a deck in a folder: English prints by import text, another language by its card id; then checks it', async () => {
+    const { acc, mox, job } = await setup();
+    mox.folders = [{ id: 'fo1', path: 'Collection' }];
+    mox.catalog.set('frOpt', { name: 'Opt', set: 'xln', cn: '65', lang: 'fr' });
+    const fr: ExportItem = { ...item('Opt', 'xln', '65', 2), key: 'xln|65|nonFoil|fr', cardId: 'frOpt', lang: 'fr', printLang: 'fr' };
+    const { op, details, calls } = await exportWith(job, acc.key as never, { accountKey: acc.key, kind: 'newDeck', name: 'Spares', visibility: 'private', folderId: 'fo1' }, [...TO_DECK, fr]);
+    expect(op.error).toBeUndefined();
+    expect(op.status).toBe('done');
+    expect(mox.writes.map((w) => w.op)).toEqual(['createDeck', 'addDeckCard']);
+    expect(mox.writes[0]).toMatchObject({ name: 'Spares', folderId: 'fo1', importText: '1 Llanowar Elves (DOM) 168 *F*\n2 Sol Ring (C21) 263' });
+    const deck = mox.decks[0];
+    expect(mainboard(deck)).toEqual(['1 Llanowar Elves dom foil', '2 Opt xln nonFoil fr', '2 Sol Ring c21 nonFoil']);
+    // The creation didn't say the deck's version: it was read before adding by card id, with its headers.
+    expect(calls[1].headers).toEqual({ 'x-public-deck-id': deck.publicId, 'x-deck-version': '1' });
+    expect(details.decks).toEqual([{ name: 'Spares', publicId: deck.publicId, created: true }]);
+    expect(details.verify).toMatchObject({ ok: true, scope: 'decks', expectedCopies: 5, foundCopies: 5 });
+  });
+
+  it('adds to an existing deck: its cards and other boards stay, the version read before is sent', async () => {
+    const { acc, mox, job } = await setup();
+    mox.decks = [{ id: 'dk9', publicId: 'pubdeck9', name: 'Main', version: 5, lastUpdatedAt: 't0', cards: [deckCard('Island', 'dsk', '279', 10), deckCard('Opt', 'xln', '65', 1, 'sideboard')] }];
+    const t: ExportTarget = { accountKey: acc.key, kind: 'deck', deckId: 'dk9', publicId: 'pubdeck9' };
+    const added = await exportWith(job, acc.key as never, t, [...TO_DECK, item('Island', 'dsk', '279', 2)]);
+    expect(added.op.status).toBe('done');
+    expect(mox.writes[0]).toMatchObject({ op: 'importDeck', version: 5 });
+    expect(mainboard(mox.decks[0])).toEqual(['1 Llanowar Elves dom foil', '12 Island dsk nonFoil', '2 Sol Ring c21 nonFoil']);
+    expect(mox.decks[0].cards.filter((c) => c.board === 'sideboard')).toHaveLength(1);
+    expect(added.calls[0].headers).toEqual({ 'x-public-deck-id': 'pubdeck9', 'x-deck-version': '5' });
+    expect(added.details.verify).toMatchObject({ ok: true, expectedCopies: 15 });
+    // A sideboard card gone meanwhile shows in the check.
+    mox.failOn = (op) => (op.op === 'importDeck' ? ((mox.decks[0].cards = mox.decks[0].cards.filter((c) => c.board !== 'sideboard')), null) : null);
+    const again = await exportWith(job, acc.key as never, t, [item('Opt', 'xln', '65', 1)]);
+    expect(again.details.verify).toMatchObject({ ok: false, otherChanged: [expect.objectContaining({ name: 'Opt', board: 'sideboard', outside: true, expected: 1, found: 0 })] });
+  });
+
+  it('a new folder: one deck per group, each split its own way, all checked', async () => {
+    const { acc, mox, job } = await setup();
+    const t: ExportTarget = { accountKey: acc.key, kind: 'newFolder', name: 'By set', parentFolderId: null, visibility: 'private', grouping: { '': 'set', 'set:fin': 'rarity' } };
+    const { op, details } = await exportWith(job, acc.key as never, t, GROUPED);
+    expect(op.status).toBe('done');
+    expect(mox.writes.map((w) => w.op)).toEqual(['createDeckFolder', 'createDeck', 'createDeck', 'createDeck']);
+    expect(mox.folders).toEqual([{ id: expect.any(String), path: 'By set' }]);
+    expect(mox.decks.map((d) => [d.name, d.folderId === mox.folders[0].id, mainboard(d)])).toEqual([
+      ['Bloomburrow', true, ['4 Mabel blb nonFoil']],
+      ['Final Fantasy - Rare', true, ['1 Aerith fic nonFoil', '3 Tifa fin nonFoil']],
+      ['Final Fantasy - Mythic', true, ['2 Cloud fin nonFoil']],
+    ]);
+    expect(details.folder).toEqual({ id: mox.folders[0].id, path: 'By set' });
+    expect(details.verify).toMatchObject({ ok: true, scope: 'decks', expectedCopies: 10 });
+  });
+
+  it('an existing folder: the group whose deck is there gets its cards, the others new decks', async () => {
+    const { acc, mox, job } = await setup();
+    mox.folders = [{ id: 'fo1', path: 'Collection' }];
+    mox.decks = [{ id: 'dk1', publicId: 'pubdeck1', name: 'Bloomburrow', folderId: 'fo1', version: 2, lastUpdatedAt: 't0', cards: [deckCard('Mabel', 'blb', '4', 1)] }];
+    const t: ExportTarget = { accountKey: acc.key, kind: 'folder', folderId: 'fo1', visibility: 'private', grouping: { '': 'set' } };
+    const { op, details } = await exportWith(job, acc.key as never, t, GROUPED);
+    expect(op.status).toBe('done');
+    expect(mox.writes.map((w) => w.op)).toEqual(['importDeck', 'createDeck']);
+    expect(mainboard(mox.decks[0])).toEqual(['5 Mabel blb nonFoil']);
+    expect(mox.decks[1]).toMatchObject({ name: 'Final Fantasy', folderId: 'fo1' });
+    expect(details.decks!.map((d) => [d.name, d.created])).toEqual([
+      ['Bloomburrow', false],
+      ['Final Fantasy', true],
+    ]);
+    expect(details.verify).toMatchObject({ ok: true });
+  });
+
+  it('refuses a deck changed since the preview; a card imported as another print shows in the check', async () => {
+    const { acc, mox, job } = await setup();
+    mox.decks = [{ id: 'dk9', publicId: 'pubdeck9', name: 'Main', version: 5, lastUpdatedAt: 't0', cards: [] }];
+    const t: ExportTarget = { accountKey: acc.key, kind: 'deck', deckId: 'dk9', publicId: 'pubdeck9' };
+    const refused = await exportWith(job, acc.key as never, t, TO_DECK, () => (mox.decks[0].lastUpdatedAt = 't1'));
+    expect(refused.op.status).toBe('failed');
+    expect(refused.op.error).toMatch(/decks or folders changed since the preview/);
+    expect(mox.writes).toHaveLength(0);
+
+    mox.misprint = { from: 'Sol Ring', to: { set: 'plst', cn: 'C21-263' } };
+    const off = await exportWith(job, acc.key as never, t, TO_DECK);
+    expect(off.op.status).toBe('done');
+    expect(off.details.verify).toMatchObject({ ok: false, short: [expect.objectContaining({ name: 'Sol Ring', expected: 2, found: 0, deck: 'Main' })] });
+    expect(off.details.verify!.extra).toEqual([expect.objectContaining({ set: 'plst', found: 2 })]);
+  });
+
+  it('checks the new kinds of targets it is sent', async () => {
+    const { acc, job } = await setup();
+    const send = (target: unknown) => job.startMany({ items: TO_DECK, sourceAccountKey: null, source: 'x', exports: [{ target: target as ExportTarget, digest: 'd' }] });
+    expect(await send({ accountKey: acc.key, kind: 'newFolder', name: 'x', parentFolderId: null, visibility: 'private', grouping: { '': 'name' } })).toMatchObject({ ok: false, code: 'bad_request' });
+    expect(await send({ accountKey: acc.key, kind: 'deck', deckId: '../x', publicId: 'p' })).toMatchObject({ ok: false, code: 'bad_request' });
+    expect(await send({ accountKey: acc.key, kind: 'newDeck', name: ' ', visibility: 'private', folderId: null })).toMatchObject({ ok: false, code: 'bad_request' });
+    // Decks aren't collection cards: a collection replace goes with a deck target on the same account.
+    expect(batchIssues([
+      { accountKey: acc.key, kind: 'deck', deckId: 'd', publicId: 'p' },
+      { accountKey: acc.key, kind: 'deck', deckId: 'd', publicId: 'p' },
+      { accountKey: acc.key, kind: 'collection', mode: 'replace' },
+    ])).toEqual([{ index: 1, level: 'error', text: 'Target 1 already exports to the same deck.' }]);
+    expect(runOrder([
+      { accountKey: acc.key, kind: 'newDeck', name: 'a', visibility: 'private', folderId: null },
+      { accountKey: acc.key, kind: 'binder', binderId: 'b', mode: 'replace' },
+    ])).toEqual([1, 0]);
   });
 });

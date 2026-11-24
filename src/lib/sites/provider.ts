@@ -23,8 +23,8 @@ export interface SiteProvider {
     collection: boolean;
     /** The site's own collection page can start a Selling run from what it shows (the panel). */
     collectionCapture: boolean;
-    /** Cards can be exported to the site: into binders, and into the collection. */
-    exportTo: { binders: boolean; collection: boolean };
+    /** Cards can be exported to the site: into binders, into the collection, into decks and deck folders. */
+    exportTo: { binders: boolean; collection: boolean; decks: boolean };
   };
   /** The request a write makes, for the change log; null when the site doesn't make that write. */
   describeMutation(op: SiteMutation): DescribedRequest | null;
@@ -32,6 +32,8 @@ export interface SiteProvider {
   binderUrl(publicId: string): string;
   /** A deck folder's page on the site (the deck list opened on it). */
   deckFolderUrl(folderId: string): string;
+  /** A deck's page on the site. */
+  deckUrl(publicId: string): string;
   /** The site's deck boards, in display order. */
   boards: BoardInfo[];
   boardLabel(key: string): string;

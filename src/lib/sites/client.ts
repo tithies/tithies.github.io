@@ -298,9 +298,10 @@ export class SiteClient {
     return folders;
   }
 
-  async deck(publicId: string): Promise<{ lastUpdatedAt: string; cards: DeckCard[] }> {
-    const { lastUpdatedAt, cards } = await this.request({ kind: 'deck', publicId });
-    return { lastUpdatedAt, cards };
+  /** One deck's cards; also its internal `id` and `version` (what a change of it sends) and `tooBig` (more cards than the site shows), when the site says. */
+  async deck(publicId: string): Promise<{ lastUpdatedAt: string; cards: DeckCard[]; id?: string; version?: number; tooBig?: boolean }> {
+    const { lastUpdatedAt, cards, id, version, tooBig } = await this.request({ kind: 'deck', publicId });
+    return { lastUpdatedAt, cards, id, version, tooBig };
   }
 
   /** One page of the whole collection, by card name (or most recently changed first). */

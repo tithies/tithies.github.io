@@ -6,6 +6,7 @@
  */
 import PQueue from 'p-queue';
 import type { CollectionEntry } from '@/lib/cards/types';
+import { scryfallCollection as fetchCollection } from '@/lib/cards/scryfall';
 import { scryfallImage } from '@/lib/f2f/links';
 import type { ScannerEngine } from './engine-client';
 import { addNoBack, currentRefIds, MODEL_KEY, noBackIds, rowKey, scannerDb, type RefRow } from './store';
@@ -46,10 +47,6 @@ export interface BuildProgress {
 /** Images per engine call: 8 prints × 2 model runs = one batch of 16 pictures (engine/features.ts). */
 const GROUP = 8;
 
-const SCRYFALL_COLLECTION = 'https://api.scryfall.com/cards/collection';
-/** Identifiers per /cards/collection request (Scryfall's limit). */
-const COLLECTION_MAX = 75;
-
 interface ScryfallCard {
   id: string;
   set: string;
@@ -58,22 +55,8 @@ interface ScryfallCard {
   image_status?: string;
 }
 
-async function scryfallCollection(identifiers: object[], signal: AbortSignal, fetchFn: typeof fetch): Promise<ScryfallCard[]> {
-  const out: ScryfallCard[] = [];
-  for (let i = 0; i < identifiers.length; i += COLLECTION_MAX) {
-    // Scryfall asks for 50–100 ms between requests.
-    if (i) await new Promise((r) => setTimeout(r, 120));
-    const res = await fetchFn(SCRYFALL_COLLECTION, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ identifiers: identifiers.slice(i, i + COLLECTION_MAX) }),
-      signal,
-    });
-    if (!res.ok) throw new Error(`Scryfall /cards/collection: HTTP ${res.status}`);
-    out.push(...((await res.json()) as { data: ScryfallCard[] }).data);
-  }
-  return out;
-}
+const scryfallCollection = (identifiers: object[], signal: AbortSignal, fetchFn: typeof fetch): Promise<ScryfallCard[]> =>
+  fetchCollection<ScryfallCard>(identifiers, signal, fetchFn);
 
 /**
  * Pictures to use instead of a print's own (print id → the stand-in's id). A non-English print Scryfall has no scan of

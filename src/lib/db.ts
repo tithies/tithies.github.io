@@ -98,7 +98,7 @@ export const db = new TithiesDB();
  * The only keys of the global meta table: account data lives in `accountMeta`.
  * `initialSyncDismissed`: accounts whose initial-sync prompt got "Not now" (they may not be in Tithies yet).
  */
-export type GlobalMetaKey = 'bulkRates' | 'f2fSets' | 'currentAccount' | 'initialSyncDismissed';
+export type GlobalMetaKey = 'bulkRates' | 'f2fSets' | 'scryfallSets' | 'currentAccount' | 'initialSyncDismissed';
 
 export async function getMeta<T>(key: GlobalMetaKey): Promise<T | undefined> {
   return (await db.meta.get(key))?.value as T | undefined;

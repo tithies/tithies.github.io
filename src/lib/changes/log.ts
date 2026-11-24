@@ -70,7 +70,7 @@ export function writeLogger(opId: number, now: () => number = Date.now): WriteLo
     async begin(req: DescribedRequest): Promise<number> {
       return db.transaction('rw', db.changeOps, db.changeCalls, async () => {
         const seq = (await db.changeCalls.where('opId').equals(opId).count()) + 1;
-        await db.changeCalls.add({ opId, seq, at: now(), method: req.method, url: req.url, body: req.body, outcome: 'sent' });
+        await db.changeCalls.add({ opId, seq, at: now(), method: req.method, url: req.url, ...(req.headers ? { headers: req.headers } : {}), body: req.body, outcome: 'sent' });
         await db.changeOps.update(opId, { calls: seq, heartbeatAt: now() });
         return seq;
       });

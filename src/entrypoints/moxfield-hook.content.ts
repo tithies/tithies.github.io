@@ -21,7 +21,13 @@ export default defineContentScript({
     const origFetch = window.fetch.bind(window);
     const pageFetch: PageFetch = (url, headers, init) =>
       init
-        ? origFetch(url, { method: init.method, headers: init.contentType ? { ...headers, 'content-type': init.contentType } : headers, body: init.body, credentials: 'include' })
+        ? origFetch(url, {
+            method: init.method,
+            // A deck change's own headers win over the session's (lowercase, like the session's).
+            headers: { ...headers, ...(init.headers ?? {}), ...(init.contentType ? { 'content-type': init.contentType } : {}) },
+            body: init.body,
+            credentials: 'include',
+          })
         : origFetch(url, { headers, credentials: 'include' });
 
     const apiUrl = (url: string): URL | null => {

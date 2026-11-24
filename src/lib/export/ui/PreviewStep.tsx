@@ -1,10 +1,10 @@
-import { Alert, List, ScrollArea, SimpleGrid, Stack, Table, Tabs, Text } from '@mantine/core';
+import { Alert, Badge, List, ScrollArea, SimpleGrid, Stack, Table, Tabs, Text } from '@mantine/core';
 import { IconAlertTriangle, IconEye, IconInfoCircle } from '@tabler/icons-react';
 import { finishLabel } from '@/lib/format';
 import { langLabel } from '@/lib/cards/languages';
 import type { SiteProvider } from '@/lib/sites/provider';
 import { Stat } from '@/lib/ui/Stat';
-import type { ExportPlan } from '../types';
+import type { DeckPlan, ExportPlan } from '../types';
 
 const n = (v: number) => v.toLocaleString('en-CA');
 export const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
@@ -25,9 +25,53 @@ export interface PreviewTarget {
   after?: string;
 }
 
+/** The decks a deck export writes into: new ones, the ones it adds to, those too big. */
+function DecksTable({ decks }: { decks: DeckPlan[] }) {
+  return (
+    <ScrollArea.Autosize mah={260}>
+      <Table fz="xs" verticalSpacing={2} striped>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Deck</Table.Th>
+            <Table.Th ta="right">Added</Table.Th>
+            <Table.Th ta="right">Cards now → after</Table.Th>
+            <Table.Th />
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {decks.map((d) => (
+            <Table.Tr key={d.name}>
+              <Table.Td c={d.over ? 'red' : undefined}>{d.name}</Table.Td>
+              <Table.Td ta="right" className="ti-num">
+                {n(d.copies)}
+              </Table.Td>
+              <Table.Td ta="right" className="ti-num" c={d.over ? 'red' : undefined}>
+                {n(d.before)} → {n(d.after)}
+              </Table.Td>
+              <Table.Td>
+                {d.over ? (
+                  <Badge size="xs" color="red" variant="light">
+                    Too big
+                  </Badge>
+                ) : (
+                  <Badge size="xs" color={d.existing ? 'gray' : 'teal'} variant="light">
+                    {d.existing ? 'Already there' : 'New'}
+                  </Badge>
+                )}
+              </Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </ScrollArea.Autosize>
+  );
+}
+
 /** What would change for one target, read live. */
 export function PreviewStep({ site, plan, name }: { site: SiteProvider; plan: ExportPlan; name: string }) {
   const removeCount = plan.remove.entries.length;
+  const decks = plan.decks;
+  const created = decks?.filter((d) => !d.existing).length ?? 0;
   return (
     <Stack>
       <Alert color="blue" variant="light" icon={<IconEye size={18} />} p="xs">
@@ -56,8 +100,12 @@ export function PreviewStep({ site, plan, name }: { site: SiteProvider; plan: Ex
           color={removeCount ? 'red' : undefined}
           lines={[removeCount ? plural(removeCount, 'entry', 'entries') : 'Nothing would be deleted']}
         />
-        <Stat label="Would be added" value={plural(plan.add.copies, 'copy', 'copies')} color="teal" lines={[plural(plan.add.prints, 'print')]} />
-        <Stat label={`In ${plan.targetLabel}`} value={`${n(plan.before)} → ${n(plan.after)}`} lines={['Copies now → after the export']} />
+        <Stat label="Would be added" value={plural(plan.add.copies, 'copy', 'copies')} color="teal" lines={[plural(plan.add.prints, 'print'), ...(decks ? ['In the mainboard'] : [])]} />
+        {decks && decks.length > 1 ? (
+          <Stat label="Decks" value={`${n(created)} new`} lines={[`${plural(decks.length - created, 'deck')} already there`, `Copies in them: ${n(plan.before)} → ${n(plan.after)}`]} />
+        ) : (
+          <Stat label={`In ${plan.targetLabel}`} value={`${n(plan.before)} → ${n(plan.after)}`} lines={['Copies now → after the export']} />
+        )}
       </SimpleGrid>
       <Stack gap={4}>
         <Text size="sm" fw={600}>
@@ -73,13 +121,23 @@ export function PreviewStep({ site, plan, name }: { site: SiteProvider; plan: Ex
           Every change it sends will be kept in the Change log, exactly as sent.
         </Text>
       </Stack>
-      <Tabs defaultValue={removeCount ? 'removed' : 'added'} keepMounted={false}>
+      <Tabs defaultValue={removeCount ? 'removed' : decks && decks.length > 1 ? 'decks' : 'added'} keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="added">To add ({n(plan.items.length)})</Tabs.Tab>
+          {decks && decks.length > 1 && (
+            <Tabs.Tab value="decks" color={decks.some((d) => d.over) ? 'red' : undefined}>
+              Decks ({n(decks.length)})
+            </Tabs.Tab>
+          )}
           <Tabs.Tab value="removed" disabled={!removeCount} color="red">
             To delete ({n(removeCount)})
           </Tabs.Tab>
         </Tabs.List>
+        {decks && decks.length > 1 && (
+          <Tabs.Panel value="decks" pt="xs">
+            <DecksTable decks={decks} />
+          </Tabs.Panel>
+        )}
         <Tabs.Panel value="added" pt="xs">
           <ScrollArea.Autosize mah={260}>
             <Table fz="xs" verticalSpacing={2} striped>
@@ -137,7 +195,7 @@ export function PreviewStep({ site, plan, name }: { site: SiteProvider; plan: Ex
 }
 
 /** A target's name in the tabs and the run order: "the binder “Trade”" (plus whose, with several accounts). */
-export const targetTitle = (t: Pick<PreviewTarget, 'plan' | 'name'>, accounts: number) =>
+export const targetTitle = (t: Pick<PreviewTarget, 'plan' | 'name'>, accounts: number): string =>
   t.plan.target.kind === 'collection' || accounts <= 1 ? t.plan.targetLabel : `${t.plan.targetLabel} of ${t.name}`;
 
 export const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

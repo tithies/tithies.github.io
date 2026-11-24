@@ -6,7 +6,7 @@ import type { CollectionEntry } from '@/lib/cards/types';
 import { siteFail, type SiteRequest, type SiteResult } from '@/lib/sites/types';
 import { MOX_API_ORIGIN, MOX_COLLECTION_PAGE_SIZE } from './constants';
 import { normalizeDeckCards, normalizeDeckFolders, normalizeDeckList } from './decks';
-import { binderFromAnswer, buildMoxMutation, importAnswer, normalizeBinderList, type BuiltMutation } from './mutations';
+import { binderFromAnswer, buildMoxMutation, deckFromAnswer, folderFromAnswer, importAnswer, normalizeBinderList, type BuiltMutation } from './mutations';
 import { COLLECTION_SEARCH_PATH, normalizeEntry, type CollectionPage } from './normalize';
 
 export const DECK_LIST_URL = `${MOX_API_ORIGIN}/v3/decks`;
@@ -95,23 +95,34 @@ export function requestUrl(req: unknown): string | null {
   }
 }
 
-/** How the page sends a write: method and body (JSON or multipart). */
+/** How the page sends a write: method, headers of its own, and body (JSON or multipart). */
 export interface WriteInit {
   method: BuiltMutation['method'];
   body?: string | FormData;
   /** Set for JSON bodies; multipart bodies let the browser set it (with its boundary). */
   contentType?: string;
+  /** A deck change's own headers (they win over the session's). */
+  headers?: Record<string, string>;
 }
 
 function writeInit(b: BuiltMutation): WriteInit {
+  const headers = b.headers ? { headers: { ...b.headers } } : {};
   if (b.file) {
     const form = new FormData();
     form.append(b.file.field, new Blob([b.file.text], { type: b.file.type }), b.file.name);
-    return { method: b.method, body: form };
+    return { method: b.method, body: form, ...headers };
   }
-  if (b.json !== undefined) return { method: b.method, body: JSON.stringify(b.json), contentType: 'application/json' };
-  return { method: b.method };
+  if (b.json !== undefined) return { method: b.method, body: JSON.stringify(b.json), contentType: 'application/json', ...headers };
+  return { method: b.method, ...headers };
 }
+
+const parse = (text: string): unknown => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+};
 
 const clip = (s: string) => (s.length > MAX_LOGGED_RESPONSE ? `${s.slice(0, MAX_LOGGED_RESPONSE)}… (${s.length} characters)` : s);
 
@@ -162,6 +173,21 @@ async function runMoxWrite(op: unknown, doFetch: (url: string, init?: WriteInit)
     const count = (op as { quantity: number }).quantity;
     return { ok: true, kind: 'mutate', status: res.status, response, imported: { ok: true, count, errors: [] } };
   }
+  if (kind === 'createDeckFolder') {
+    const folder = folderFromAnswer(parse(text));
+    if (!folder) return { ...siteFail(res.status, 'parse', "Moxfield created the folder but its answer didn't say which one"), response };
+    return { ok: true, kind: 'mutate', status: res.status, response, folder: folder.path ? folder : { ...folder, path: (op as { name: string }).name.trim() } };
+  }
+  if (kind === 'createDeck' || kind === 'importDeck' || kind === 'addDeckCard') {
+    const { deck, failed, errors } = deckFromAnswer(parse(text));
+    // An added card's answer has no deck in it: Moxfield's own app reads the new version from this header.
+    const header = Number(res.headers.get('x-deck-version') ?? NaN);
+    if (deck.version === undefined && Number.isInteger(header) && header >= 0) deck.version = header;
+    if (kind === 'createDeck' && failed) return { ...siteFail(res.status, 'http', `Moxfield didn't create the deck${errors.length ? `: ${errors.slice(0, 3).join('; ')}` : ''}`), response };
+    if (kind === 'createDeck' && !deck.publicId) return { ...siteFail(res.status, 'parse', "Moxfield created the deck but its answer didn't say which one"), response };
+    const imported = kind === 'addDeckCard' ? { ok: true, count: (op as { quantity: number }).quantity, errors: [] } : failed || errors.length ? { ok: !failed, count: 0, errors } : undefined;
+    return { ok: true, kind: 'mutate', status: res.status, response, deck, ...(imported ? { imported } : {}) };
+  }
   return { ok: true, kind: 'mutate', status: res.status, response };
 }
 
@@ -195,8 +221,8 @@ export async function runMoxRequest(req: SiteRequest, doFetch: (url: string, ini
     case 'binders':
       return { ok: true, kind: 'binders', binders: normalizeBinderList(body) };
     case 'deck': {
-      const { lastUpdatedAt, cards } = normalizeDeckCards(body);
-      return { ok: true, kind: 'deck', lastUpdatedAt, cards };
+      const { lastUpdatedAt, cards, id, version, tooBig } = normalizeDeckCards(body);
+      return { ok: true, kind: 'deck', lastUpdatedAt, cards, ...(id ? { id } : {}), ...(version !== undefined ? { version } : {}), ...(tooBig ? { tooBig } : {}) };
     }
     case 'collection':
     case 'binderPage': {

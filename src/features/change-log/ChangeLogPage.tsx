@@ -76,6 +76,14 @@ function CallRow({ call }: { call: ChangeCall }) {
           {call.as ? ` · as ${call.as.userName}` : ''}
           {call.error ? ` · ${call.error}` : ''}
         </Text>
+        {call.headers && (
+          <Block
+            label="Request headers"
+            text={Object.entries(call.headers)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join('\n')}
+          />
+        )}
         <Block label="Request body" text={call.body} />
         <Block label="Answer" text={call.response ?? ''} />
       </Stack>

@@ -62,7 +62,7 @@ async function tableSize(table: Table): Promise<number> {
 export async function measureStoredData(accountKey: AccountKey | null): Promise<Record<DataGroup, number>> {
   const [lookups, f2fMeta, changes, scanner, own] = await Promise.all([
     tableSize(db.f2fCache),
-    db.meta.bulkGet(['bulkRates', 'f2fSets']).then((rows) => rows.reduce((sum, r) => sum + (r ? jsonSize(r) : 0), 0)),
+    db.meta.bulkGet(['bulkRates', 'f2fSets', 'scryfallSets']).then((rows) => rows.reduce((sum, r) => sum + (r ? jsonSize(r) : 0), 0)),
     measureChangeLog().then((m) => m.bytes),
     Promise.all([measureScannerData(), measurePublished()]).then(([m, files]) => m.bytes + files),
     accountKey ? accountData(accountKey).measure() : Promise.resolve({ decks: 0, collection: 0, runs: 0 }),

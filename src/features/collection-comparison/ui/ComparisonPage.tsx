@@ -302,7 +302,7 @@ export function ComparisonPage() {
           <ComparisonTable
             rows={shown}
             allRows={result?.rows ?? []}
-            exportList={site.capabilities.exportTo.binders || site.capabilities.exportTo.collection ? exportList : undefined}
+            exportList={site.capabilities.exportTo.binders || site.capabilities.exportTo.collection || site.capabilities.exportTo.decks ? exportList : undefined}
             decks={deckById}
             boardLabel={site.boardLabel}
             loading={!loaded}
