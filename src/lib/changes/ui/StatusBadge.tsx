@@ -3,6 +3,7 @@ import { IconAlertTriangle } from '@tabler/icons-react';
 import type { ChangeOp, ChangeOpStatus } from '../types';
 
 const STATUS: Record<ChangeOpStatus, { label: string; color: string }> = {
+  queued: { label: 'Waiting', color: 'gray' },
   running: { label: 'Running', color: 'blue' },
   done: { label: 'Done', color: 'teal' },
   failed: { label: 'Failed', color: 'red' },

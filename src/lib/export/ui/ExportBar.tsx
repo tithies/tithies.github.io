@@ -114,13 +114,20 @@ function ExportTable({ exportList, narrow }: { exportList: ExportList; narrow: b
   );
 }
 
-/** The bar's button for the page's exports: the running one (with its progress), or "Exports". */
-function SeeExports({ running, narrow, onClick }: { running?: ChangeOp; narrow: boolean; onClick: () => void }) {
+/** The bar's button for the page's exports: the running one (with its progress, and how many wait after it), or "Exports". */
+function SeeExports({ running, waiting, narrow, onClick }: { running?: ChangeOp; waiting: number; narrow: boolean; onClick: () => void }) {
   const p = running?.progress;
   const count = running?.overall ? `${overallPercent(running.overall)}%` : p && p.total > 0 ? `${n(p.done)}/${n(p.total)}` : '';
-  const label = running ? (narrow ? count || 'Running' : `Export running${count ? ` · ${count}` : ''}`) : narrow ? 'Exports' : 'See exports';
+  const busy = !!running || waiting > 0;
+  const label = busy
+    ? narrow
+      ? count || 'Running'
+      : `Export running${count ? ` · ${count}` : ''}${waiting ? ` · ${n(waiting)} waiting` : ''}`
+    : narrow
+      ? 'Exports'
+      : 'See exports';
   return (
-    <Button size="xs" variant="light" leftSection={running ? <Loader size={12} /> : <IconListDetails size={14} />} onClick={onClick} className="ti-num" style={{ whiteSpace: 'nowrap' }}>
+    <Button size="xs" variant="light" leftSection={busy ? <Loader size={12} /> : <IconListDetails size={14} />} onClick={onClick} className="ti-num" style={{ whiteSpace: 'nowrap' }}>
       {label}
     </Button>
   );
@@ -131,7 +138,7 @@ export interface ExportBarProps {
   /** Opens the export dialog. */
   onExport: () => void;
   siteLabel: string;
-  /** The latest exports made from this page (running first): the bar's "See exports" button shows when there are some. */
+  /** The latest exports made from this page (running, then waiting, first): the bar's "See exports" button shows when there are some. */
   exports: ChangeOp[];
   onSeeExports: () => void;
 }
@@ -145,10 +152,11 @@ export function ExportBar({ exportList, onExport, siteLabel, exports, onSeeExpor
   const [open, setOpen] = useState(false);
   const narrow = useMatches({ base: true, sm: false });
   const running = exports.find((o) => o.status === 'running');
+  const waiting = exports.filter((o) => o.status === 'queued').length;
   const picked = exportList.prints > 0;
   return (
     <>
-      {(picked || running) && (
+      {(picked || running || waiting > 0) && (
         <Affix position={narrow ? { bottom: 12, left: 12, right: 12 } : { bottom: 20, right: 24 }} zIndex={150}>
           <Paper withBorder shadow="lg" radius="md" p="xs" pl={narrow ? 'sm' : 'md'}>
             <Group gap={narrow ? 'xs' : 'sm'} wrap={narrow ? 'wrap' : 'nowrap'} justify="flex-end">
@@ -170,7 +178,7 @@ export function ExportBar({ exportList, onExport, siteLabel, exports, onSeeExpor
                   Review
                 </Button>
               )}
-              {exports.length > 0 && <SeeExports running={running} narrow={narrow} onClick={onSeeExports} />}
+              {exports.length > 0 && <SeeExports running={running} waiting={waiting} narrow={narrow} onClick={onSeeExports} />}
               {picked && (
                 <Button size="xs" leftSection={<IconUpload size={14} />} onClick={onExport} style={{ whiteSpace: 'nowrap' }}>
                   {narrow ? 'Export…' : `Export to ${siteLabel}…`}

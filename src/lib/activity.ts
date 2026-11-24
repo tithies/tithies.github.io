@@ -47,7 +47,9 @@ export async function readActivity(): Promise<ActivityItem[]> {
   const names = new Map(accounts.map((a) => [a.key, a.nickname || a.userName]));
   const items: ActivityItem[] = [];
 
-  for (const op of await db.changeOps.where('status').equals('running').toArray()) {
+  // Running exports, and those waiting for the one before them (started together with it), in the order they run.
+  for (const op of (await db.changeOps.where('status').anyOf('running', 'queued').toArray()).sort((a, b) => Number(a.status === 'queued') - Number(b.status === 'queued') || a.id! - b.id!)) {
+    const waiting = op.status === 'queued';
     if (!names.has(op.accountKey)) continue;
     // An export opens on the Comparator it was made from, in its window; else in the Change log.
     const source = (op.details as ExportDetails | undefined)?.sourceAccountKey;
@@ -58,8 +60,8 @@ export async function readActivity(): Promise<ActivityItem[]> {
       accountKey: fromComparator ? source : op.accountKey,
       userName: names.get(op.accountKey)!,
       title: op.title,
-      detail: op.phase ?? 'Working…',
-      progress: op.overall ?? (op.progress && op.progress.total > 0 ? { done: op.progress.done, total: op.progress.total } : undefined),
+      detail: waiting ? 'Waiting for its turn' : (op.phase ?? 'Working…'),
+      progress: waiting ? undefined : (op.overall ?? (op.progress && op.progress.total > 0 ? { done: op.progress.done, total: op.progress.total } : undefined)),
       to: fromComparator ? `/collection/comparator?export=${op.id}` : `/changes?op=${op.id}`,
     });
   }

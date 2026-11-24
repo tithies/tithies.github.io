@@ -15,6 +15,45 @@ export async function startOp(op: NewChangeOp, now = Date.now()): Promise<number
   return (await db.changeOps.add({ ...op, status: 'running', startedAt: now, heartbeatAt: now, calls: 0, unknownCalls: 0 })) as number;
 }
 
+/**
+ * Several actions started together, in the order they run: the first running, the others queued
+ * (each claims its turn with claimQueuedOp). All rows or none.
+ */
+export async function startOps(ops: NewChangeOp[], now = Date.now()): Promise<number[]> {
+  return db.transaction('rw', db.changeOps, async () => {
+    const ids: number[] = [];
+    for (const [i, op] of ops.entries()) {
+      ids.push((await db.changeOps.add({ ...op, status: i === 0 ? 'running' : 'queued', startedAt: now, heartbeatAt: now, calls: 0, unknownCalls: 0 })) as number);
+    }
+    return ids;
+  });
+}
+
+/**
+ * A queued action's turn: marks it running (started now) if it is still queued. False when it
+ * was cancelled meanwhile, or deleted (its account forgotten, the log cleared): it doesn't run.
+ */
+export async function claimQueuedOp(id: number, now = Date.now()): Promise<boolean> {
+  return db.transaction('rw', db.changeOps, async () => {
+    const op = await db.changeOps.get(id);
+    if (!op) return false;
+    if (op.status === 'running') return true;
+    if (op.status !== 'queued') return false;
+    await db.changeOps.update(id, { status: 'running', startedAt: now, heartbeatAt: now });
+    return true;
+  });
+}
+
+/** A queued action that won't run: cancelled before it started (nothing sent). No-op once it has started. */
+export async function cancelQueuedOp(id: number, error: string, now = Date.now()): Promise<boolean> {
+  return db.transaction('rw', db.changeOps, async () => {
+    const op = await db.changeOps.get(id);
+    if (op?.status !== 'queued') return false;
+    await db.changeOps.update(id, { status: 'cancelled', error, phase: undefined, finishedAt: now, heartbeatAt: now });
+    return true;
+  });
+}
+
 export async function patchOp(id: number, patch: Partial<Omit<ChangeOp, 'id'>>): Promise<void> {
   await db.changeOps.update(id, { ...patch, heartbeatAt: Date.now() });
 }
@@ -57,10 +96,19 @@ export function writeLogger(opId: number, now: () => number = Date.now): WriteLo
 
 /**
  * On worker start: an action still marked running died with the previous worker. It is never
- * resumed; a write it had sent without an answer gets an unknown outcome.
+ * resumed; a write it had sent without an answer gets an unknown outcome. One still queued never
+ * started: nothing was sent.
  */
 export async function markStaleOps(now = Date.now()): Promise<void> {
   await db.transaction('rw', db.changeOps, db.changeCalls, async () => {
+    for (const op of await db.changeOps.where('status').equals('queued').toArray()) {
+      await db.changeOps.update(op.id!, {
+        status: 'interrupted',
+        finishedAt: now,
+        phase: undefined,
+        error: 'Not started: Tithies was closed, reloaded or updated before its turn. Nothing was changed.',
+      });
+    }
     for (const op of await db.changeOps.where('status').equals('running').toArray()) {
       const sent = await db.changeCalls.where('opId').equals(op.id!).filter((c) => c.outcome === 'sent').toArray();
       for (const c of sent) await db.changeCalls.update([c.opId, c.seq], { outcome: 'unknown', error: 'Tithies stopped before the answer came' });
@@ -80,9 +128,9 @@ export const listOps = (): Promise<ChangeOp[]> => db.changeOps.orderBy('startedA
 export const latestOps = (keep: (op: ChangeOp) => boolean, limit: number): Promise<ChangeOp[]> =>
   db.changeOps.orderBy('startedAt').reverse().filter(keep).limit(limit).toArray();
 
-/** Counts for Settings → Stored data (use inside a live query). */
+/** Counts for Settings → Stored data (use inside a live query). `running`: running or waiting for their turn. */
 export async function changeLogCounts(): Promise<{ ops: number; calls: number; running: number }> {
-  const [ops, calls, running] = await Promise.all([db.changeOps.count(), db.changeCalls.count(), db.changeOps.where('status').equals('running').count()]);
+  const [ops, calls, running] = await Promise.all([db.changeOps.count(), db.changeCalls.count(), db.changeOps.where('status').anyOf('running', 'queued').count()]);
   return { ops, calls, running };
 }
 

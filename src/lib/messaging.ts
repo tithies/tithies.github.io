@@ -3,7 +3,7 @@ import type { CollectionEntry } from '@/lib/cards/types';
 import type { AccountKey } from '@/lib/accounts/types';
 import type { InitialSyncState } from '@/lib/decks/initial-sync';
 import type { StartSyncResult } from '@/lib/decks/job';
-import type { ReadTargetResult, StartExportRequest, StartExportResult } from '@/lib/export/job';
+import type { ReadTargetResult, StartExportsRequest, StartExportsResult } from '@/lib/export/job';
 import type { ReadProgress, TargetRead } from '@/lib/export/types';
 import type { SiteApiCall, SiteIdentity, SiteResult, SiteTabStatus, SiteType } from '@/lib/sites/types';
 import type { RunProgress, RunSource } from '@/features/f2f-buylist/types';
@@ -66,10 +66,16 @@ interface ProtocolMap {
   readExportTarget(data: { type: SiteType; accountKey: AccountKey; read?: TargetRead }): ReadTargetResult;
   /** background → extension pages: pages read so far by readExportTarget. */
   exportReadProgress(data: { type: SiteType; accountKey: AccountKey } & ReadProgress): void;
-  /** dashboard → background: starts an export; progress and result are in its change-log row (`opId`). */
-  startExport(data: { type: SiteType } & StartExportRequest): StartExportResult;
-  /** dashboard → background: stops the export (or preview read) of a site. */
-  cancelExport(data: { type: SiteType }): { ok: boolean };
+  /**
+   * dashboard → background: starts the exports of the cards to each target, one after another;
+   * progress and result are in their change-log rows (`opIds`, in the order they run).
+   */
+  startExport(data: { type: SiteType } & StartExportsRequest): StartExportsResult;
+  /**
+   * dashboard → background: stops exports of a site: those of `opIds` (running or waiting), or
+   * with `read` only the preview read.
+   */
+  cancelExport(data: { type: SiteType; opIds?: number[]; read?: boolean }): { ok: boolean };
 }
 
 export const { sendMessage, onMessage } = defineExtensionMessaging<ProtocolMap>();

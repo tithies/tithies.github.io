@@ -7,6 +7,7 @@ import { migrateStorage } from '@/lib/accounts/migrate';
 import { markStaleOps } from '@/lib/changes/log';
 import { initialSyncStateOf } from '@/lib/decks/initial-sync';
 import { AccountSyncJob } from '@/lib/decks/job';
+import { MAX_EXPORT_TARGETS } from '@/lib/export/batch';
 import { ExportJob } from '@/lib/export/job';
 import { SiteLock } from '@/lib/sites/lock';
 import { holdAwake } from '@/lib/keepalive';
@@ -176,9 +177,17 @@ export default defineBackground(() => {
   onMessage('startExport', ({ data }) => {
     if (!isSiteType(data?.type)) return { ok: false, code: 'unsupported', error: 'Unknown site.' } as const;
     const { type, ...req } = data;
-    return exportJobs[type].start(req);
+    return exportJobs[type].startMany(req);
   });
-  onMessage('cancelExport', ({ data }) => ({ ok: isSiteType(data?.type) && exportJobs[data.type].cancel() }));
+  onMessage('cancelExport', ({ data }) => {
+    if (!isSiteType(data?.type)) return { ok: false };
+    const job = exportJobs[data.type];
+    if (data.read === true) return { ok: job.cancelRead() };
+    // Only the exports named: a button never cancels another export than its own.
+    const ids = data.opIds;
+    if (!Array.isArray(ids) || !ids.length || ids.length > MAX_EXPORT_TARGETS || !ids.every((id) => Number.isInteger(id) && id > 0)) return { ok: false };
+    return { ok: job.cancel(ids) };
+  });
 
   onMessage('getProgress', ({ data, sender }) => progressFor(data, sender.tab?.id));
 

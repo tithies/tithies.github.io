@@ -1,10 +1,11 @@
 import Papa from 'papaparse';
-import { getOp, opCalls } from '@/lib/changes/log';
+import { clearChangeLogOf, getOp, markStaleOps, opCalls, startOps } from '@/lib/changes/log';
 import type { ChangeOp } from '@/lib/changes/types';
 import type { OverallProgress } from '@/lib/progress';
 import { db } from '@/lib/db';
 import type { CollectionEntry, Finish } from '@/lib/cards/types';
-import { ExportJob, type StartExportRequest } from '@/lib/export/job';
+import { batchIssues, runOrder } from '@/lib/export/batch';
+import { ExportJob, type StartExportRequest, type StartExportsRequest } from '@/lib/export/job';
 import { afterRead, beforeRead, mergeItems, planExport, previewRead, stateCovers, type PlanContext } from '@/lib/export/plan';
 import type { ExportDetails, ExportItem, ExportTarget, TargetState } from '@/lib/export/types';
 import { verifyExport } from '@/lib/export/verify';
@@ -171,6 +172,51 @@ describe('Export plan', () => {
     expect(planExport(t, exportList, { ...s, entries: [...s.entries, entry('Forest', 'dsk', '286', 1)] }, ctx()).digest).toBe(d);
     expect(planExport(t, exportList, { ...s, entries: [...s.entries, entry('Bolt', 'lea', '161', 1, 'nonFoil', 'b1')] }, ctx()).digest).not.toBe(d);
     expect(planExport(t, exportList.slice(1), s, ctx()).digest).not.toBe(d);
+  });
+
+  it('the digest depends only on what the target read of the binders (an export to another binder just before changes nothing)', () => {
+    const s = state();
+    const more: TargetState = { ...s, binders: [...s.binders, { id: 'b9', publicId: 'pb9', name: 'Other', visibility: 'private' }] };
+    const binderAdd: ExportTarget = { accountKey: A_KEY, kind: 'binder', binderId: 'b1', mode: 'add' };
+    const newBinder: ExportTarget = { accountKey: A_KEY, kind: 'newBinder', name: 'Wish', visibility: 'private' };
+    for (const t of [binderAdd, { ...binderAdd, mode: 'replace' }, { accountKey: A_KEY, kind: 'collection', mode: 'add' }, newBinder] as ExportTarget[]) {
+      expect(planExport(t, exportList, more, ctx()).digest).toBe(planExport(t, exportList, s, ctx()).digest);
+    }
+    // A binder of the new one's name appeared (the preview didn't warn about it).
+    const named: TargetState = { ...s, binders: [...s.binders, { ...BINDER, id: 'b8', name: ' wish ' }] };
+    expect(planExport(newBinder, exportList, named, ctx()).digest).not.toBe(planExport(newBinder, exportList, s, ctx()).digest);
+    // The binder was renamed (its name is what a replace has the user type).
+    const renamed: TargetState = { ...s, binders: [{ ...BINDER, name: 'Trades' }] };
+    expect(planExport(binderAdd, exportList, renamed, ctx()).digest).not.toBe(planExport(binderAdd, exportList, s, ctx()).digest);
+    // The same target, built in another order.
+    expect(planExport({ mode: 'add', binderId: 'b1', kind: 'binder', accountKey: A_KEY }, exportList, s, ctx()).digest).toBe(planExport(binderAdd, exportList, s, ctx()).digest);
+  });
+});
+
+describe('Export to several targets: rules', () => {
+  const B_KEY = 'moxfield:222222' as never;
+  const nb = (name: string, accountKey = A_KEY): ExportTarget => ({ accountKey, kind: 'newBinder', name, visibility: 'private' });
+  const coll = (mode: 'add' | 'replace', accountKey = A_KEY): ExportTarget => ({ accountKey, kind: 'collection', mode });
+  const binder = (binderId: string, mode: 'add' | 'replace' = 'add'): ExportTarget => ({ accountKey: A_KEY, kind: 'binder', binderId, mode });
+  const errors = (ts: ExportTarget[]) => batchIssues(ts).filter((i) => i.level === 'error').map((i) => i.index);
+
+  it('refuses the same destination twice, and a whole-collection replace with another target on its account', () => {
+    expect(errors([coll('add'), coll('add')])).toEqual([1]);
+    expect(errors([binder('b1'), binder('b1', 'replace')])).toEqual([1]);
+    expect(errors([nb('Trade'), nb(' trade ')])).toEqual([1]);
+    expect(errors([nb('Trade'), nb('Trade', B_KEY)])).toEqual([]);
+    expect(errors([coll('replace'), nb('X')])).toEqual([0, 1]);
+    expect(errors([coll('replace'), coll('add', B_KEY)])).toEqual([]);
+    expect(errors(Array.from({ length: 11 }, (_, i) => nb(`n${i}`, `moxfield:${i + 1}` as never)))).toEqual([10]);
+  });
+
+  it('warns when two targets share an account: its collection gets the cards once per target', () => {
+    expect(batchIssues([nb('X'), coll('add')])).toEqual([{ index: 1, level: 'warning', text: expect.stringMatching(/Target 1 is on the same account/) }]);
+    expect(batchIssues([nb('X'), nb('Y', B_KEY)])).toEqual([]);
+  });
+
+  it('exports binder replaces first, the others in the list order', () => {
+    expect(runOrder([nb('X'), binder('b1', 'replace'), coll('add'), binder('b2', 'replace'), binder('b3')])).toEqual([1, 3, 0, 2, 4]);
   });
 });
 
@@ -545,6 +591,270 @@ describe('Export job', () => {
         code: 'bad_request',
       });
     }
+  });
+
+  describe('several targets', () => {
+    /** Reads and plans every target before starting, like the dialog, then the request that starts them all. */
+    async function previewAll(job: ExportJob, targets: ExportTarget[], items = TO_EXPORT): Promise<StartExportsRequest> {
+      const exports: StartExportsRequest['exports'] = [];
+      for (const target of targets) {
+        const read = await job.readTarget(target.accountKey as never, previewRead(target));
+        if (!read.ok) throw new Error(read.error);
+        const plan = planExport(target, items, read.state, { sourceAccountKey: null, targetName: 'x', limits: { ...moxfieldExporter.limits, pageSize: 5000 } });
+        exports.push({ target, digest: plan.digest, estimate: plan.requests, label: plan.targetLabel });
+      }
+      return { items, sourceAccountKey: null, source: 'test', exports };
+    }
+    /** Holds the batch's first write until `open()`; `reached` resolves when it is there. */
+    function gate(port: FakeTabs) {
+      let open!: () => void;
+      let reach!: () => void;
+      const opened = new Promise<void>((r) => (open = r));
+      const reached = new Promise<void>((r) => (reach = r));
+      let armed = true;
+      port.onCall = async (call) => {
+        if (armed && call.req.kind === 'mutate') {
+          armed = false;
+          reach();
+          await opened;
+        }
+      };
+      return { reached, open };
+    }
+    const ops = (ids: number[]) => Promise.all(ids.map(async (id) => (await getOp(id))!));
+    const started = async (job: ExportJob, req: StartExportsRequest) => {
+      const res = await job.startMany(req);
+      if (!res.ok) throw new Error(res.error);
+      return res.opIds;
+    };
+    /** Bob too, logged in in a second tab, with his own Moxfield account. */
+    async function withBob(port: FakeTabs, alice: FakeMox) {
+      const bob = await newAccount(BOB.userId, BOB.userName);
+      const bobMox = new FakeMox();
+      port.tabs.push({ id: 2, account: BOB });
+      port.answer = ((as: typeof ALICE, call: never) => (as.userId === BOB.userId ? bobMox : alice).answer(as, call)) as never;
+      return { bob, bobMox };
+    }
+
+    it('makes one export per target, one after another, each with its own row, writes and check', async () => {
+      const { acc, mox, port, job, lock } = await setup();
+      mox.binders = [BINDER];
+      mox.entries = [entry('Opt', 'xln', '65', 1)];
+      // A new binder first: the binder list then changes, which must not refuse the export after it.
+      const req = await previewAll(job, [
+        { accountKey: acc.key, kind: 'newBinder', name: 'A', visibility: 'private' },
+        { accountKey: acc.key, kind: 'collection', mode: 'add' },
+      ]);
+      const g = gate(port);
+      const ids = await started(job, req);
+      await g.reached;
+      expect((await ops(ids)).map((o) => o.status)).toEqual(['running', 'queued']);
+      // The site is taken until the last one ends: no preview read, no other export, no sync in between.
+      expect(await job.readTarget(acc.key as never)).toMatchObject({ ok: false, code: 'busy', error: expect.stringMatching(/1 more waiting/) });
+      expect(await job.startMany(req)).toMatchObject({ ok: false, code: 'busy' });
+      expect(lock.tryAcquire('sync')).toBe(false);
+      expect(lock.heldBy).toBe('export');
+      g.open();
+      await job.finished;
+      const [a, b] = await ops(ids);
+      expect([a.status, b.status]).toEqual(['done', 'done']);
+      expect(b.startedAt).toBeGreaterThanOrEqual(a.finishedAt!);
+      expect(a.title).toMatch(/to the new binder “A”/);
+      expect(b.title).toMatch(/to alice's collection/);
+      expect([(a.details as ExportDetails).verify?.ok, (b.details as ExportDetails).verify?.ok]).toEqual([true, true]);
+      expect(mox.writes.map((w) => w.op)).toEqual(['createBinder', 'importCsv', 'importCsv']);
+      expect((await opCalls(ids[0])).length).toBe(2);
+      expect((await opCalls(ids[1])).length).toBe(1);
+      expect(lock.heldBy).toBeNull();
+    });
+
+    it('replaces a binder after creating a new one on the same account', async () => {
+      const { acc, mox, job } = await setup();
+      mox.binders = [BINDER];
+      mox.entries = [entry('Opt', 'xln', '65', 4, 'nonFoil', 'b1')];
+      const ids = await started(
+        job,
+        await previewAll(job, [
+          { accountKey: acc.key, kind: 'newBinder', name: 'A', visibility: 'private' },
+          { accountKey: acc.key, kind: 'binder', binderId: 'b1', mode: 'replace' },
+        ]),
+      );
+      await job.finished;
+      expect((await ops(ids)).map((o) => o.status)).toEqual(['done', 'done']);
+      expect(mox.entries.filter((e) => e.binderId === 'b1').map((e) => e.card.name).sort()).toEqual(['Llanowar Elves', 'Sol Ring']);
+    });
+
+    it("goes on when one fails: the others don't depend on it", async () => {
+      const { acc, mox, job } = await setup();
+      mox.binders = [BINDER];
+      mox.entries = [entry('Opt', 'xln', '65', 4, 'nonFoil', 'b1')];
+      const req = await previewAll(job, [
+        { accountKey: acc.key, kind: 'binder', binderId: 'b1', mode: 'replace' },
+        { accountKey: acc.key, kind: 'collection', mode: 'add' },
+      ]);
+      // The binder changed since its preview: that export refuses, the next one is made.
+      mox.entries.push(entry('Bolt', 'lea', '161', 1, 'nonFoil', 'b1'));
+      const ids = await started(job, req);
+      await job.finished;
+      const [a, b] = await ops(ids);
+      expect(a).toMatchObject({ status: 'failed', calls: 0 });
+      expect(a.error).toMatch(/changed since the preview/);
+      expect(b.status).toBe('done');
+      expect(mox.writes.map((w) => w.op)).toEqual(['importCsv']);
+    });
+
+    it('cancels only the export asked: the running one stops, the next still runs', async () => {
+      const { acc, mox, port, job } = await setup();
+      const req = await previewAll(job, [
+        { accountKey: acc.key, kind: 'newBinder', name: 'A', visibility: 'private' },
+        { accountKey: acc.key, kind: 'newBinder', name: 'B', visibility: 'private' },
+      ]);
+      const g = gate(port);
+      const ids = await started(job, req);
+      await g.reached;
+      expect(job.cancel([ids[0]])).toBe(true);
+      g.open();
+      await job.finished;
+      const [a, b] = await ops(ids);
+      expect(a.status).toBe('cancelled');
+      expect(b.status).toBe('done');
+      expect(mox.writes.map((w) => (w.op === 'createBinder' ? `create ${w.name}` : w.op))).toEqual(['create A', 'create B', 'importCsv']);
+    });
+
+    it('cancels a waiting export before it starts: nothing is sent for it', async () => {
+      const { acc, mox, port, job } = await setup();
+      const req = await previewAll(job, [
+        { accountKey: acc.key, kind: 'newBinder', name: 'A', visibility: 'private' },
+        { accountKey: acc.key, kind: 'newBinder', name: 'B', visibility: 'private' },
+        { accountKey: acc.key, kind: 'collection', mode: 'add' },
+      ]);
+      const g = gate(port);
+      const ids = await started(job, req);
+      await g.reached;
+      expect(job.cancel([ids[1]])).toBe(true);
+      await expect.poll(async () => (await getOp(ids[1]))!.status).toBe('cancelled');
+      g.open();
+      await job.finished;
+      const [a, b, c] = await ops(ids);
+      expect([a.status, b.status, c.status]).toEqual(['done', 'cancelled', 'done']);
+      expect(b.error).toMatch(/before it started: nothing was changed/);
+      expect(await opCalls(ids[1])).toEqual([]);
+      expect(mox.binders.map((x) => x.name)).toEqual(['A']);
+    });
+
+    it('cancels them all: the running one stops, none of the waiting ones starts', async () => {
+      const { acc, mox, port, job, lock } = await setup();
+      const req = await previewAll(job, [
+        { accountKey: acc.key, kind: 'newBinder', name: 'A', visibility: 'private' },
+        { accountKey: acc.key, kind: 'newBinder', name: 'B', visibility: 'private' },
+        { accountKey: acc.key, kind: 'collection', mode: 'add' },
+      ]);
+      const g = gate(port);
+      const ids = await started(job, req);
+      await g.reached;
+      expect(job.cancel()).toBe(true);
+      g.open();
+      await job.finished;
+      expect((await ops(ids)).map((o) => o.status)).toEqual(['cancelled', 'cancelled', 'cancelled']);
+      expect(mox.writes.map((w) => w.op)).toEqual(['createBinder']);
+      expect(lock.heldBy).toBeNull();
+    });
+
+    it('refuses the whole export, before any row, when one target is not valid', async () => {
+      const { acc, job, lock } = await setup();
+      const ok: StartExportsRequest['exports'][number] = { target: { accountKey: acc.key, kind: 'collection', mode: 'add' }, digest: 'x' };
+      const start = (...exports: unknown[]) => job.startMany({ items: TO_EXPORT, sourceAccountKey: null, source: 't', exports: exports as never });
+      expect(await start(ok, ok)).toMatchObject({ ok: false, code: 'bad_request', index: 1, error: expect.stringMatching(/same collection/) });
+      expect(await start(ok, { target: { accountKey: acc.key, kind: 'binder', binderId: 'a b', mode: 'add' }, digest: 'x' })).toMatchObject({ ok: false, code: 'bad_request', index: 1 });
+      expect(await start({ target: { accountKey: acc.key, kind: 'collection', mode: 'wipe' }, digest: 'x' })).toMatchObject({ ok: false, code: 'bad_request', index: 0 });
+      expect(await start({ target: { accountKey: acc.key, kind: 'newBinder', name: '   ', visibility: 'private' }, digest: 'x' })).toMatchObject({ ok: false, code: 'bad_request' });
+      expect(await start(ok, { target: { accountKey: 'moxfield:999', kind: 'collection', mode: 'add' }, digest: 'x' })).toMatchObject({ ok: false, code: 'no_account', index: 1 });
+      expect(await start(...Array.from({ length: 11 }, () => ok))).toMatchObject({ ok: false, code: 'bad_request' });
+      expect(await start()).toMatchObject({ ok: false, code: 'bad_request' });
+      expect(await db.changeOps.count()).toBe(0);
+      expect(lock.heldBy).toBeNull();
+    });
+
+    it('starts one of two exports asked at the same time; the other is busy', async () => {
+      const { acc, job } = await setup();
+      const req = await previewAll(job, [{ accountKey: acc.key, kind: 'collection', mode: 'add' }]);
+      const [a, b] = await Promise.all([job.startMany(req), job.startMany(req)]);
+      expect([a.ok, b.ok].sort()).toEqual([false, true]);
+      expect((a.ok ? b : a) as object).toMatchObject({ code: 'busy' });
+      await job.finished;
+      expect(await db.changeOps.count()).toBe(1);
+    });
+
+    it('exports to several accounts, each one as itself', async () => {
+      const { acc, mox, port, job } = await setup();
+      const { bob, bobMox } = await withBob(port, mox);
+      const ids = await started(
+        job,
+        await previewAll(job, [
+          { accountKey: acc.key, kind: 'newBinder', name: 'A', visibility: 'private' },
+          { accountKey: bob.key, kind: 'collection', mode: 'add' },
+        ]),
+      );
+      await job.finished;
+      const [a, b] = await ops(ids);
+      expect([a.status, b.status]).toEqual(['done', 'done']);
+      expect([a.userName, b.userName]).toEqual(['alice', 'bob']);
+      expect((await opCalls(ids[0])).every((c) => c.as?.userId === ALICE.userId)).toBe(true);
+      expect((await opCalls(ids[1])).every((c) => c.as?.userId === BOB.userId)).toBe(true);
+      expect(mox.writes.map((w) => w.op)).toEqual(['createBinder', 'importCsv']);
+      expect(bobMox.writes.map((w) => w.op)).toEqual(['importCsv']);
+    });
+
+    it("forgetting an account stops its waiting exports only: another account's export goes on", async () => {
+      const { acc, mox, port, job } = await setup();
+      const { bob, bobMox } = await withBob(port, mox);
+      const req = await previewAll(job, [
+        { accountKey: bob.key, kind: 'collection', mode: 'add' },
+        { accountKey: acc.key, kind: 'newBinder', name: 'A', visibility: 'private' },
+      ]);
+      const g = gate(port);
+      const ids = await started(job, req);
+      await g.reached;
+      expect(job.activeAccountKey).toBe(bob.key);
+      await job.stopAccount(acc.key);
+      expect((await getOp(ids[1]))!.status).toBe('cancelled');
+      g.open();
+      await job.finished;
+      expect((await getOp(ids[0]))!.status).toBe('done');
+      expect(bobMox.writes.map((w) => w.op)).toEqual(['importCsv']);
+      expect(mox.writes).toEqual([]);
+    });
+
+    it('skips a waiting export whose row was deleted (its account forgotten, the log cleared)', async () => {
+      const { acc, mox, port, job } = await setup();
+      const { bob, bobMox } = await withBob(port, mox);
+      const req = await previewAll(job, [
+        { accountKey: bob.key, kind: 'collection', mode: 'add' },
+        { accountKey: acc.key, kind: 'collection', mode: 'add' },
+      ]);
+      const g = gate(port);
+      const ids = await started(job, req);
+      await g.reached;
+      await clearChangeLogOf(acc.key);
+      g.open();
+      await job.finished;
+      expect((await getOp(ids[0]))!.status).toBe('done');
+      expect(await getOp(ids[1])).toBeUndefined();
+      expect(bobMox.writes.length).toBe(1);
+      expect(mox.writes).toEqual([]);
+    });
+
+    it('a worker that died mid-batch: the running export is interrupted, the waiting ones never started', async () => {
+      const { acc } = await setup();
+      const row = { site: 'moxfield', accountKey: acc.key, userName: 'alice', kind: 'export', title: 't', source: 's', details: {} } as const;
+      const ids = await startOps([row, row]);
+      await markStaleOps();
+      const [a, b] = await ops(ids);
+      expect([a.status, b.status]).toEqual(['interrupted', 'interrupted']);
+      expect(a.error).toMatch(/while this was running/);
+      expect(b.error).toMatch(/Not started.*Nothing was changed/);
+      expect(b.finishedAt).toBeTypeOf('number');
+    });
   });
 });
 

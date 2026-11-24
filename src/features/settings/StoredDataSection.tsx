@@ -181,7 +181,7 @@ export function StoredDataSection() {
     effect:
       "The only record of what Tithies changed on your sites (and of the cards an export removed): it is gone for good. Nothing on the sites is touched.",
     empty: !s.changeOps,
-    blocked: s.changesRunning ? 'An export is running: wait for it to finish.' : undefined,
+    blocked: s.changesRunning ? 'An export is running or waiting for its turn: wait for it to finish (or cancel it).' : undefined,
   };
   const scanner: Row = {
     id: 'scanner',

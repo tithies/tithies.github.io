@@ -1,4 +1,5 @@
-import { Alert, Anchor, Badge, Button, Group, Loader, Modal, Stack, Text, UnstyledButton } from '@mantine/core';
+import { Accordion, Alert, Anchor, Badge, Button, Group, Loader, Modal, Stack, Text, UnstyledButton } from '@mantine/core';
+import { useEffect, useState } from 'react';
 import { IconAlertTriangle, IconUpload } from '@tabler/icons-react';
 import { Link } from 'react-router';
 import { StatusBadge } from '@/lib/changes/ui/StatusBadge';
@@ -7,7 +8,7 @@ import { timeAgo } from '@/lib/format';
 import type { SiteProvider } from '@/lib/sites/provider';
 import { siteOf } from '@/lib/sites/registry';
 import { JobProgress } from '@/lib/ui/JobProgress';
-import { cancelExport, useChangeOp } from '../client';
+import { cancelExport, useChangeOp, useChangeOps } from '../client';
 import type { ReadProgress } from '../types';
 import { ExportOpDetails } from './ExportOpDetails';
 
@@ -24,24 +25,49 @@ export function PercentBar({ progress, unit }: { progress: ReadProgress; unit: '
 const stepCount = (p: NonNullable<ChangeOp['progress']>) =>
   p.unit === 'page' ? `page ${n(p.done)} of ${n(p.total)}` : `${n(p.done)} of ${plural(p.total, 'change')}`;
 
-/** An export, live: its progress while it runs (with Cancel), then what it did and the check of the result. */
-export function ExportProgress({ opId, site }: { opId: number; site: SiteProvider }) {
+/**
+ * An export, live: waiting for its turn (with Cancel), its progress while it runs (with Cancel),
+ * then what it did and the check of the result. `inList`: shown under its title and status
+ * (ExportBatchProgress), so without them.
+ */
+export function ExportProgress({ opId, site, inList }: { opId: number; site: SiteProvider; inList?: boolean }) {
   const op = useChangeOp(opId);
   if (op === undefined) return <Loader size="sm" />;
   if (op === null) return <Text size="sm">This export isn't in the Change log any more.</Text>;
   const running = op.status === 'running';
+  const waiting = op.status === 'queued';
   const p = op.progress;
+  const link = (
+    <Anchor component={Link} to={`/changes?op=${opId}`} size="sm">
+      Open the Change log
+    </Anchor>
+  );
   return (
     <Stack>
-      <Group justify="space-between">
-        <StatusBadge op={op} />
-        <Anchor component={Link} to={`/changes?op=${opId}`} size="sm">
-          Open the Change log
-        </Anchor>
-      </Group>
-      <Text size="sm" fw={600}>
-        {op.title}
-      </Text>
+      {inList ? (
+        <Group justify="flex-end">{link}</Group>
+      ) : (
+        <>
+          <Group justify="space-between">
+            <StatusBadge op={op} />
+            {link}
+          </Group>
+          <Text size="sm" fw={600}>
+            {op.title}
+          </Text>
+        </>
+      )}
+      {waiting && (
+        <Group justify="space-between" wrap="nowrap" align="flex-start">
+          <Text size="sm" c="dimmed">
+            Waiting: it starts when the export before it has finished. Nothing has been changed for it on {site.label} yet. You can close this window: the exports go
+            on.
+          </Text>
+          <Button size="xs" variant="default" onClick={() => void cancelExport(site.type, [opId])} style={{ flexShrink: 0 }}>
+            Cancel this one
+          </Button>
+        </Group>
+      )}
       {running && (
         <Stack gap={6}>
           <Text size="sm">
@@ -65,11 +91,11 @@ export function ExportProgress({ opId, site }: { opId: number; site: SiteProvide
             from the export bar of the Comparator.
           </Text>
           <Group>
-            <Button size="xs" variant="default" onClick={() => void cancelExport(site.type)}>
+            <Button size="xs" variant="default" onClick={() => void cancelExport(site.type, [opId])}>
               Cancel
             </Button>
             <Text size="xs" c="dimmed">
-              Cancelling stops before the next change; what {site.label} already made stays.
+              Cancelling stops before the next change; what {site.label} already made stays. Exports waiting after this one still run.
             </Text>
           </Group>
         </Stack>
@@ -79,7 +105,60 @@ export function ExportProgress({ opId, site }: { opId: number; site: SiteProvide
           {op.error}
         </Alert>
       )}
-      {!running && <ExportOpDetails op={op} />}
+      {!running && !waiting && <ExportOpDetails op={op} />}
+    </Stack>
+  );
+}
+
+/** Exports started together, live, in the order they run: each with its status, the running one open; Cancel all. */
+export function ExportBatchProgress({ opIds, site }: { opIds: number[]; site: SiteProvider }) {
+  const ops = useChangeOps(opIds);
+  const [open, setOpen] = useState<string[]>([]);
+  const runningId = ops?.find((o) => o.status === 'running')?.id;
+  // The running export opens as its turn comes (the others stay as the user left them).
+  useEffect(() => {
+    if (runningId != null) setOpen((v) => (v.includes(String(runningId)) ? v : [...v, String(runningId)]));
+  }, [runningId]);
+  if (!ops) return <Loader size="sm" />;
+  const active = ops.filter((o) => o.status === 'running' || o.status === 'queued');
+  const count = (status: ChangeOp['status']) => ops.filter((o) => o.status === status).length;
+  const parts = [
+    [count('done'), 'done'],
+    [count('running'), 'running'],
+    [count('queued'), 'waiting'],
+    [count('failed') + count('interrupted'), 'failed'],
+    [count('cancelled'), 'cancelled'],
+  ].filter(([c]) => c) as [number, string][];
+  return (
+    <Stack>
+      <Group justify="space-between">
+        <Text size="sm">
+          {plural(ops.length, 'export')}, one after another: {parts.map(([c, what]) => `${n(c)} ${what}`).join(', ')}.
+        </Text>
+        {active.length > 0 && (
+          <Button size="xs" variant="default" onClick={() => void cancelExport(site.type, active.map((o) => o.id!))}>
+            Cancel all
+          </Button>
+        )}
+      </Group>
+      <Accordion multiple value={open} onChange={setOpen} variant="separated">
+        {ops.map((o, i) => (
+          <Accordion.Item key={o.id} value={String(o.id)}>
+            <Accordion.Control>
+              <Group justify="space-between" wrap="nowrap" pr="xs">
+                <Text size="sm" fw={600} lineClamp={2}>
+                  {i + 1}. {o.title}
+                </Text>
+                <StatusBadge op={o} />
+              </Group>
+              {o.status === 'running' && <JobProgress size="xs" done={(o.overall ?? o.progress)?.done ?? 0} total={(o.overall ?? o.progress)?.total ?? 0} />}
+            </Accordion.Control>
+            <Accordion.Panel>
+              <ExportProgress opId={o.id!} site={site} inList />
+            </Accordion.Panel>
+          </Accordion.Item>
+        ))}
+      </Accordion>
     </Stack>
   );
 }
@@ -139,7 +218,7 @@ export function RecentExportsModal({ opened, ops, onPick, onClose }: { opened: b
                   <StatusBadge op={o} />
                 </Group>
                 <Text size="xs" c="dimmed">
-                  Started {timeAgo(o.startedAt)}
+                  {o.status === 'queued' ? 'Waiting for the export before it' : `Started ${timeAgo(o.startedAt)}`}
                   {o.status === 'running' && o.phase ? ` · ${o.phase}` : ''}
                 </Text>
                 {o.status === 'running' && <JobProgress size="xs" done={(o.overall ?? p)?.done ?? 0} total={(o.overall ?? p)?.total ?? 0} />}

@@ -84,7 +84,8 @@ function DiffTable({ title, rows, color }: { title: string; rows: VerifyDiff[]; 
 /** What an export did: target, counts, the before/after check, and the cards it removed. */
 export function ExportOpDetails({ op }: { op: ChangeOp }) {
   const d = op.details as ExportDetails;
-  if (!d?.target) return null;
+  // Waiting for its turn: nothing read nor made yet.
+  if (!d?.target || op.status === 'queued') return null;
   const site = siteOf(op.site);
   const v = d.verify;
   const date = new Date(op.startedAt).toISOString().slice(0, 10);
@@ -158,7 +159,7 @@ export function ExportOpDetails({ op }: { op: ChangeOp }) {
             </Stack>
           </Alert>
         )
-      ) : op.status === 'running' ? null : (
+      ) : op.status === 'running' || op.calls === 0 ? null : (
         <Text size="sm" c="dimmed">
           Not checked: the collection couldn't be read again after the export.
         </Text>

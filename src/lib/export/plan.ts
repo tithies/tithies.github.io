@@ -98,6 +98,10 @@ function hash(s: string): string {
 }
 
 const copies = (entries: readonly { qty: number }[]) => entries.reduce((s, e) => s + e.qty, 0);
+
+/** A target's fields in a fixed order (the digest doesn't depend on how the object was built). */
+const targetFields = (t: ExportTarget) =>
+  t.kind === 'newBinder' ? [t.accountKey, t.kind, t.name, t.visibility] : t.kind === 'binder' ? [t.accountKey, t.kind, t.binderId, t.mode] : [t.accountKey, t.kind, t.mode];
 const chunks = (n: number, size: number) => (n > 0 ? Math.ceil(n / Math.max(1, size)) : 0);
 
 export function planExport(target: ExportTarget, rawItems: readonly ExportItem[], state: TargetState, ctx: PlanContext): ExportPlan {
@@ -112,12 +116,15 @@ export function planExport(target: ExportTarget, rawItems: readonly ExportItem[]
   let toRemove: CollectionEntry[] = [];
   let wholeCollection = false;
   let before: number;
+  /** A new binder: the account already has a binder of that name. */
+  let sameName = false;
 
   if (target.kind === 'newBinder') {
     targetLabel = `the new binder “${target.name.trim()}”`;
     before = 0;
     if (!target.name.trim()) blocked = 'Give the new binder a name.';
-    if (state.binders.some((b) => b.name.trim().toLowerCase() === target.name.trim().toLowerCase())) {
+    sameName = state.binders.some((b) => b.name.trim().toLowerCase() === target.name.trim().toLowerCase());
+    if (sameName) {
       warnings.push({ level: 'warning', text: `${who} already has a binder named “${target.name.trim()}”: a second one with the same name would be created.` });
     }
     steps.push(`Create the ${target.visibility} binder “${target.name.trim()}” on ${who}`);
@@ -186,15 +193,13 @@ export function planExport(target: ExportTarget, rawItems: readonly ExportItem[]
   const checkPages = target.kind === 'binder' ? pages((target.mode === 'replace' ? 0 : targetEntries) + items.length) : pages(items.length);
   const reads = 1 + beforePages + checkPages;
 
-  // What the run must find unchanged: the binders, and every entry it deletes.
-  const digest = hash(
-    JSON.stringify([
-      target,
-      items.map((i) => [i.key, i.qty]),
-      state.binders.map((b) => b.id).sort(),
-      toRemove.map((e) => [e.id, e.qty]).sort(),
-    ]),
-  );
+  // What the run must find unchanged: what the plan read of the binders (the binder targeted and
+  // its name, or whether a binder has the new one's name), and every entry it deletes. Nothing
+  // else: an export made just before to another binder of the account (several targets) doesn't
+  // change this one.
+  const binderFacts =
+    target.kind === 'binder' ? (binder ? [binder.id, binder.name] : null) : target.kind === 'newBinder' ? sameName : null;
+  const digest = hash(JSON.stringify([targetFields(target), items.map((i) => [i.key, i.qty]), binderFacts, toRemove.map((e) => [e.id, e.qty]).sort()]));
 
   return {
     target,

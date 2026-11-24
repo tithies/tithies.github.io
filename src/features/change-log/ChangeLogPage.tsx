@@ -229,7 +229,7 @@ export function ChangeLogPage() {
                   </Text>
                   <Text size="xs" c="dimmed">
                     {o.source}
-                    {o.status === 'running' && o.phase ? ` · ${o.phase}` : ''}
+                    {(o.status === 'running' || o.status === 'queued') && o.phase ? ` · ${o.phase}` : ''}
                   </Text>
                 </Stack>
               ),

@@ -133,7 +133,9 @@ export function ComparisonPage() {
     );
   /** One export: open it; several: pick one first. */
   const showExports = () => (recentExports.length === 1 ? viewExport(recentExports[0].id!) : setPickingExport(true));
-  const runningExport = recentExports.find((o) => o.status === 'running');
+  // The export running, to open it directly: only when none waits after it (else pick one).
+  const activeExports = recentExports.filter((o) => o.status === 'running' || o.status === 'queued');
+  const runningExport = activeExports.length === 1 ? activeExports[0] : undefined;
   const hintedOnly = params.get('hint') === '1';
   const toggleHinted = () => {
     const f = comparisonFiltersFromParams(params);

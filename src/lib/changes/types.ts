@@ -2,7 +2,8 @@ import type { AccountKey } from '@/lib/accounts/types';
 import type { OverallProgress } from '@/lib/progress';
 import type { SiteIdentity, SiteType } from '@/lib/sites/types';
 
-export type ChangeOpStatus = 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted';
+/** queued: waiting for the actions started with it to finish (one at a time per site); nothing sent yet. */
+export type ChangeOpStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted';
 
 /** Kinds of user actions that change a site (more come with later features). */
 export type ChangeOpKind = 'export';

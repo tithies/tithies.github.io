@@ -1,49 +1,26 @@
-import {
-  Alert,
-  Badge,
-  Button,
-  Checkbox,
-  Group,
-  List,
-  Loader,
-  Modal,
-  Radio,
-  ScrollArea,
-  SegmentedControl,
-  Select,
-  SimpleGrid,
-  Stack,
-  Stepper,
-  Table,
-  Tabs,
-  Text,
-  TextInput,
-} from '@mantine/core';
-import { IconAlertTriangle, IconEye, IconInfoCircle, IconRefresh, IconUpload } from '@tabler/icons-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Alert, Badge, Button, Group, Modal, Stack, Stepper, Text } from '@mantine/core';
+import { IconPlus, IconUpload } from '@tabler/icons-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
-import { accountLabel, type AccountKey, type AccountRow } from '@/lib/accounts/types';
-import { finishLabel } from '@/lib/format';
-import { langLabel } from '@/lib/cards/languages';
+import { accountData } from '@/lib/accounts/data';
+import { accountLabel, type AccountKey } from '@/lib/accounts/types';
 import type { SiteProvider } from '@/lib/sites/provider';
-import type { BinderVisibility } from '@/lib/sites/types';
 import { useSiteSessions } from '@/lib/sites/useSiteSessions';
-import { SiteIcon } from '@/lib/ui/SiteIcon';
-import { Stat } from '@/lib/ui/Stat';
 import { FULL_READ_EVERY_MS } from '@/lib/decks/collection';
-import { useCollectionMeta } from '@/lib/decks/hooks';
-import { readExportTarget, startExport, useReadProgress } from '../client';
+import { batchIssues, MAX_EXPORT_TARGETS, runOrder } from '../batch';
+import { cancelExportRead, readExportTarget, startExport, useReadProgress } from '../client';
 import { exporterOf } from '../exporters';
 import type { ReadTargetResult } from '../job';
-import { planExport, previewRead, stateCovers } from '../plan';
-import type { ExportItem, ExportMode, ExportPlan, ExportTarget, TargetRead, TargetState } from '../types';
-import { ExportProgress, PercentBar } from './ExportProgress';
+import { planExport, previewRead } from '../plan';
+import type { ExportItem, ExportPlan, ExportTarget, TargetRead, TargetState } from '../types';
+import { ConfirmStep, typedAll, type ConfirmTarget } from './ConfirmStep';
+import { ExportBatchProgress, ExportProgress } from './ExportProgress';
+import { plural, PreviewStep, PreviewTabs, targetTitle, type PreviewTarget } from './PreviewStep';
+import { draftTarget, latestBinders, newDraft, pickState, type TargetDraft } from './targets';
+import { TargetForm } from './TargetForm';
 
-const n = (v: number) => v.toLocaleString('en-CA');
-const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
 const today = () => new Date().toISOString().slice(0, 10);
-
-type Kind = ExportTarget['kind'];
 
 export interface ExportDialogProps {
   opened: boolean;
@@ -55,148 +32,35 @@ export interface ExportDialogProps {
   /** For the change log: "Comparator of alice". */
   source: string;
   /**
-   * Called once the export has started: the cards are handed over to it, so the page clears its
-   * list (to try again after a failure, pick the cards again; the Change log keeps what was sent).
+   * Called once the exports have started: the cards are handed over to them, so the page clears
+   * its list (to try again after a failure, pick the cards again; the Change log keeps what was sent).
    */
   onStarted?: () => void;
 }
 
-/** About how long the requests take at the site's pace. */
-function estimate(site: SiteProvider, requests: number): string {
-  const s = Math.round((requests * (site.pacing.intervalMs + site.pacing.jitterMs / 2)) / 1000);
-  return s < 60 ? `about ${Math.max(5, s)} seconds` : `about ${Math.round(s / 60)} minute${Math.round(s / 60) === 1 ? '' : 's'}`;
-}
+type States = Partial<Record<AccountKey, TargetState[]>>;
+type ReadError = { code: string; error: string };
 
-/** "the binder's cards" / "the collection" */
-const readLabel = (r: TargetRead, name: string) =>
-  r.kind === 'binder' ? "the binder's cards" : r.kind === 'collection' ? `${name}'s whole collection` : r.kind === 'totals' ? `the size of ${name}'s collection` : `${name}'s binders`;
-
-function ModeChoice({ mode, setMode, add, replace }: { mode: ExportMode; setMode: (m: ExportMode) => void; add: string; replace: string }) {
+/** Accounts whose saved collection is recent: reading it again is usually one page (its changes). Joined by commas. */
+function useSavedCollections(keys: readonly AccountKey[]): string {
   return (
-    <Radio.Group value={mode} onChange={(v) => setMode(v as ExportMode)}>
-      <Stack gap={6}>
-        <Radio value="add" label={add} />
-        <Radio value="replace" color="red" label={replace} />
-      </Stack>
-    </Radio.Group>
-  );
-}
-
-function PreviewStep({ site, plan, name }: { site: SiteProvider; plan: ExportPlan; name: string }) {
-  const removeCount = plan.remove.entries.length;
-  return (
-    <Stack>
-      <Alert color="blue" variant="light" icon={<IconEye size={18} />} p="xs">
-        <b>Preview only.</b> Nothing has been changed on {site.label} yet, and nothing will be until you confirm on the next step.
-      </Alert>
-      {plan.blocked && (
-        <Alert color="red" variant="light" icon={<IconAlertTriangle size={18} />}>
-          {plan.blocked}
-        </Alert>
-      )}
-      {plan.warnings.map((w, i) => (
-        <Alert
-          key={i}
-          color={w.level === 'danger' ? 'red' : w.level === 'warning' ? 'yellow' : 'blue'}
-          variant="light"
-          icon={w.level === 'info' ? <IconInfoCircle size={18} /> : <IconAlertTriangle size={18} />}
-          p="xs"
-        >
-          {w.text}
-        </Alert>
-      ))}
-      <SimpleGrid cols={{ base: 1, sm: 3 }}>
-        <Stat
-          label="Would be deleted"
-          value={removeCount ? plural(plan.remove.copies, 'copy', 'copies') : 'Nothing'}
-          color={removeCount ? 'red' : undefined}
-          lines={[removeCount ? plural(removeCount, 'entry', 'entries') : 'Nothing would be deleted']}
-        />
-        <Stat label="Would be added" value={plural(plan.add.copies, 'copy', 'copies')} color="teal" lines={[plural(plan.add.prints, 'print')]} />
-        <Stat label={`In ${plan.targetLabel}`} value={`${n(plan.before)} → ${n(plan.after)}`} lines={['Copies now → after the export']} />
-      </SimpleGrid>
-      <Stack gap={4}>
-        <Text size="sm" fw={600}>
-          If you confirm, Tithies will, in order:
-        </Text>
-        <List type="ordered" size="sm" spacing={2}>
-          {plan.steps.map((s, i) => (
-            <List.Item key={i}>{s}</List.Item>
-          ))}
-        </List>
-        <Text size="xs" c="dimmed">
-          That would be {plural(plan.writes, 'change')} sent to {name} on {site.label} and about {plural(plan.reads, 'read')}, {estimate(site, plan.writes + plan.reads)}.
-          Every change it sends will be kept in the Change log, exactly as sent.
-        </Text>
-      </Stack>
-      <Tabs defaultValue={removeCount ? 'removed' : 'added'} keepMounted={false}>
-        <Tabs.List>
-          <Tabs.Tab value="added">To add ({n(plan.items.length)})</Tabs.Tab>
-          <Tabs.Tab value="removed" disabled={!removeCount} color="red">
-            To delete ({n(removeCount)})
-          </Tabs.Tab>
-        </Tabs.List>
-        <Tabs.Panel value="added" pt="xs">
-          <ScrollArea.Autosize mah={260}>
-            <Table fz="xs" verticalSpacing={2} striped>
-              <Table.Tbody>
-                {plan.items.map((i) => (
-                  <Table.Tr key={i.key}>
-                    <Table.Td className="ti-num" w={50}>
-                      ×{i.qty}
-                    </Table.Td>
-                    <Table.Td>{i.name}</Table.Td>
-                    <Table.Td>
-                      {i.set.toUpperCase()} #{i.cn} · {finishLabel(i.finish)}
-                    </Table.Td>
-                    <Table.Td c="dimmed">{langLabel(i.lang)}</Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea.Autosize>
-        </Tabs.Panel>
-        <Tabs.Panel value="removed" pt="xs">
-          <ScrollArea.Autosize mah={260}>
-            <Table fz="xs" verticalSpacing={2} striped>
-              <Table.Tbody>
-                {plan.remove.entries.slice(0, 2000).map((e) => (
-                  <Table.Tr key={e.entryId}>
-                    <Table.Td className="ti-num" w={50}>
-                      ×{e.qty}
-                    </Table.Td>
-                    <Table.Td>{e.name}</Table.Td>
-                    <Table.Td>
-                      {e.set.toUpperCase()} #{e.cn} · {finishLabel(e.finish)}
-                    </Table.Td>
-                    <Table.Td c="dimmed">
-                      {e.lang.toUpperCase()} · {e.condition}
-                      {e.isProxy ? ' · proxy' : ''}
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-            {removeCount > 2000 && (
-              <Text size="xs" c="dimmed">
-                …and {n(removeCount - 2000)} more.
-              </Text>
-            )}
-          </ScrollArea.Autosize>
-          <Text size="xs" c="dimmed" mt={4}>
-            If the export runs, the Change log will keep every deleted entry, with a CSV to import them back on {site.label}.
-          </Text>
-        </Tabs.Panel>
-      </Tabs>
-    </Stack>
+    useLiveQuery(async () => {
+      const fresh: AccountKey[] = [];
+      for (const k of keys) {
+        const meta = await accountData(k).meta.get('collection');
+        if (meta?.fullReadAt && Date.now() - meta.fullReadAt < FULL_READ_EVERY_MS) fresh.push(k);
+      }
+      return fresh.join(',');
+    }, [keys.join(',')]) ?? ''
   );
 }
 
 /**
- * Exports cards to an account of a site, in four steps: the target (an account, then a new or
- * existing binder, or the collection; replace or add), a preview of every change read live
- * from the target, a confirmation, then the progress and the check of the result. Each step
- * reads only what it needs (the binder list, then the binder's cards or the collection).
+ * Exports cards to accounts of a site, in four steps: the targets (each an account, then a new or
+ * existing binder, or the collection; replace or add), a preview of every change read live from
+ * each target, a confirmation, then the progress and the check of the results. Several targets
+ * are several exports, made one after another, each as if made by hand after the one before.
+ * Each step reads only what it needs (the binder list, then the binder's cards or the collection).
  */
 export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, source, onStarted }: ExportDialogProps) {
   const { accounts: all } = useCurrentAccount();
@@ -204,101 +68,176 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
   const accounts = useMemo(() => all.filter((a) => a.type === site.type), [all, site.type]);
   const exporter = exporterOf(site.type);
   const [step, setStep] = useState(0);
-  const [accountKey, setAccountKey] = useState<AccountKey | null>(null);
-  const [read, setRead] = useState<ReadTargetResult | null>(null);
-  const [reading, setReading] = useState<TargetRead | null>(null);
-  const [kind, setKind] = useState<Kind>('newBinder');
-  const [binderName, setBinderName] = useState(`Tithies export ${today()}`);
-  const [visibility, setVisibility] = useState<BinderVisibility>('private');
-  const [binderId, setBinderId] = useState<string | null>(null);
-  const [mode, setMode] = useState<ExportMode>('add');
+  const nextId = useRef(1);
+  const [drafts, setDrafts] = useState<TargetDraft[]>([]);
+  // What was read of each account since the dialog opened (newest last), and its last failed read.
+  const [states, setStatesNow] = useState<States>({});
+  const statesRef = useRef<States>({});
+  const setStates = (next: States) => {
+    statesRef.current = next;
+    setStatesNow(next);
+  };
+  const [errors, setErrors] = useState<Partial<Record<AccountKey, ReadError>>>({});
+  /** The read running (one at a time), and the target it is for (null: an account's binder list). */
+  const [reading, setReading] = useState<{ accountKey: AccountKey; read: TargetRead; draftId: number | null } | null>(null);
+  const chain = useRef<Promise<unknown>>(Promise.resolve());
+  const askedBinders = useRef(new Set<AccountKey>());
+  const openedRef = useRef(opened);
   const [understood, setUnderstood] = useState(false);
   const [sameUnderstood, setSameUnderstood] = useState(false);
-  const [typed, setTyped] = useState('');
+  const [typed, setTyped] = useState<Record<number, string>>({});
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
-  const [opId, setOpId] = useState<number | null>(null);
-  /** What the started export sent: the page's list is cleared once it starts. */
-  const [sent, setSent] = useState<{ prints: number; copies: number } | null>(null);
-  const progress = useReadProgress(reading ? accountKey : null);
-  const savedMeta = useCollectionMeta(accountKey);
-  const savedCollection = !!savedMeta?.fullReadAt && Date.now() - savedMeta.fullReadAt < FULL_READ_EVERY_MS;
+  const [opIds, setOpIds] = useState<number[] | null>(null);
+  /** What the started exports sent: the page's list is cleared once they start. */
+  const [sent, setSent] = useState<{ prints: number; copies: number; targets: number } | null>(null);
+  const progress = useReadProgress(reading?.accountKey ?? null);
+  const defaultKey = (accounts.find((a) => a.key !== sourceAccountKey) ?? accounts[0])?.key ?? null;
 
-  // Opening: start over at the target step (choices kept); another account than the compared one first.
+  // Opening: start over at the target step (targets kept, reads made again); another account than the compared one first.
   useEffect(() => {
+    openedRef.current = opened;
     if (!opened) return;
     setStep(0);
-    setOpId(null);
+    setOpIds(null);
     setSent(null);
     setStartError(null);
     setUnderstood(false);
     setSameUnderstood(false);
-    setTyped('');
-    setAccountKey((k) => (k && accounts.some((a) => a.key === k) ? k : ((accounts.find((a) => a.key !== sourceAccountKey) ?? accounts[0])?.key ?? null)));
+    setTyped({});
+    setStates({});
+    setErrors({});
+    askedBinders.current = new Set();
+    setDrafts((ds) => {
+      const kept = ds.filter((d) => d.accountKey && accounts.some((a) => a.key === d.accountKey));
+      return kept.length ? kept : [newDraft(nextId.current++, defaultKey, [], today())];
+    });
   }, [opened]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /** Reads `what` from the account; resolves with the new state (null when the read failed). */
-  const doRead = async (key: AccountKey | null, what: TargetRead): Promise<TargetState | null> => {
-    if (!key) return null;
-    setReading(what);
-    try {
-      const res = await readExportTarget(site.type, key, what).catch((e): ReadTargetResult => ({ ok: false, code: 'error', error: e instanceof Error ? e.message : String(e) }));
-      setRead(res);
-      return res.ok ? res.state : null;
-    } finally {
-      setReading(null);
-    }
-  };
-  // The account's binder list (one request), to pick a binder.
+  // Accounts known after the dialog opened: the targets without one get the first.
   useEffect(() => {
-    setRead(null);
-    if (opened && accountKey) void doRead(accountKey, { kind: 'binders' });
-  }, [opened, accountKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (opened && defaultKey) setDrafts((ds) => (ds.some((d) => !d.accountKey) ? ds.map((d) => (d.accountKey ? d : { ...d, accountKey: defaultKey })) : ds));
+  }, [opened, defaultKey]);
 
-  const state: TargetState | null = read?.ok ? read.state : null;
-  const account: AccountRow | null = accounts.find((a) => a.key === accountKey) ?? null;
-  const name = account ? accountLabel(account) : '';
-  const binders = state?.binders ?? [];
-  const target: ExportTarget | null = !accountKey
-    ? null
-    : kind === 'newBinder'
-      ? { accountKey, kind, name: binderName, visibility }
-      : kind === 'binder'
-        ? binderId
-          ? { accountKey, kind, binderId, mode }
-          : null
-        : { accountKey, kind, mode };
-  const plan = useMemo(
-    () =>
-      target && state && exporter && stateCovers(state, previewRead(target))
-        ? planExport(target, items, state, { sourceAccountKey, targetName: name, limits: exporter.limits, savedCollection })
-        : null,
-    [JSON.stringify(target), state, items, sourceAccountKey, name, exporter, savedCollection], // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  /** Reads `what` from the account, after the reads asked before; resolves with the new state (null when the read failed). */
+  const doRead = (key: AccountKey, what: TargetRead, draftId: number | null): Promise<TargetState | null> => {
+    const run = async (): Promise<TargetState | null> => {
+      if (!openedRef.current) return null;
+      setReading({ accountKey: key, read: what, draftId });
+      try {
+        const res = await readExportTarget(site.type, key, what).catch((e): ReadTargetResult => ({ ok: false, code: 'error', error: e instanceof Error ? e.message : String(e) }));
+        if (!res.ok) {
+          if (res.code !== 'cancelled') setErrors((e) => ({ ...e, [key]: { code: res.code, error: res.error } }));
+          return null;
+        }
+        setStates({ ...statesRef.current, [key]: [...(statesRef.current[key] ?? []), res.state] });
+        setErrors((e) => {
+          const { [key]: _, ...rest } = e;
+          return rest;
+        });
+        return res.state;
+      } finally {
+        setReading(null);
+      }
+    };
+    const p = chain.current.then(run, run);
+    chain.current = p.catch(() => {});
+    return p;
+  };
 
-  /** "Preview the changes": reads what this target needs (if not read yet), then shows the preview. */
+  // Each target's account: its binder list (one request), to pick a binder.
+  const draftAccounts = useMemo(() => [...new Set(drafts.map((d) => d.accountKey).filter((k): k is AccountKey => !!k))], [drafts]);
+  useEffect(() => {
+    if (!opened) return;
+    for (const key of draftAccounts) {
+      if (askedBinders.current.has(key)) continue;
+      askedBinders.current.add(key);
+      void doRead(key, { kind: 'binders' }, null);
+    }
+  }, [opened, draftAccounts.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saved = useSavedCollections(draftAccounts);
+  const nameOf = (key: AccountKey | null) => {
+    const a = accounts.find((x) => x.key === key);
+    return a ? accountLabel(a) : '';
+  };
+  const targets = drafts.map(draftTarget);
+  const targetsKey = JSON.stringify(targets);
+  const plans: (ExportPlan | null)[] = useMemo(() => {
+    const fresh = new Set(saved.split(','));
+    return targets.map((t) => {
+      const state = t && exporter ? pickState(states[t.accountKey], previewRead(t)) : null;
+      if (!t || !state || !exporter) return null;
+      return planExport(t, items, state, { sourceAccountKey, targetName: nameOf(t.accountKey), limits: exporter.limits, savedCollection: fresh.has(t.accountKey) });
+    });
+  }, [targetsKey, states, items, sourceAccountKey, accounts, exporter, saved]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The rules between targets (the same destination twice…), on the targets complete so far.
+  const issues = useMemo(() => {
+    const at = targets.map((t, i) => (t ? i : -1)).filter((i) => i >= 0);
+    return batchIssues(at.map((i) => targets[i]!)).map((x) => ({ ...x, index: at[x.index] ?? x.index }));
+  }, [targetsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const complete = drafts.length > 0 && targets.every(Boolean);
+  const order = complete ? runOrder(targets as ExportTarget[]) : drafts.map((_, i) => i);
+  const allPlanned = complete && plans.every((p) => p && !p.blocked);
+
+  /** "Preview the changes": reads what each target needs (if not read yet), then shows the preview. */
   const preview = async () => {
-    if (!target || !state) return;
-    const need = previewRead(target);
-    if (!stateCovers(state, need) && !(await doRead(accountKey, need))) return;
+    for (const [i, t] of targets.entries()) {
+      if (!t) return;
+      const need = previewRead(t);
+      if (!pickState(statesRef.current[t.accountKey], need) && !(await doRead(t.accountKey, need, drafts[i].id))) return;
+    }
     setStep(1);
   };
 
-  const destructive = !!plan && plan.remove.entries.length > 0;
-  const same = !!accountKey && accountKey === sourceAccountKey;
-  const confirmWord = plan?.remove.wholeCollection ? (account?.userName ?? '') : (plan?.binder?.name ?? '');
-  const canExport = !!plan && !plan.blocked && understood && (!same || sameUnderstood) && (!destructive || typed.trim() === confirmWord.trim());
+  const close = () => {
+    // A preview read nobody waits for any more (it can be hundreds of pages).
+    if (reading) void cancelExportRead(site.type).catch(() => {});
+    onClose();
+  };
+
+  const update = (id: number, patch: Partial<TargetDraft>) => setDrafts((ds) => ds.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const addTarget = () => setDrafts((ds) => [...ds, newDraft(nextId.current++, ds[ds.length - 1]?.accountKey ?? defaultKey, ds, today())]);
+  const removeTarget = (id: number) => setDrafts((ds) => ds.filter((d) => d.id !== id));
+
+  const previewTargets: PreviewTarget[] = drafts.flatMap((d, i) => {
+    const plan = plans[i];
+    if (!plan) return [];
+    // The export made just before this one on the same account (in the order they run).
+    const pos = order.indexOf(i);
+    const before = order.slice(0, pos).filter((j) => targets[j]?.accountKey === d.accountKey && plans[j]);
+    const prev = before.length ? before[before.length - 1] : -1;
+    const after = prev >= 0 ? `${targetTitle({ plan: plans[prev]!, name: nameOf(d.accountKey) }, 1)} (target ${prev + 1})` : undefined;
+    return [{ number: i + 1, plan, name: nameOf(d.accountKey), after }];
+  });
+  const confirmTargets: ConfirmTarget[] = order.flatMap((i) => {
+    const plan = plans[i];
+    const d = drafts[i];
+    const a = accounts.find((x) => x.key === d?.accountKey);
+    return plan && d && a ? [{ id: d.id, number: i + 1, plan, name: accountLabel(a), userName: a.userName }] : [];
+  });
+  const sameAccount = accounts.find((a) => a.key === sourceAccountKey && drafts.some((d) => d.accountKey === a.key));
+  const destructive = confirmTargets.some((t) => t.plan.remove.entries.length > 0);
+  const canExport = allPlanned && understood && (!sameAccount || sameUnderstood) && typedAll(confirmTargets, typed);
+  const several = drafts.length > 1;
 
   const go = async () => {
-    if (!plan || !target) return;
+    if (!allPlanned) return;
     setStarting(true);
     setStartError(null);
     try {
-      const res = await startExport(site.type, { target, items: plan.items, digest: plan.digest, sourceAccountKey, source, estimate: plan.requests });
-      if (!res.ok) setStartError(res.error);
+      // A read still running would make the start busy.
+      await chain.current;
+      const ordered = order.map((i) => ({ i, plan: plans[i]! }));
+      const res = await startExport(site.type, {
+        items: ordered[0].plan.items,
+        sourceAccountKey,
+        source,
+        exports: ordered.map(({ plan }) => ({ target: plan.target, digest: plan.digest, estimate: plan.requests, label: plan.targetLabel })),
+      });
+      if (!res.ok) setStartError(res.index != null && ordered.length > 1 && ordered[res.index] ? `Target ${ordered[res.index].i + 1}: ${res.error}` : res.error);
       else {
-        setSent({ prints: items.length, copies: items.reduce((s, i) => s + i.qty, 0) });
-        setOpId(res.opId);
+        setSent({ prints: items.length, copies: items.reduce((s, i) => s + i.qty, 0), targets: ordered.length });
+        setOpIds(res.opIds);
         setStep(3);
         onStarted?.();
       }
@@ -309,11 +248,12 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
     }
   };
 
-  const readingTarget = reading && reading.kind !== 'binders' ? reading : null;
+  const readingDraft = reading?.draftId ?? null;
+  const targetCount = sent?.targets ?? drafts.length;
   return (
     <Modal
       opened={opened}
-      onClose={onClose}
+      onClose={close}
       size="xl"
       title={
         <Group gap="xs">
@@ -322,112 +262,48 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
           <Badge variant="light">
             {plural(sent?.prints ?? items.length, 'print')} · {plural(sent?.copies ?? items.reduce((s, i) => s + i.qty, 0), 'copy', 'copies')}
           </Badge>
+          {targetCount > 1 && <Badge variant="outline">{plural(targetCount, 'target')}</Badge>}
         </Group>
       }
     >
       <Stepper active={step} size="sm" allowNextStepsSelect={false} onStepClick={(s) => step < 3 && s < step && setStep(s)}>
-        <Stepper.Step label="Target" description="Where the cards go">
+        <Stepper.Step label={several ? 'Targets' : 'Target'} description="Where the cards go">
           <Stack mt="md">
             {!accounts.length ? (
               <Alert color="yellow">No {site.label} account in Tithies yet: sync one first.</Alert>
             ) : (
               <>
-                <Select
-                  label={`${site.label} account to change`}
-                  description={`Tithies makes the changes as this account: it must be the one logged in on ${site.label} in this browser.`}
-                  data={accounts.map((a) => ({
-                    value: a.key,
-                    label: `${accountLabel(a)}${a.key === sourceAccountKey ? ' (the account compared here)' : ''}${liveKeys.has(a.key) ? ' · logged in' : ''}`,
-                  }))}
-                  value={accountKey}
-                  onChange={(v) => v && setAccountKey(v as AccountKey)}
-                  allowDeselect={false}
-                  leftSection={<SiteIcon type={site.type} size={16} />}
-                  disabled={!!reading}
-                />
-                {same && (
-                  <Alert color="yellow" variant="light" icon={<IconAlertTriangle size={18} />} p="xs">
-                    This is the account you're comparing. Its collection would change with the export: see the warning in the preview.
-                  </Alert>
-                )}
-                {reading?.kind === 'binders' && (
-                  <Group gap="xs">
-                    <Loader size="xs" />
-                    <Text size="sm" c="dimmed">
-                      Reading {name}'s binders on {site.label}… (reads only)
-                    </Text>
-                  </Group>
-                )}
-                {read && !read.ok && !reading && (
-                  <Alert color={read.code === 'busy' ? 'yellow' : 'red'} variant="light" icon={<IconAlertTriangle size={18} />}>
-                    <Group justify="space-between" gap="xs">
-                      <Text size="sm">{read.error}</Text>
-                      <Button size="xs" variant="light" leftSection={<IconRefresh size={14} />} onClick={() => void doRead(accountKey, { kind: 'binders' })}>
-                        Try again
-                      </Button>
-                    </Group>
-                  </Alert>
-                )}
-
-                <SegmentedControl
-                  value={kind}
-                  onChange={(v) => setKind(v as Kind)}
-                  disabled={!!readingTarget}
-                  data={[
-                    { value: 'newBinder', label: 'New binder' },
-                    { value: 'binder', label: 'Existing binder', disabled: !site.capabilities.exportTo.binders },
-                    { value: 'collection', label: 'Collection', disabled: !site.capabilities.exportTo.collection },
-                  ]}
-                />
-                {kind === 'newBinder' && (
-                  <Group grow align="flex-start">
-                    <TextInput label="Binder name" value={binderName} onChange={(e) => setBinderName(e.currentTarget.value)} maxLength={100} />
-                    <Select
-                      label="Visibility"
-                      data={[
-                        { value: 'private', label: 'Private' },
-                        { value: 'unlisted', label: 'Unlisted' },
-                        { value: 'public', label: 'Public' },
-                      ]}
-                      value={visibility}
-                      onChange={(v) => v && setVisibility(v as BinderVisibility)}
-                      allowDeselect={false}
-                    />
-                  </Group>
-                )}
-                {kind === 'binder' && (
-                  <Stack gap="xs">
-                    <Select
-                      label="Binder"
-                      placeholder={state ? (binders.length ? 'Pick a binder' : 'This account has no binder yet') : 'Reading the binders…'}
-                      data={binders.map((b) => ({ value: b.id, label: b.name }))}
-                      value={binderId}
-                      onChange={setBinderId}
-                      disabled={!binders.length || !!readingTarget}
-                      searchable={binders.length > 8}
-                    />
-                    <ModeChoice
-                      mode={mode}
-                      setMode={setMode}
-                      add="Add the cards to the binder (its cards stay)"
-                      replace="Replace the binder's cards (they would be deleted from the collection)"
-                    />
-                  </Stack>
-                )}
-                {kind === 'collection' && (
-                  <ModeChoice
-                    mode={mode}
-                    setMode={setMode}
-                    add="Add the cards to the collection (not in a binder)"
-                    replace="Replace the whole collection (every card would be deleted, binders' cards included)"
+                {drafts.map((d, i) => (
+                  <TargetForm
+                    key={d.id}
+                    site={site}
+                    draft={d}
+                    number={i + 1}
+                    count={drafts.length}
+                    accounts={accounts}
+                    sourceAccountKey={sourceAccountKey}
+                    sameNoted={drafts.slice(0, i).some((x) => x.accountKey === sourceAccountKey)}
+                    liveKeys={liveKeys}
+                    binders={d.accountKey ? latestBinders(states[d.accountKey]) : null}
+                    readingBinders={!!reading && reading.draftId == null && reading.accountKey === d.accountKey}
+                    readError={(d.accountKey && errors[d.accountKey]) || null}
+                    onRetry={() => d.accountKey && void doRead(d.accountKey, { kind: 'binders' }, null)}
+                    readingTarget={readingDraft === d.id ? reading!.read : null}
+                    progress={readingDraft === d.id ? progress : null}
+                    issues={issues.filter((x) => x.index === i)}
+                    busy={!!reading}
+                    onChange={(patch) => update(d.id, patch)}
+                    onRemove={() => removeTarget(d.id)}
                   />
-                )}
-                {readingTarget && (
-                  <Stack gap={4}>
-                    <Text size="sm">Reading {readLabel(readingTarget, name)} for the preview… (reads only, nothing is changed)</Text>
-                    <PercentBar progress={progress ?? { done: 0, total: 1 }} unit="page" />
-                  </Stack>
-                )}
+                ))}
+                <Group>
+                  <Button variant="light" size="xs" leftSection={<IconPlus size={14} />} onClick={addTarget} disabled={drafts.length >= MAX_EXPORT_TARGETS || readingDraft != null}>
+                    Add a target
+                  </Button>
+                  <Text size="xs" c="dimmed">
+                    The same cards go to every target: each target is its own export, made one after another.
+                  </Text>
+                </Group>
                 <Text size="xs" c="dimmed">
                   Cards will be added Near Mint, each in its language, with their exact set, collector number and finish (Moxfield's CSV import). Nothing is
                   changed until you confirm, two steps from here.
@@ -435,10 +311,14 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
               </>
             )}
             <Group justify="flex-end">
-              <Button variant="default" onClick={onClose}>
+              <Button variant="default" onClick={close}>
                 Cancel
               </Button>
-              <Button disabled={!target || !state || (!!reading && !readingTarget)} loading={!!readingTarget} onClick={() => void preview()}>
+              <Button
+                disabled={!complete || issues.some((x) => x.level === 'error') || draftAccounts.some((k) => !states[k]?.length) || (!!reading && readingDraft == null)}
+                loading={readingDraft != null}
+                onClick={() => void preview()}
+              >
                 Preview the changes
               </Button>
             </Group>
@@ -446,12 +326,16 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
         </Stepper.Step>
         <Stepper.Step label="Preview" description="What would change">
           <Stack mt="md">
-            {plan && <PreviewStep site={site} plan={plan} name={name} />}
+            {previewTargets.length === 1 && !several ? (
+              <PreviewStep site={site} plan={previewTargets[0].plan} name={previewTargets[0].name} />
+            ) : (
+              previewTargets.length > 0 && <PreviewTabs site={site} targets={previewTargets} />
+            )}
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setStep(0)}>
                 Back
               </Button>
-              <Button disabled={!plan || !!plan.blocked} onClick={() => setStep(2)}>
+              <Button disabled={!allPlanned} onClick={() => setStep(2)}>
                 Continue
               </Button>
             </Group>
@@ -459,67 +343,35 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
         </Stepper.Step>
         <Stepper.Step label="Confirm" description="Last check">
           <Stack mt="md">
-            {plan && (
-              <>
-                <Alert color={destructive ? 'red' : 'blue'} variant="light" icon={<IconAlertTriangle size={18} />} title="Nothing has been changed yet">
-                  <Text size="sm">
-                    When you click the button below, Tithies will change <b>{name}</b> on {site.label}:{' '}
-                    {destructive ? `it will delete ${plural(plan.remove.copies, 'copy', 'copies')}, then add ` : 'it will add '}
-                    {plural(plan.add.copies, 'copy', 'copies')} to {plan.targetLabel}. {site.label} has no undo; the Change log will keep what is deleted, as a CSV
-                    to import back.
-                  </Text>
-                </Alert>
-                <Checkbox
-                  checked={understood}
-                  onChange={(e) => setUnderstood(e.currentTarget.checked)}
-                  label={`I understand that this will change ${name}'s ${plan.target.kind === 'collection' ? 'collection' : 'binders and collection'} on ${site.label}`}
-                />
-                {same && (
-                  <Alert color="yellow" variant="light" icon={<IconAlertTriangle size={18} />} title={`${name} is the account you're comparing`}>
-                    <Stack gap="xs">
-                      <Text size="sm">
-                        On {site.label}, the cards of a binder are cards of the collection. Exporting to this account would therefore change the very collection this
-                        page compares with your decks:
-                      </Text>
-                      <List size="sm" spacing={2}>
-                        <List.Item>cards “Missing from collection” you export would become owned: they wouldn't be missing any more;</List.Item>
-                        <List.Item>cards “Not in any deck” you export would be added once more: the collection would then have them twice;</List.Item>
-                        <List.Item>the next “Sync decks and collection” would show the collection as it is after the export.</List.Item>
-                      </List>
-                      <Checkbox checked={sameUnderstood} onChange={(e) => setSameUnderstood(e.currentTarget.checked)} label="I want to change the collection I'm comparing" />
-                    </Stack>
-                  </Alert>
-                )}
-                {destructive && (
-                  <TextInput
-                    label={plan.remove.wholeCollection ? `Type the username ${confirmWord} to delete the whole collection` : `Type the binder name “${confirmWord}” to replace its cards`}
-                    value={typed}
-                    onChange={(e) => setTyped(e.currentTarget.value)}
-                    error={typed && typed.trim() !== confirmWord.trim() ? "That's not it" : undefined}
-                  />
-                )}
-                {startError && (
-                  <Alert color="red" variant="light" icon={<IconAlertTriangle size={18} />}>
-                    {startError}
-                  </Alert>
-                )}
-              </>
+            {allPlanned && (
+              <ConfirmStep
+                site={site}
+                targets={confirmTargets}
+                sameName={sameAccount ? accountLabel(sameAccount) : null}
+                understood={understood}
+                setUnderstood={setUnderstood}
+                sameUnderstood={sameUnderstood}
+                setSameUnderstood={setSameUnderstood}
+                typed={typed}
+                setTyped={(id, v) => setTyped((t) => ({ ...t, [id]: v }))}
+                startError={startError}
+              />
             )}
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setStep(1)}>
                 Back
               </Button>
               <Button color={destructive ? 'red' : 'blue'} disabled={!canExport} loading={starting} leftSection={<IconUpload size={16} />} onClick={() => void go()}>
-                {destructive ? 'Delete and export' : 'Export now'}
+                {several ? `${destructive ? 'Delete and start' : 'Start'} the ${drafts.length} exports` : destructive ? 'Delete and export' : 'Export now'}
               </Button>
             </Group>
           </Stack>
         </Stepper.Step>
         <Stepper.Completed>
           <Stack mt="md">
-            {opId != null && <ExportProgress opId={opId} site={site} />}
+            {opIds && (opIds.length === 1 ? <ExportProgress opId={opIds[0]} site={site} /> : <ExportBatchProgress opIds={opIds} site={site} />)}
             <Group justify="flex-end">
-              <Button variant="default" onClick={onClose}>
+              <Button variant="default" onClick={close}>
                 Close
               </Button>
             </Group>

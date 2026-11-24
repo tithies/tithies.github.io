@@ -1,25 +1,31 @@
 /**
- * Background export of cards to an account of a site (one per site; it shares the site's lock
- * with the deck sync). The account must be logged in on the site: every request is made as it,
- * and nothing is sent as anyone else.
+ * Background export of cards to accounts of a site (one export at a time per site; it shares the
+ * site's lock with the deck sync). The account must be logged in on the site: every request is
+ * made as it, and nothing is sent as anyone else.
  *
- * Steps: read the target (binders + whole collection) and refuse if it changed since the preview;
- * make the changes (create the binder, or delete what a replace deletes; then add the cards);
- * read the collection again and check every copy. Every write is in the change log. A write
- * whose outcome is unknown stops the export (never sent twice); the collection is read again
- * anyway, so the log shows what was made.
+ * Several targets are several exports, started together and made one after another, each as if
+ * made by hand after the one before: its own change-log row, its own read of the target, its own
+ * check. The ones waiting are 'queued' in the log; a failure or a cancel of one doesn't stop the
+ * others. The site's lock is held from the first to the last (no sync in between).
+ *
+ * Steps of each: read the target (binders + whole collection) and refuse if it changed since the
+ * preview; make the changes (create the binder, or delete what a replace deletes; then add the
+ * cards); read the collection again and check every copy. Every write is in the change log. A
+ * write whose outcome is unknown stops the export (never sent twice); the collection is read
+ * again anyway, so the log shows what was made.
  */
 import { accountData, getAccount } from '@/lib/accounts/data';
-import { accountLabel, identityOf, type AccountKey, type AccountRow } from '@/lib/accounts/types';
-import { getOp, patchOp, startOp, writeLogger } from '@/lib/changes/log';
+import { accountLabel, identityOf, parseAccountKey, type AccountKey, type AccountRow } from '@/lib/accounts/types';
+import { cancelQueuedOp, claimQueuedOp, getOp, patchOp, startOps, writeLogger, type NewChangeOp } from '@/lib/changes/log';
 import { StepTally } from '@/lib/progress';
 import type { CollectionEntry } from '@/lib/cards/types';
 import { FULL_READ_EVERY_MS, readBinder, readCollection, readWholeCollection } from '@/lib/decks/collection';
 import type { SyncTransport } from '@/lib/decks/job';
-import { CancelledError, describeSiteError, SiteAuthError, SiteClient, SiteWrongAccountError, type SiteClientOptions } from '@/lib/sites/client';
+import { abortableSleep, CancelledError, describeSiteError, SiteAuthError, SiteClient, SiteWrongAccountError, type SiteClientOptions } from '@/lib/sites/client';
 import type { SiteLock } from '@/lib/sites/lock';
 import type { SiteProvider } from '@/lib/sites/provider';
-import type { SiteIdentity } from '@/lib/sites/types';
+import type { BinderVisibility, SiteIdentity } from '@/lib/sites/types';
+import { batchIssues, MAX_EXPORT_TARGETS } from './batch';
 import { exporterOf, type SiteExporter } from './exporters';
 import { afterRead, beforeRead, mergeItems, planExport } from './plan';
 import type { ExportDetails, ExportItem, ExportPlan, ExportTarget, ReadProgress, TargetRead, TargetState } from './types';
@@ -36,18 +42,35 @@ export interface ExportJobDeps {
 export type ExportFailCode = 'busy' | 'no_account' | 'wrong_account' | 'no_tab' | 'unsupported' | 'bad_request' | 'error' | 'cancelled';
 export type ReadTargetResult = { ok: true; state: TargetState } | { ok: false; code: ExportFailCode; error: string; actual?: SiteIdentity | null };
 export type StartExportResult = { ok: true; opId: number } | { ok: false; code: ExportFailCode; error: string };
+/** `index`: the export refused (nothing was started: every export is checked first). */
+export type StartExportsResult = { ok: true; opIds: number[] } | { ok: false; code: ExportFailCode; error: string; index?: number };
 
-export interface StartExportRequest {
+/** One target of an export, as previewed. */
+export interface StartExportTarget {
   target: ExportTarget;
-  items: ExportItem[];
   /** The previewed plan's digest: nothing is changed when the target differs from what was previewed. */
   digest: string;
+  /** The previewed plan's requests of each step, to size the progress before this run's own plan. */
+  estimate?: ExportPlan['requests'];
+  /** The preview's name of the target ('the binder “Trade”'): the row's title until its run reads the target. */
+  label?: string;
+}
+
+/** The cards, and every target they go to (in the order they are exported). */
+export interface StartExportsRequest {
+  items: ExportItem[];
   /** The account whose page the cards come from (for the same-account warning). */
   sourceAccountKey: AccountKey | null;
   /** "Comparator of alice" */
   source: string;
-  /** The previewed plan's requests of each step, to size the progress before this run's own plan. */
-  estimate?: ExportPlan['requests'];
+  exports: StartExportTarget[];
+}
+
+/** One target: a single export. */
+export interface StartExportRequest extends StartExportTarget {
+  items: ExportItem[];
+  sourceAccountKey: AccountKey | null;
+  source: string;
 }
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -101,9 +124,61 @@ export function validItems(items: unknown): items is ExportItem[] {
   );
 }
 
+const VISIBILITIES = new Set(['private', 'unlisted', 'public']);
+
+/** A target from an extension page, rebuilt from its checked fields only (null when not valid). */
+export function cleanTarget(t: unknown): ExportTarget | null {
+  const x = t as Record<string, unknown> | null;
+  if (!x || typeof x !== 'object' || !parseAccountKey(x.accountKey)) return null;
+  const accountKey = x.accountKey as AccountKey;
+  const mode = x.mode === 'add' || x.mode === 'replace' ? x.mode : null;
+  if (x.kind === 'newBinder') {
+    // The name as typed (the plan trims it where it uses it, and its digest has it as typed).
+    const name = typeof x.name === 'string' && x.name.length <= 100 && x.name.trim() !== '' ? x.name : null;
+    return name && VISIBILITIES.has(x.visibility as string) ? { accountKey, kind: 'newBinder', name, visibility: x.visibility as BinderVisibility } : null;
+  }
+  if (x.kind === 'binder') return mode && typeof x.binderId === 'string' && ID.test(x.binderId) ? { accountKey, kind: 'binder', binderId: x.binderId, mode } : null;
+  if (x.kind === 'collection') return mode ? { accountKey, kind: 'collection', mode } : null;
+  return null;
+}
+
+const count = (v: unknown) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1_000_000;
+/** A previewed estimate, if it is one (it only sizes the progress). */
+const cleanEstimate = (e: unknown): ExportPlan['requests'] | undefined => {
+  const x = e as ExportPlan['requests'] | null;
+  return x && typeof x === 'object' && count(x.before) && count(x.write) && count(x.check) ? { before: x.before, write: x.write, check: x.check } : undefined;
+};
+
+/** One export waiting for its turn (or running). */
+interface Turn {
+  opId: number;
+  accountKey: AccountKey;
+  exp: StartExportTarget;
+  details: ExportDetails;
+}
+
+/** The exports started together: the one running (`current`) and those waiting (`queue`). */
+interface Batch {
+  items: ExportItem[];
+  sourceAccountKey: AccountKey | null;
+  exporter: SiteExporter;
+  queue: Turn[];
+  current: { opId: number; accountKey: AccountKey; abort: AbortController; done: Promise<void> } | null;
+  /** Rows of waiting exports being marked cancelled: written before the batch ends. */
+  pending: Promise<unknown>[];
+  /** Everything was cancelled (possibly before the rows were written): no export of it starts any more. */
+  stopped: boolean;
+  /** Resolves once the batch has ended (from the moment it holds the site). */
+  done: Promise<void>;
+}
+
+const NOT_STARTED = 'Cancelled before it started: nothing was changed.';
+
 export class ExportJob {
-  private active: { opId: number; accountKey: AccountKey; abort: AbortController; done: Promise<void> } | null = null;
+  private batch: Batch | null = null;
   private reading: { accountKey: AccountKey; abort: AbortController } | null = null;
+  /** Preview reads, one after another (several dialogs or targets may ask at once). */
+  private reads: Promise<void> = Promise.resolve();
 
   constructor(
     readonly site: SiteProvider,
@@ -112,30 +187,92 @@ export class ExportJob {
 
   /** The account being changed (or read for a preview). */
   get activeAccountKey(): AccountKey | null {
-    return this.active?.accountKey ?? this.reading?.accountKey ?? null;
+    return this.batch?.current?.accountKey ?? this.reading?.accountKey ?? null;
   }
 
+  /** The export running now. */
   get activeOpId(): number | null {
-    return this.active?.opId ?? null;
+    return this.batch?.current?.opId ?? null;
   }
 
-  /** Resolves when the running export (if any) has finished. */
+  /** Resolves when the running exports (if any), and those waiting, have finished. */
   get finished(): Promise<void> {
-    return this.active?.done ?? Promise.resolve();
+    return this.batch?.done ?? Promise.resolve();
   }
 
-  cancel(): boolean {
-    const running = this.active ?? this.reading;
-    if (!running) return false;
-    running.abort.abort();
+  /**
+   * Cancels exports: those of `opIds` (the running one stops before its next change, a waiting one
+   * never starts; the others go on), or with no ids every export and the preview read.
+   */
+  cancel(opIds?: readonly number[]): boolean {
+    const b = this.batch;
+    if (!opIds) {
+      let any = false;
+      if (this.reading) {
+        this.reading.abort.abort();
+        any = true;
+      }
+      if (b) {
+        b.stopped = true;
+        for (const t of b.queue.splice(0)) b.pending.push(cancelQueuedOp(t.opId, NOT_STARTED).catch(() => {}));
+        b.current?.abort.abort();
+        any = true;
+      }
+      return any;
+    }
+    if (!b) return false;
+    let any = false;
+    for (const id of opIds) {
+      if (b.current?.opId === id) {
+        b.current.abort.abort();
+        any = true;
+        continue;
+      }
+      const at = b.queue.findIndex((t) => t.opId === id);
+      if (at < 0) continue;
+      b.queue.splice(at, 1);
+      b.pending.push(cancelQueuedOp(id, NOT_STARTED).catch(() => {}));
+      any = true;
+    }
+    return any;
+  }
+
+  /** Stops the preview read (an export dialog closed while it read). */
+  cancelRead(): boolean {
+    if (!this.reading) return false;
+    this.reading.abort.abort();
     return true;
+  }
+
+  /**
+   * Stops everything working for one account (it is being forgotten): its waiting exports never
+   * start, its running one (or preview read) is cancelled. Exports to other accounts go on.
+   * Resolves once its running export has stopped.
+   */
+  async stopAccount(key: AccountKey): Promise<void> {
+    if (this.reading?.accountKey === key) this.reading.abort.abort();
+    const b = this.batch;
+    if (!b) return;
+    for (const t of b.queue.filter((q) => q.accountKey === key)) {
+      b.queue.splice(b.queue.indexOf(t), 1);
+      b.pending.push(cancelQueuedOp(t.opId, NOT_STARTED).catch(() => {}));
+    }
+    const cur = b.current;
+    if (cur?.accountKey === key) {
+      cur.abort.abort();
+      await cur.done;
+    }
+    await Promise.allSettled(b.pending);
   }
 
   private busy(): string {
     const label = this.site.label;
-    return this.deps.lock.heldBy === 'sync'
-      ? `Tithies is syncing ${label} decks or a collection: wait for it to finish (or cancel it), then try again.`
-      : `Another export to ${label} is running: wait for it to finish.`;
+    if (this.deps.lock.heldBy === 'sync') return `Tithies is syncing ${label} decks or a collection: wait for it to finish (or cancel it), then try again.`;
+    if (this.batch) {
+      const waiting = this.batch.queue.length;
+      return `An export to ${label} is running${waiting ? ` (${plural(waiting, 'more')} waiting)` : ''}: wait for it to finish.`;
+    }
+    return `Tithies is reading a ${label} account for an export preview: wait for it to finish.`;
   }
 
   private async account(accountKey: AccountKey): Promise<AccountRow | null> {
@@ -208,12 +345,25 @@ export class ExportJob {
     return { ...empty, entries, totals: { entries: entries.length, copies: entries.reduce((s, e) => s + e.qty, 0) }, readAt: Date.now() };
   }
 
-  /** Reads the target account for a preview (what `read` says). Changes nothing. */
+  /** Reads the target account for a preview (what `read` says), after the reads asked before. Changes nothing. */
   async readTarget(accountKey: AccountKey, read: TargetRead = { kind: 'binders' }, onProgress?: (p: ReadProgress) => void): Promise<ReadTargetResult> {
     if (!validRead(read)) return { ok: false, code: 'bad_request', error: 'Unknown read.' };
+    const before = this.reads;
+    let done!: () => void;
+    this.reads = new Promise<void>((r) => (done = r));
+    try {
+      await before;
+      return await this.readNow(accountKey, read, onProgress);
+    } finally {
+      done();
+    }
+  }
+
+  private async readNow(accountKey: AccountKey, read: TargetRead, onProgress?: (p: ReadProgress) => void): Promise<ReadTargetResult> {
     const row = await this.account(accountKey);
     if (!row) return { ok: false, code: 'no_account', error: `This ${this.site.label} account isn't in Tithies any more.` };
-    if (!this.deps.lock.tryAcquire('export')) return { ok: false, code: 'busy', error: this.busy() };
+    // No await between the check and the claim: nothing else can start in between.
+    if (this.batch || this.reading || !this.deps.lock.tryAcquire('export')) return { ok: false, code: 'busy', error: this.busy() };
     const abort = new AbortController();
     this.reading = { accountKey, abort };
     this.deps.onActiveChange?.(true);
@@ -240,65 +390,156 @@ export class ExportJob {
     }
   }
 
-  /** Starts an export; answers once it is in the change log (progress: the op row). */
+  /** Starts one export (see startMany); answers once it is in the change log. */
   async start(req: StartExportRequest): Promise<StartExportResult> {
+    const r = req as Partial<StartExportRequest> | null;
+    const res = await this.startMany({
+      items: r?.items as ExportItem[],
+      sourceAccountKey: r?.sourceAccountKey ?? null,
+      source: r?.source as string,
+      exports: [{ target: r?.target as ExportTarget, digest: r?.digest as string, estimate: r?.estimate, label: r?.label }],
+    });
+    return res.ok ? { ok: true, opId: res.opIds[0] } : { ok: false, code: res.code, error: res.error };
+  }
+
+  /**
+   * Starts the exports of the same cards to each target, one after another in the order given.
+   * Every one is checked first (nothing starts if one is refused), then each gets its change-log
+   * row: the first running, the others waiting. Answers once they are in the log (progress: the rows).
+   */
+  async startMany(req: StartExportsRequest): Promise<StartExportsResult> {
+    const label = this.site.label;
     const exporter = exporterOf(this.site.type);
-    if (!exporter) return { ok: false, code: 'unsupported', error: `Tithies can't export to ${this.site.label}.` };
-    if (!req || !validItems(req.items) || typeof req.digest !== 'string' || !req.target) return { ok: false, code: 'bad_request', error: 'Nothing valid to export.' };
-    const t = req.target;
-    if (t.kind === 'binder' && !this.site.capabilities.exportTo.binders) return { ok: false, code: 'unsupported', error: `${this.site.label} has no binders.` };
-    if (t.kind === 'newBinder' && !this.site.capabilities.exportTo.binders) return { ok: false, code: 'unsupported', error: `${this.site.label} has no binders.` };
-    if (t.kind === 'collection' && !this.site.capabilities.exportTo.collection) return { ok: false, code: 'unsupported', error: `Tithies can't export into a ${this.site.label} collection.` };
-    const row = await this.account(t.accountKey);
-    if (!row) return { ok: false, code: 'no_account', error: `This ${this.site.label} account isn't in Tithies any more.` };
-    if (!this.deps.lock.tryAcquire('export')) return { ok: false, code: 'busy', error: this.busy() };
+    if (!exporter) return { ok: false, code: 'unsupported', error: `Tithies can't export to ${label}.` };
+    const list: unknown = req?.exports;
+    if (!Array.isArray(list) || !list.length || list.length > MAX_EXPORT_TARGETS || !validItems(req.items)) return { ok: false, code: 'bad_request', error: 'Nothing valid to export.' };
+    const sourceAccountKey = parseAccountKey(req.sourceAccountKey) ? req.sourceAccountKey : null;
+    const source = typeof req.source === 'string' ? req.source.slice(0, 200) : '';
+    const caps = this.site.capabilities.exportTo;
+
+    const checked: { exp: StartExportTarget; row: AccountRow }[] = [];
+    for (const [index, e] of (list as Partial<StartExportTarget>[]).entries()) {
+      const target = cleanTarget(e?.target);
+      if (!target || typeof e?.digest !== 'string') return { ok: false, code: 'bad_request', error: 'This target is not valid.', index };
+      if (target.kind !== 'collection' && !caps.binders) return { ok: false, code: 'unsupported', error: `${label} has no binders.`, index };
+      if (target.kind === 'collection' && !caps.collection) return { ok: false, code: 'unsupported', error: `Tithies can't export into a ${label} collection.`, index };
+      const row = await this.account(target.accountKey);
+      if (!row) return { ok: false, code: 'no_account', error: `This ${label} account isn't in Tithies any more.`, index };
+      const hint = typeof e.label === 'string' && e.label.length <= 200 ? e.label : undefined;
+      checked.push({ exp: { target, digest: e.digest, estimate: cleanEstimate(e.estimate), label: hint }, row });
+    }
+    const conflict = batchIssues(checked.map((c) => c.exp.target)).find((i) => i.level === 'error');
+    if (conflict) return { ok: false, code: 'bad_request', error: conflict.text, index: conflict.index };
+    // No await between the check and the claim: nothing else can start in between.
+    if (this.batch || this.reading || !this.deps.lock.tryAcquire('export')) return { ok: false, code: 'busy', error: this.busy() };
 
     const items = mergeItems(req.items);
     const add = { prints: items.length, copies: items.reduce((s, i) => s + i.qty, 0) };
-    const name = accountLabel(row);
-    const details: ExportDetails = {
-      target: t,
-      targetLabel: t.kind === 'collection' ? `${name}'s collection` : t.kind === 'newBinder' ? `the new binder “${t.name.trim()}”` : 'a binder',
-      sourceAccountKey: req.sourceAccountKey ?? null,
-      items,
-      add,
-      removed: [],
-      wholeCollection: false,
-      before: 0,
-      after: 0,
-    };
-    let opId: number;
+    let ended!: () => void;
+    const batch: Batch = { items, sourceAccountKey, exporter, queue: [], current: null, pending: [], stopped: false, done: new Promise<void>((r) => (ended = r)) };
+    this.batch = batch;
+    const turns = checked.map(({ exp, row }): { turn: Omit<Turn, 'opId'>; op: NewChangeOp } => {
+      const t = exp.target;
+      const name = accountLabel(row);
+      const details: ExportDetails = {
+        target: t,
+        targetLabel: t.kind === 'collection' ? `${name}'s collection` : t.kind === 'newBinder' ? `the new binder “${t.name}”` : (exp.label ?? 'a binder'),
+        sourceAccountKey,
+        items,
+        add,
+        removed: [],
+        wholeCollection: false,
+        before: 0,
+        after: 0,
+      };
+      return {
+        turn: { accountKey: row.key, exp, details },
+        op: {
+          site: this.site.type,
+          accountKey: row.key,
+          userName: row.userName,
+          kind: 'export',
+          title: exportTitle(t, add, details.targetLabel),
+          source,
+          phase: `Connecting to ${label} as ${name}`,
+          details,
+        },
+      };
+    });
+    let opIds: number[];
     try {
-      opId = await startOp({
-        site: this.site.type,
-        accountKey: row.key,
-        userName: row.userName,
-        kind: 'export',
-        title: exportTitle(t, add, details.targetLabel),
-        source: typeof req.source === 'string' ? req.source.slice(0, 200) : '',
-        phase: `Connecting to ${this.site.label} as ${name}`,
-        details,
-      });
+      opIds = await startOps(turns.map((t, i) => (i === 0 ? t.op : { ...t.op, phase: 'Waiting for the export before it to finish' })));
     } catch (e) {
+      this.batch = null;
       this.deps.lock.release('export');
+      ended();
       return { ok: false, code: 'error', error: describeSiteError(e) };
     }
-    const abort = new AbortController();
+    batch.queue = turns.map((t, i) => ({ ...t.turn, opId: opIds[i] }));
     this.deps.onActiveChange?.(true);
-    const active = { opId, accountKey: row.key, abort, done: Promise.resolve() };
-    this.active = active;
-    active.done = this.run(opId, row, req, items, details, exporter, abort).finally(() => {
-      if (this.active === active) this.active = null;
+    void this.drain(batch).finally(ended);
+    return { ok: true, opIds };
+  }
+
+  /** Makes the batch's exports, one after another, until none is left; then frees the site. */
+  private async drain(b: Batch): Promise<void> {
+    try {
+      for (let first = true; b.queue.length; first = false) {
+        const turn = b.queue.shift()!;
+        const abort = new AbortController();
+        // Cancelled as a whole while its rows were being written.
+        if (b.stopped) abort.abort();
+        const current = { opId: turn.opId, accountKey: turn.accountKey, abort, done: Promise.resolve() };
+        b.current = current;
+        current.done = this.turn(b, turn, abort, first);
+        await current.done;
+        b.current = null;
+      }
+    } finally {
+      await Promise.allSettled(b.pending);
+      if (this.batch === b) this.batch = null;
       this.deps.lock.release('export');
       this.deps.onActiveChange?.(false);
-    });
-    return { ok: true, opId };
+    }
+  }
+
+  /** One export of the batch: waits a request's gap after the one before, claims its row, runs. Never throws. */
+  private async turn(b: Batch, turn: Turn, abort: AbortController, first: boolean): Promise<void> {
+    try {
+      if (abort.signal.aborted) {
+        // Nothing sent for it: the first one's row says running already, the others' queued.
+        if (first) await patchOp(turn.opId, { status: 'cancelled', error: NOT_STARTED, phase: undefined, finishedAt: Date.now() });
+        else await cancelQueuedOp(turn.opId, NOT_STARTED);
+        return;
+      }
+      if (!first) {
+        // A new client starts without the previous one's pace: keep the gap between their requests.
+        const opts = { ...this.site.pacing, ...((await this.deps.clientOptions?.()) ?? {}) };
+        if (opts.intervalMs > 0) await (opts.sleep ?? abortableSleep)(opts.intervalMs, abort.signal).catch(() => {});
+        if (abort.signal.aborted) {
+          await cancelQueuedOp(turn.opId, NOT_STARTED);
+          return;
+        }
+      }
+      // Cancelled, or deleted (its account forgotten, the log cleared) while it waited: it doesn't run.
+      if (!(await claimQueuedOp(turn.opId))) return;
+      const row = await this.account(turn.accountKey);
+      if (!row) {
+        await patchOp(turn.opId, { status: 'failed', error: `This ${this.site.label} account isn't in Tithies any more. Nothing was changed.`, phase: undefined, finishedAt: Date.now() });
+        return;
+      }
+      await this.run(turn.opId, row, turn.exp, b.sourceAccountKey, b.items, turn.details, b.exporter, abort);
+    } catch (e) {
+      // run() reports its own failures: this is something unexpected around it.
+      await patchOp(turn.opId, { status: 'failed', error: describeSiteError(e), phase: undefined, finishedAt: Date.now() }).catch(() => {});
+    }
   }
 
   private async run(
     opId: number,
     row: AccountRow,
-    req: StartExportRequest,
+    exp: StartExportTarget,
+    sourceAccountKey: AccountKey | null,
     items: ExportItem[],
     details: ExportDetails,
     exporter: SiteExporter,
@@ -307,7 +548,7 @@ export class ExportJob {
     const { signal } = abort;
     const { label } = this.site;
     const name = accountLabel(row);
-    const target = req.target;
+    const target = exp.target;
     const transport = this.deps.createTransport({
       signal,
       onStatus: (message) => void patchOp(opId, { phase: message }).catch(() => {}),
@@ -322,7 +563,7 @@ export class ExportJob {
     const save = (p: Parameters<typeof patchOp>[1]) => patchOp(opId, { ...p, details }).catch(() => {});
     // One progress over the three steps: read the target, send the changes, check.
     const [BEFORE, WRITE, CHECK] = [0, 1, 2];
-    const est = req.estimate;
+    const est = exp.estimate;
     const tally = new StepTally([est?.before ?? 1, est?.write ?? 1, est?.check ?? 1]);
     const readProgress = (step: number, phase?: string) => (p: ReadProgress) =>
       void patchOp(opId, { ...(phase ? { phase } : {}), progress: { ...p, unit: 'page' }, overall: tally.report(step, p.done, p.total) }).catch(() => {});
@@ -343,7 +584,7 @@ export class ExportJob {
       });
       const saved = first.kind === 'collection' ? await this.savedCollection(row.key) : null;
       before = await this.readState(client, first, signal, readProgress(BEFORE), saved);
-      plan = planExport(target, items, before, { sourceAccountKey: req.sourceAccountKey, targetName: name, limits: exporter.limits });
+      plan = planExport(target, items, before, { sourceAccountKey, targetName: name, limits: exporter.limits });
       Object.assign(details, {
         targetLabel: plan.targetLabel,
         removed: plan.remove.entries,
@@ -356,7 +597,7 @@ export class ExportJob {
       tally.expect(CHECK, plan.requests.check);
       await save({ title: exportTitle(target, plan.add, plan.targetLabel), overall: tally.overall });
       if (plan.blocked) throw new ExportStop(plan.blocked);
-      if (plan.digest !== req.digest) throw new ExportStop(`${name}'s binders or collection changed since the preview, so nothing was changed. Open the preview again.`);
+      if (plan.digest !== exp.digest) throw new ExportStop(`${name}'s binders or collection changed since the preview, so nothing was changed. Open the preview again.`);
 
       const log = writeLogger(opId);
       let done = 0;

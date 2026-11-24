@@ -14,8 +14,11 @@ import type { AccountKey } from './types';
 export interface ForgetDeps {
   /** Cancels these runs, and resolves once the runner has stopped working on them. */
   stopRuns(runIds: number[]): Promise<void>;
-  /** The background jobs working for an account (sync and export, one of each per site). */
-  syncJobs: { readonly activeAccountKey: AccountKey | null; cancel(): boolean; readonly finished: Promise<void> }[];
+  /**
+   * The background jobs working for an account (sync and export, one of each per site). A job with
+   * `stopAccount` (the export: it may hold several accounts' exports) stops only that account's work.
+   */
+  syncJobs: { readonly activeAccountKey: AccountKey | null; cancel(): boolean; readonly finished: Promise<void>; stopAccount?(key: AccountKey): Promise<void> }[];
   removeStorage(keys: string[]): Promise<void>;
 }
 
@@ -23,6 +26,10 @@ export async function forgetAccount(key: AccountKey, deps: ForgetDeps): Promise<
   const data = accountData(key);
   await deps.stopRuns(await data.runs.activeIds());
   for (const job of deps.syncJobs) {
+    if (job.stopAccount) {
+      await job.stopAccount(key);
+      continue;
+    }
     if (job.activeAccountKey !== key) continue;
     const done = job.finished;
     job.cancel();
