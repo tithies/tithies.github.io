@@ -39,6 +39,7 @@ function NodeRow(p: RowProps) {
   const there = leaf ? (p.existing.get(name.trim().toLowerCase()) ?? null) : null;
   const size = node.copies + (there ?? 0);
   const tooBig = leaf && size > p.maxCards;
+  const badName = leaf && (name.trim().length < 2 || name.trim().length > 100);
   const pad = depth * 18;
   return (
     <>
@@ -84,9 +85,10 @@ function NodeRow(p: RowProps) {
         )}
       </Group>
       {leaf && (
-        <Text size="xs" c={tooBig ? 'red' : 'dimmed'} pl={pad + 28} pb={2}>
+        <Text size="xs" c={tooBig || badName ? 'red' : 'dimmed'} pl={pad + 28} pb={2}>
           Deck “{name}”{there != null ? ` · the deck already in the folder gets them (${plural(there, 'card')} now)` : ''}
           {tooBig ? ` · ${n(size)} cards: a deck holds at most ${n(p.maxCards)}` : ''}
+          {badName ? ` · a deck name has 2 to 100 characters (this one ${name.trim().length})` : ''}
         </Text>
       )}
       {node.split &&

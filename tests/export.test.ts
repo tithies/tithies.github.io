@@ -1041,6 +1041,10 @@ describe('Deck export plan', () => {
     // A deck of that name in that folder already: a second one would be made.
     expect(planExport(NEW_DECK, [item('Opt', 'xln', '65', 1)], dstate([summary({ folderId: 'fo1', folderPath: 'Collection' })]), dctx()).warnings[0].text).toMatch(/already has a deck named “Spare”/);
     expect(planExport({ ...NEW_DECK, folderId: 'gone' }, [item('Opt', 'xln', '65', 1)], dstate(), dctx()).blocked).toMatch(/folder isn't on alice/);
+    // Moxfield takes deck names of 2 to 100 characters.
+    expect(planExport({ ...NEW_DECK, name: 'x'.repeat(100) }, [item('Opt', 'xln', '65', 1)], dstate(), dctx()).blocked).toBeUndefined();
+    expect(planExport({ ...NEW_DECK, name: 'x'.repeat(101) }, [item('Opt', 'xln', '65', 1)], dstate(), dctx()).blocked).toBe('A deck name has 2 to 100 characters: this one has 101.');
+    expect(planExport({ ...NEW_DECK, name: ' x ' }, [item('Opt', 'xln', '65', 1)], dstate(), dctx()).blocked).toMatch(/this one has 1\./);
   });
 
   it('an existing deck: adds to its mainboard (its cards stay); a deck over 1,000 cards is refused', () => {
@@ -1093,7 +1097,17 @@ describe('Deck export plan', () => {
     const nf: ExportTarget = { accountKey: A_KEY, kind: 'newFolder', name: 'Final Fantasy: Rares', parentFolderId: null, visibility: 'private', grouping: { '': 'set' } };
     expect(planExport(nf, GROUPED, dstate(), dctx()).blocked).toMatch(/letters, numbers, spaces and hyphens/);
     expect(planExport({ ...nf, name: 'collection' }, GROUPED, dstate(), dctx()).blocked).toMatch(/already has a folder “collection”/);
+    // In a folder too deep: the full path, parents and "/" included, has at most 500 characters.
+    const deep: DeckFolder = { id: 'fo9', path: Array.from({ length: 5 }, () => 'a'.repeat(98)).join('/') };
+    const inDeep = (name: string) => planExport({ ...nf, name, parentFolderId: 'fo9' }, GROUPED, { ...dstate(), folders: [FOLDER, deep] }, dctx()).blocked;
+    expect(deep.path.length).toBe(494);
+    expect(inDeep('abcde')).toBeUndefined();
+    expect(inDeep('abcdef')).toMatch(/full path would have 501 characters/);
     expect(planExport({ ...nf, name: 'Spares' }, [item('Opt', 'xln', '65', 1)], dstate(), dctx()).blocked).toMatch(/set, rarity and color identity/);
+    // A name made of the groups' labels must fit as well.
+    const long = [gitem('Odd', 'zzz', '1', 1, { set: 'zzz', setName: 'L'.repeat(95), rarity: 'uncommon', colors: 'R' })];
+    expect(planExport({ ...nf, name: 'Spares', grouping: { '': 'set' } }, long, dstate(), dctx()).blocked).toBeUndefined();
+    expect(planExport({ ...nf, name: 'Spares', grouping: { '': 'set', 'set:zzz': 'rarity' } }, long, dstate(), dctx()).blocked).toMatch(/name of 106 characters: a deck name has 2 to 100\. Split that group another way/);
     const many = Array.from({ length: 101 }, (_, i) => gitem(`C${i}`, `s${i}`, '1', 1, { set: `s${i}`, setName: `Set ${i}`, rarity: 'rare', colors: 'R' }));
     expect(planExport({ ...nf, name: 'Spares' }, many, dstate(), dctx()).blocked).toMatch(/101 decks: at most 100/);
   });

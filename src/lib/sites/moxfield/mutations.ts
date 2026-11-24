@@ -24,10 +24,16 @@ export const MAX_ADD_QUANTITY = 10_000;
 export const MAX_DECK_ADD_QUANTITY = 99;
 /** Largest deck import text sent in one request (characters; a deck shows at most 1,000 cards). */
 export const MAX_DECK_TEXT = 200_000;
-/** Longest deck name Tithies sends. */
-export const MAX_DECK_NAME = 200;
-/** Longest folder path Tithies sends. */
-export const MAX_FOLDER_PATH = 200;
+/** A deck name's length, as Moxfield takes it ("Name must be between 2 and 100 characters.", HTTP 400, verified 2026-11-24). */
+export const MIN_DECK_NAME = 2;
+export const MAX_DECK_NAME = 100;
+/**
+ * A folder's own name has at most 100 characters, and its full path (its parents' names and the
+ * "/" between them included) at most 500: Moxfield refuses a folder deeper than that (seen by the
+ * user 2026-11-24).
+ */
+export const MAX_FOLDER_NAME = 100;
+export const MAX_FOLDER_PATH = 500;
 
 /**
  * One folder name: letters, numbers, spaces and hyphens, as Moxfield's own folder form accepts
@@ -35,12 +41,38 @@ export const MAX_FOLDER_PATH = 200;
  * path joins names with "/" (a folder in a folder).
  */
 export const FOLDER_NAME = /^[a-zA-Z0-9 -]+$/;
-export const validFolderPath = (path: string) => {
-  const t = path.trim();
-  return t.length > 0 && t.length <= MAX_FOLDER_PATH && t.split('/').every((seg) => seg.trim() !== '' && FOLDER_NAME.test(seg));
+
+const segmentsOf = (path: string) => path.split('/').map((seg) => seg.trim());
+
+/** Why Moxfield wouldn't take this folder path (null: it would). */
+export function folderPathProblem(path: string): string | null {
+  const segs = segmentsOf(path.trim());
+  const full = segs.join('/');
+  if (!full || segs.some((s) => !s)) return 'Give the folder a name.';
+  const bad = segs.find((s) => !FOLDER_NAME.test(s));
+  if (bad) return 'A Moxfield folder name can only have letters, numbers, spaces and hyphens.';
+  const long = segs.find((s) => s.length > MAX_FOLDER_NAME);
+  if (long) return `A Moxfield folder name has at most ${MAX_FOLDER_NAME} characters (this one has ${long.length}).`;
+  if (full.length > MAX_FOLDER_PATH) {
+    return `The folder's full path would have ${full.length} characters (its parent folders' names and the “/” between them included): Moxfield takes at most ${MAX_FOLDER_PATH}. Put it in a folder higher up, or give it a shorter name.`;
+  }
+  return null;
+}
+export const validFolderPath = (path: string) => folderPathProblem(path) === null;
+
+/** Why Moxfield wouldn't take a new folder `name` in `parent` (a full path; null: at the top), or null. */
+export function newFolderProblem(parent: string | null, name: string): string | null {
+  const n = name.trim();
+  if (!n) return 'Give the folder a name.';
+  // Its own name: no "/" (that would make folders in folders), as Moxfield's own form.
+  if (!FOLDER_NAME.test(n)) return 'A Moxfield folder name can only have letters, numbers, spaces and hyphens.';
+  return folderPathProblem(parent ? `${parent}/${n}` : n);
+}
+/** Deck names (trimmed): 2 to 100 characters, any text but control characters. */
+export const validDeckName = (name: string) => {
+  const t = name.trim();
+  return t.length >= MIN_DECK_NAME && t.length <= MAX_DECK_NAME && !/[\u0000-\u001f\u007f]/.test(t);
 };
-/** Deck names: any text but control characters. */
-const validDeckName = (name: string) => name.trim().length > 0 && name.length <= MAX_DECK_NAME && !/[\u0000-\u001f\u007f]/.test(name);
 const isVersion = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1e9;
 
 const VISIBILITIES: readonly BinderVisibility[] = ['private', 'unlisted', 'public'];
@@ -123,7 +155,7 @@ export function buildMoxMutation(raw: unknown): BuiltMutation | null {
       // Moxfield's own CREATE_FOLDER (2026-11-24): the full path as the name.
       const name = typeof m.name === 'string' ? m.name.trim() : '';
       if (!validFolderPath(name)) return null;
-      return { method: 'POST', url: `${MOX_API_ORIGIN}/v1/deck-folders`, json: { name: name.split('/').map((seg) => seg.trim()).join('/') } };
+      return { method: 'POST', url: `${MOX_API_ORIGIN}/v1/deck-folders`, json: { name: segmentsOf(name).join('/') } };
     }
     case 'createDeck': {
       // Moxfield's own CREATE_DECK (2026-11-24), with only what a plain deck needs.

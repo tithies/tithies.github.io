@@ -91,6 +91,8 @@ export interface TargetFormProps {
   facts: CardFactsState;
   /** Most cards a deck holds. */
   maxDeckCards: number;
+  /** Why the site wouldn't take a new folder `name` in `parent` (null: it would). */
+  newFolderProblem?: (parent: string | null, name: string) => string | null;
   onChange: (patch: Partial<TargetDraft>) => void;
   onRemove: () => void;
 }
@@ -101,6 +103,10 @@ function FolderChoice({ p }: { p: TargetFormProps }) {
   const folder = folders?.find((f) => f.id === d.folderId) ?? null;
   const parent = folders?.find((f) => f.id === d.parentFolderId) ?? null;
   const path = d.newFolder ? (parent ? `${parent.path}/${d.folderName.trim()}` : d.folderName.trim()) : (folder?.path ?? '');
+  // A full path the site wouldn't take (a name's letters, its length, or the folder too deep): said under the name.
+  const pathProblem = d.newFolder && d.folderName.trim() ? (p.newFolderProblem?.(parent?.path ?? null, d.folderName) ?? null) : null;
+  // A folder with no room left for another one inside (its path at the site's limit) can't be picked.
+  const parentOptions = folderOptions(folders ?? []).map((o) => ({ ...o, disabled: !!p.newFolderProblem?.(o.label, 'x') }));
   // The decks already in an existing folder, by name: a group of that name adds to it.
   const existing = useMemo(() => {
     const m = new Map<string, number>();
@@ -123,13 +129,13 @@ function FolderChoice({ p }: { p: TargetFormProps }) {
             value={d.folderName}
             onChange={(e) => p.onChange({ folderName: e.currentTarget.value })}
             maxLength={100}
-            error={d.folderName.trim() && !/^[a-zA-Z0-9 -]+$/.test(d.folderName.trim()) ? 'Only letters, numbers, spaces and hyphens' : undefined}
+            error={pathProblem ?? undefined}
           />
           <Select
             label="In the folder"
             description="Optional"
             placeholder={folders ? 'At the top' : 'Reading the folders…'}
-            data={folderOptions(folders ?? [])}
+            data={parentOptions}
             value={d.parentFolderId}
             onChange={(v) => p.onChange({ parentFolderId: v })}
             clearable
@@ -198,7 +204,13 @@ function DeckChoice({ p }: { p: TargetFormProps }) {
       {d.newDeck ? (
         <>
           <Group grow align="flex-start">
-            <TextInput label="Deck name" value={d.deckName} onChange={(e) => p.onChange({ deckName: e.currentTarget.value })} maxLength={200} />
+            <TextInput
+              label="Deck name"
+              value={d.deckName}
+              onChange={(e) => p.onChange({ deckName: e.currentTarget.value })}
+              maxLength={100}
+              error={d.deckName.trim().length === 1 ? 'At least 2 characters' : undefined}
+            />
             <Select label="Visibility" data={VISIBILITY} value={d.visibility} onChange={(v) => v && p.onChange({ visibility: v as BinderVisibility })} allowDeselect={false} />
           </Group>
           <Select

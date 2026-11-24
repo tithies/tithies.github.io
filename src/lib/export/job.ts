@@ -159,6 +159,7 @@ export function cleanTarget(t: unknown): ExportTarget | null {
   const folder = x.kind === 'newDeck' ? x.folderId : x.kind === 'newFolder' ? x.parentFolderId : null;
   if (folder !== null && folder !== undefined && !id(folder)) return null;
   if (x.kind === 'newDeck') {
+    // The name as typed (a bound only: the plan refuses a name the site wouldn't take, and says why).
     const name = typeof x.name === 'string' && x.name.length <= 200 && x.name.trim() !== '' ? x.name : null;
     return name && visibility ? { accountKey, kind: 'newDeck', name, visibility, folderId: (folder as string | null | undefined) ?? null } : null;
   }

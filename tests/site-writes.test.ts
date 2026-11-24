@@ -4,7 +4,7 @@ import { CancelledError, SiteClient, SiteError, SiteRateLimitError, SiteUnknownO
 import { runMoxRequest } from '@/lib/sites/moxfield/api';
 import { MOX_PACING } from '@/lib/sites/moxfield/constants';
 import { MOX_CSV_HEADER, toMoxCsv } from '@/lib/sites/moxfield/csv';
-import { binderFromAnswer, buildMoxMutation, describeMoxMutation, MAX_BULK_REMOVE, normalizeBinderList } from '@/lib/sites/moxfield/mutations';
+import { binderFromAnswer, buildMoxMutation, describeMoxMutation, MAX_BULK_REMOVE, newFolderProblem, normalizeBinderList } from '@/lib/sites/moxfield/mutations';
 import { MoxPageSession } from '@/lib/sites/moxfield/page-api';
 import { moxfieldSite } from '@/lib/sites/moxfield/provider';
 import { TabTransport } from '@/lib/sites/tab-transport';
@@ -384,12 +384,33 @@ describe('Moxfield deck writes', () => {
     expect(describeMoxMutation(IMPORT_DECK)).toMatchObject({ headers: { 'x-deck-version': '7' } });
   });
 
+  it('takes folder names of up to 100 characters, and full paths of up to 500 (the "/" included)', () => {
+    const seg = (c: string, len: number) => c.repeat(len);
+    // Five folders of 99 characters: 5 × 99 + 4 "/" = 499.
+    const deep = Array.from({ length: 5 }, (_, i) => seg(String(i), 99)).join('/');
+    expect(deep.length).toBe(499);
+    expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: deep })).not.toBeNull();
+    expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: `${deep}x` })).not.toBeNull();
+    expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: `${deep}/x` })).toBeNull();
+    expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: seg('a', 101) })).toBeNull();
+    // A new folder in a deep one: the user's case, 4 × 100 + 4 "/" + 95 = 499 leaves room for nothing more.
+    const parent = Array.from({ length: 4 }, () => seg('a', 100)).join('/') + '/' + seg('b', 95);
+    expect(newFolderProblem(parent, 'c')).toMatch(/full path would have 501 characters .*at most 500/);
+    expect(newFolderProblem(parent.slice(0, -2), 'c')).toBeNull();
+    expect(newFolderProblem(null, 'Sets/Rares')).toBe('A Moxfield folder name can only have letters, numbers, spaces and hyphens.');
+    expect(newFolderProblem(null, seg('a', 101))).toMatch(/at most 100 characters \(this one has 101\)/);
+    expect(newFolderProblem(null, '  ')).toBe('Give the folder a name.');
+  });
+
   it('refuses malformed deck writes', () => {
     const bad: unknown[] = [
       { site: 'moxfield', op: 'createDeckFolder', name: 'Final Fantasy: Rare' },
       { site: 'moxfield', op: 'createDeckFolder', name: 'A//B' },
       { site: 'moxfield', op: 'createDeckFolder', name: '  ' },
       { site: 'moxfield', op: 'createDeck', name: '', visibility: 'private', importText: '' },
+      // Moxfield takes 2 to 100 characters (HTTP 400 "Name must be between 2 and 100 characters.").
+      { site: 'moxfield', op: 'createDeck', name: ' D ', visibility: 'private', importText: '' },
+      { site: 'moxfield', op: 'createDeck', name: 'x'.repeat(101), visibility: 'private', importText: '' },
       { site: 'moxfield', op: 'createDeck', name: 'x', visibility: 'secret', importText: '' },
       { site: 'moxfield', op: 'createDeck', name: 'x\ny', visibility: 'private', importText: '' },
       { site: 'moxfield', op: 'createDeck', name: 'x', visibility: 'private', importText: 'x'.repeat(300_000) },
@@ -414,7 +435,7 @@ describe('Moxfield deck writes', () => {
     expect(
       await runMoxRequest({ kind: 'mutate', op: { site: 'moxfield', op: 'createDeckFolder', name: 'By set' } }, reply('{"id":"rng9V","name":"By set"}')),
     ).toMatchObject({ ok: true, folder: { id: 'rng9V', path: 'By set' } });
-    const create: SiteMutation = { site: 'moxfield', op: 'createDeck', name: 'D', visibility: 'private', importText: '' };
+    const create: SiteMutation = { site: 'moxfield', op: 'createDeck', name: 'Deck', visibility: 'private', importText: '' };
     expect(await runMoxRequest({ kind: 'mutate', op: create }, reply('{"isSuccessful":true,"publicId":"newDeckPublicId","errors":[]}'))).toMatchObject({
       ok: true,
       deck: { publicId: 'newDeckPublicId' },
@@ -426,6 +447,13 @@ describe('Moxfield deck writes', () => {
     const add: SiteMutation = { site: 'moxfield', op: 'addDeckCard', deckId: 'dk1', publicId: 'p', version: 1, cardId: 'c', quantity: 1, finish: 'nonFoil' };
     expect(await runMoxRequest({ kind: 'mutate', op: add }, async () => new Response('{"card":{}}', { status: 200, headers: { 'x-deck-version': '2' } }))).toMatchObject({ ok: true, deck: { version: 2 } });
     expect(await runMoxRequest({ kind: 'mutate', op: add }, reply('{"card":{}}'))).toMatchObject({ ok: true, deck: {} });
+    // A refusal says Moxfield's reasons.
+    expect(await runMoxRequest({ kind: 'mutate', op: create }, async () => answer(400, '{"name":["Name must be between 2 and 100 characters."]}'))).toMatchObject({
+      ok: false,
+      status: 400,
+      message: 'Moxfield answered HTTP 400: Name must be between 2 and 100 characters.',
+    });
+    expect(buildMoxMutation({ ...create, name: 'x'.repeat(100) })).not.toBeNull();
     // An import's row errors are kept.
     expect(await runMoxRequest({ kind: 'mutate', op: IMPORT_DECK }, reply('{"isSuccessful":true,"errors":["Unknown card"]}'))).toMatchObject({ imported: { errors: ['Unknown card'] } });
   });

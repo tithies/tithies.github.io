@@ -308,6 +308,7 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
                     folders={d.accountKey ? (latestDecks(states[d.accountKey])?.folders ?? null) : null}
                     facts={facts}
                     maxDeckCards={exporter?.limits.deck?.maxCards ?? 1000}
+                    newFolderProblem={exporter?.limits.deck?.newFolder}
                     readError={(d.accountKey && errors[d.accountKey]) || null}
                     onRetry={() => d.accountKey && void doRead(d.accountKey, needsDecks(d) ? { kind: 'decks' } : { kind: 'binders' }, null)}
                     readingTarget={readingDraft === d.id ? reading!.read : null}

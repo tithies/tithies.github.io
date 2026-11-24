@@ -6,7 +6,7 @@ import type { SiteMutation } from '@/lib/sites/types';
 import { MOX_LANGUAGE_NAMES, toMoxCsv } from './csv';
 import { isEnglish, langOf } from '@/lib/cards/languages';
 import { MOX_ENGLISH_ID, MOX_LANGUAGES } from './languages';
-import { MAX_BULK_REMOVE, MAX_DECK_ADD_QUANTITY, validFolderPath } from './mutations';
+import { MAX_BULK_REMOVE, MAX_DECK_ADD_QUANTITY, MAX_DECK_NAME, MIN_DECK_NAME, newFolderProblem } from './mutations';
 
 /** Rows per CSV import (kept small: one failed import loses little). */
 export const IMPORT_ROWS = 500;
@@ -54,7 +54,8 @@ export const moxfieldExporter: SiteExporter = {
       maxAddQty: MAX_DECK_ADD_QUANTITY,
       importLines: DECK_IMPORT_LINES,
       oneByOne: addsOneByOne,
-      folderName: { test: validFolderPath, text: 'A Moxfield folder name can only have letters, numbers, spaces and hyphens.' },
+      newFolder: newFolderProblem,
+      nameLength: { min: MIN_DECK_NAME, max: MAX_DECK_NAME },
     },
   },
   decks: {

@@ -124,6 +124,14 @@ const parse = (text: string): unknown => {
   }
 };
 
+/** Moxfield's reasons for a refused write, when it gives them (`{"name":["Name must be between 2 and 100 characters."]}`). */
+export function refusalReasons(text: string): string {
+  const r = parse(text);
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return '';
+  const out = Object.values(r as Record<string, unknown>).flatMap((v) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []));
+  return out.slice(0, 3).map((m) => m.slice(0, 200)).join(' ');
+}
+
 const clip = (s: string) => (s.length > MAX_LOGGED_RESPONSE ? `${s.slice(0, MAX_LOGGED_RESPONSE)}… (${s.length} characters)` : s);
 
 /**
@@ -147,7 +155,10 @@ async function runMoxWrite(op: unknown, doFetch: (url: string, init?: WriteInit)
   }
   const response = clip(text);
   if (res.status === 401 || res.status === 403) return { ...siteFail(res.status, 'no_auth', 'Moxfield refused the change: log in to Moxfield, or reload the Moxfield tab.'), response };
-  if (!res.ok) return { ...siteFail(res.status, 'http', `Moxfield answered HTTP ${res.status}${res.status === 429 ? ' (rate limited)' : ''}`), response };
+  if (!res.ok) {
+    const why = res.status >= 400 && res.status < 500 ? refusalReasons(text) : '';
+    return { ...siteFail(res.status, 'http', `Moxfield answered HTTP ${res.status}${res.status === 429 ? ' (rate limited)' : ''}${why ? `: ${why}` : ''}`), response };
+  }
   const kind = (op as { op?: unknown }).op;
   if (kind === 'createBinder') {
     let binder = null;

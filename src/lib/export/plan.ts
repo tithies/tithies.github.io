@@ -46,8 +46,10 @@ export interface PlanLimits {
     maxAddQty: number;
     importLines: number;
     oneByOne: (item: ExportItem) => boolean;
-    /** The site's rule for a folder's names (a full path, "/"-separated), and what to say when one breaks it. */
-    folderName?: { test: (path: string) => boolean; text: string };
+    /** Why the site wouldn't take a new folder `name` in `parent` (a full "/"-separated path; null: at the top), or null when it would. */
+    newFolder?: (parent: string | null, name: string) => string | null;
+    /** Shortest and longest deck name the site takes. */
+    nameLength?: { min: number; max: number };
   };
 }
 
@@ -333,6 +335,9 @@ function planDeckExport(target: DeckTarget, rawItems: readonly ExportItem[], sta
       const f = target.folderId ? (folders.find((x) => x.id === target.folderId) ?? null) : null;
       targetLabel = `the new deck “${name}”`;
       if (!name) blocked ??= 'Give the new deck a name.';
+      else if (lim?.nameLength && (name.length < lim.nameLength.min || name.length > lim.nameLength.max)) {
+        blocked ??= `A deck name has ${lim.nameLength.min} to ${lim.nameLength.max} characters: this one has ${name.length}.`;
+      }
       if (target.folderId && !f) blocked ??= `This folder isn't on ${who} any more: read the account again.`;
       if (f) folder = { id: f.id, path: f.path, create: false };
       const same = decks.some((d) => (d.folderId ?? null) === (target.folderId ?? null) && sameName(d.name, name));
@@ -355,7 +360,10 @@ function planDeckExport(target: DeckTarget, rawItems: readonly ExportItem[], sta
       const path = parent ? `${parent.path}/${name}` : name;
       targetLabel = `the new folder “${path}”`;
       if (!name) blocked ??= 'Give the new folder a name.';
-      else if (lim?.folderName && !lim.folderName.test(path)) blocked ??= lim.folderName.text;
+      else {
+        const problem = lim?.newFolder?.(parent?.path ?? null, name);
+        if (problem) blocked ??= problem;
+      }
       if (target.parentFolderId && !parent) blocked ??= `The folder to put it in isn't on ${who} any more: read the account again.`;
       const exists = folders.some((f) => sameName(f.path, path));
       if (exists) blocked ??= `${who} already has a folder “${path}”: pick it as an existing folder instead.`;
@@ -388,6 +396,10 @@ function planDeckExport(target: DeckTarget, rawItems: readonly ExportItem[], sta
     blocked ??= "Tithies needs each card's set, rarity and color identity (read from Scryfall) to split the cards into decks: wait for them, or try again.";
   }
   if (groups.length > MAX_FOLDER_DECKS) blocked ??= `That would make ${n(groups.length)} decks: at most ${MAX_FOLDER_DECKS} in one export. Split the cards into fewer groups.`;
+  // The names a folder export makes up (its groups' labels) must fit too.
+  const len = lim?.nameLength;
+  const badName = isFolder && len ? groups.find((g) => g.name.trim().length < len.min || g.name.trim().length > len.max) : undefined;
+  if (badName) blocked ??= `The deck “${badName.name}” would have a name of ${badName.name.trim().length} characters: a deck name has ${len!.min} to ${len!.max}. Split that group another way.`;
 
   const deckPlans: DeckPlan[] = groups.map((g) => {
     const dItems = mergeForDeck(g.items, oneByOne);
