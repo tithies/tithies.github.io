@@ -26,7 +26,7 @@ export function useUpdateState(): UpdateCheckState | null {
 }
 
 /**
- * Menu: when Tithies last looked for a new version, with a refresh icon; a click looks now.
+ * Bottom of the menu: when Tithies last looked for a new version, with a refresh icon; a click looks now.
  * It also runs the automatic check (every CHECK_EVERY_MS while a dashboard page is open); the
  * banner (UpdateBanner) shows what it finds.
  */
@@ -72,6 +72,7 @@ export function UpdateCheckButton() {
           ? `Tithies ${newer.version} available`
           : `Update checked ${when}`;
   const host = new URL(RELEASE_PAGE_URL).host;
+  const tone = failed ? 'var(--mantine-color-orange-4)' : newer ? 'var(--mantine-color-blue-4)' : 'rgba(255, 255, 255, 0.6)';
 
   return (
     <Tooltip
@@ -98,17 +99,18 @@ export function UpdateCheckButton() {
     >
       <Button
         variant="subtle"
-        color={failed ? 'orange' : newer ? 'blue' : 'gray'}
         size="sm"
         px="xs"
         fw={400}
         fullWidth
         justify="space-between"
+        // Over the menu art's black bottom: light text in both themes, like the links above it (.ti-nav-on-art).
+        vars={() => ({ root: { '--button-color': tone, '--button-hover': 'rgba(255, 255, 255, 0.1)' } })}
         onClick={() => void checkNow()}
         rightSection={<IconRefresh size={16} className={checking ? 'ti-spin' : undefined} />}
         aria-label={`${label}. Check for updates now`}
       >
-        <Text span size="xs" c={failed ? 'orange' : newer ? 'blue' : 'dimmed'}>
+        <Text span size="xs">
           {label}
         </Text>
       </Button>

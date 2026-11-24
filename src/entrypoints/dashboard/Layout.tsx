@@ -57,13 +57,11 @@ export function Layout() {
                 <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Close the menu" />
               </Group>
             </Group>
-            <Stack gap={6}>
+            <Stack gap={6} mb="md">
               <AccountSelector />
               <InitialSyncButton />
               <ActivityButton />
-              <UpdateCheckButton />
             </Stack>
-            <Divider my="sm" />
           </AppShell.Section>
           <AppShell.Section grow>
             {/* A section is a heading (small, bold, uppercase, with its icon) over its links; a line separates sections. */}
@@ -106,6 +104,7 @@ export function Layout() {
               active={pathname === '/settings'}
               className="ti-nav-on-art"
             />
+            <UpdateCheckButton />
           </AppShell.Section>
         </AppShell.Navbar>
         <AppShell.Main>
