@@ -1102,7 +1102,7 @@ describe('Deck export plan', () => {
     const inDeep = (name: string) => planExport({ ...nf, name, parentFolderId: 'fo9' }, GROUPED, { ...dstate(), folders: [FOLDER, deep] }, dctx()).blocked;
     expect(deep.path.length).toBe(494);
     expect(inDeep('abcde')).toBeUndefined();
-    expect(inDeep('abcdef')).toMatch(/full path would have 501 characters/);
+    expect(inDeep('abcdef')).toMatch(/at most 500 characters .* This one would have 501/);
     expect(planExport({ ...nf, name: 'Spares' }, [item('Opt', 'xln', '65', 1)], dstate(), dctx()).blocked).toMatch(/set, rarity and color identity/);
     // A name made of the groups' labels must fit as well.
     const long = [gitem('Odd', 'zzz', '1', 1, { set: 'zzz', setName: 'L'.repeat(95), rarity: 'uncommon', colors: 'R' })];

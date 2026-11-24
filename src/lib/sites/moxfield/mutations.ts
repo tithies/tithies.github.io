@@ -43,16 +43,16 @@ export const FOLDER_NAME = /^[a-zA-Z0-9 -]+$/;
 
 const segmentsOf = (path: string) => path.split('/').map((seg) => seg.trim());
 
+/** Moxfield's two rules for a folder name, said together whichever one is broken. */
+export const FOLDER_RULES = `A Moxfield folder name can only have letters, numbers, spaces and hyphens, and at most ${MAX_FOLDER_PATH} characters with the folders it is in (their names and the “/” between them count).`;
+
 /** Why Moxfield wouldn't take this folder path (null: it would). */
 export function folderPathProblem(path: string): string | null {
   const segs = segmentsOf(path.trim());
   const full = segs.join('/');
   if (!full || segs.some((s) => !s)) return 'Give the folder a name.';
-  const bad = segs.find((s) => !FOLDER_NAME.test(s));
-  if (bad) return 'A Moxfield folder name can only have letters, numbers, spaces and hyphens.';
-  if (full.length > MAX_FOLDER_PATH) {
-    return `The folder's full path would have ${full.length} characters (its parent folders' names and the “/” between them included): Moxfield takes at most ${MAX_FOLDER_PATH}. Put it in a folder higher up, or give it a shorter name.`;
-  }
+  if (segs.some((s) => !FOLDER_NAME.test(s))) return FOLDER_RULES;
+  if (full.length > MAX_FOLDER_PATH) return `${FOLDER_RULES} This one would have ${full.length}: shorten it, or put it in a folder higher up.`;
   return null;
 }
 export const validFolderPath = (path: string) => folderPathProblem(path) === null;
@@ -62,7 +62,7 @@ export function newFolderProblem(parent: string | null, name: string): string | 
   const n = name.trim();
   if (!n) return 'Give the folder a name.';
   // Its own name: no "/" (that would make folders in folders), as Moxfield's own form.
-  if (!FOLDER_NAME.test(n)) return 'A Moxfield folder name can only have letters, numbers, spaces and hyphens.';
+  if (!FOLDER_NAME.test(n)) return FOLDER_RULES;
   return folderPathProblem(parent ? `${parent}/${n}` : n);
 }
 /** Deck names (trimmed): 2 to 100 characters, any text but control characters. */

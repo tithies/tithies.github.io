@@ -125,7 +125,7 @@ function FolderChoice({ p }: { p: TargetFormProps }) {
         <Group grow align="flex-start">
           <TextInput
             label="Folder name"
-            description="Letters, numbers, spaces and hyphens"
+            description={`Letters, numbers, spaces and hyphens; at most 500 characters with the folders it is in (now ${path.length})`}
             value={d.folderName}
             onChange={(e) => p.onChange({ folderName: e.currentTarget.value })}
             maxLength={500}

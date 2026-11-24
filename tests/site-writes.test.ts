@@ -397,11 +397,13 @@ describe('Moxfield deck writes', () => {
     expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: seg('a', 501) })).toBeNull();
     // A new folder in a deep one: the user's case, 4 × 100 + 4 "/" + 95 = 499 leaves room for nothing more.
     const parent = Array.from({ length: 4 }, () => seg('a', 100)).join('/') + '/' + seg('b', 95);
-    expect(newFolderProblem(parent, 'c')).toMatch(/full path would have 501 characters .*at most 500/);
+    expect(newFolderProblem(parent, 'c')).toMatch(/letters, numbers, spaces and hyphens, and at most 500 characters .* This one would have 501: shorten it/);
     expect(newFolderProblem(parent.slice(0, -2), 'c')).toBeNull();
-    expect(newFolderProblem(null, 'Sets/Rares')).toBe('A Moxfield folder name can only have letters, numbers, spaces and hyphens.');
+    expect(newFolderProblem(null, 'Sets/Rares')).toBe(
+      'A Moxfield folder name can only have letters, numbers, spaces and hyphens, and at most 500 characters with the folders it is in (their names and the “/” between them count).',
+    );
     expect(newFolderProblem(null, seg('a', 500))).toBeNull();
-    expect(newFolderProblem(null, seg('a', 501))).toMatch(/full path would have 501 characters/);
+    expect(newFolderProblem(null, seg('a', 501))).toMatch(/This one would have 501/);
     expect(newFolderProblem(null, '  ')).toBe('Give the folder a name.');
   });
 
