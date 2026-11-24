@@ -1,5 +1,5 @@
 import { useReducedMotion } from '@mantine/hooks';
-import { type PointerEvent, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { buildSkyline, createFireScene, type FireScene } from './menu-art-scene';
 
 const CITY_FAR = buildSkyline(7, 668, 18, 80, 7, 18);
@@ -11,8 +11,8 @@ const HEAD = 'translate(290 262) rotate(12) scale(1.18) translate(-290 -262)';
  * The fire mage art at the bottom of the menu, painted live: two still SVG layers (the dusk sky
  * and city, then the figure on its cliff) with the moving fire drawn on canvases around them (see
  * menu-art-scene.ts). A light follows the pointer over it, and a click stokes the fireball. It
- * sits under the menu's links, which take their own hover and clicks first (see dashboard.css):
- * over a link the light fades out. With reduced motion it is a still image.
+ * sits under the menu's links: the pointer and clicks reach it through them too, and the links
+ * still work. With reduced motion it is a still image.
  */
 export function MenuArt() {
   const reduceMotion = useReducedMotion(false, { getInitialValueInEffect: false });
@@ -63,24 +63,47 @@ export function MenuArt() {
     };
   }, [reduceMotion]);
 
-  const point = (event: PointerEvent<HTMLDivElement>) => {
-    const box = event.currentTarget.getBoundingClientRect();
-    sceneRef.current?.point(((event.clientX - box.left) / box.width) * 600, ((event.clientY - box.top) / box.height) * 800);
-  };
-
-  const stoke = () => {
-    sceneRef.current?.stoke();
-    backdropRef.current?.animate([{ filter: 'brightness(1.55) saturate(1.2)' }, { filter: 'none' }], { duration: 900, easing: 'ease-out' });
-  };
+  // The menu's links and buttons lie over the art: the pointer and clicks reach it through them as
+  // well (they still do their own thing). So the whole menu is listened to, in the capture phase
+  // (a child that stops an event can't hide it), and an event counts where it lands on the art.
+  useEffect(() => {
+    if (reduceMotion) return;
+    const stage = stageRef.current!;
+    const menu = stage.parentElement!;
+    /** Where the event is in the art's view box, or null when it isn't over the art. */
+    const at = (event: MouseEvent) => {
+      const box = stage.getBoundingClientRect();
+      const x = (event.clientX - box.left) / box.width;
+      const y = (event.clientY - box.top) / box.height;
+      return x >= 0 && x <= 1 && y >= 0 && y <= 1 ? { x: x * 600, y: y * 800 } : null;
+    };
+    const move = (event: PointerEvent) => {
+      const p = at(event);
+      if (p) sceneRef.current?.point(p.x, p.y);
+      else sceneRef.current?.unpoint();
+    };
+    const leave = () => sceneRef.current?.unpoint();
+    const click = (event: MouseEvent) => {
+      // Not a link opened with the keyboard (a click with no pointer).
+      if (event.detail === 0 || !at(event)) return;
+      sceneRef.current?.stoke();
+      backdropRef.current?.animate([{ filter: 'brightness(1.55) saturate(1.2)' }, { filter: 'none' }], { duration: 900, easing: 'ease-out' });
+    };
+    menu.addEventListener('pointermove', move, { capture: true, passive: true });
+    menu.addEventListener('pointerleave', leave);
+    menu.addEventListener('click', click, { capture: true });
+    return () => {
+      menu.removeEventListener('pointermove', move, { capture: true });
+      menu.removeEventListener('pointerleave', leave);
+      menu.removeEventListener('click', click, { capture: true });
+    };
+  }, [reduceMotion]);
 
   return (
     <div
       ref={stageRef}
       className="ti-menu-art"
       data-interactive={!reduceMotion || undefined}
-      onClick={reduceMotion ? undefined : stoke}
-      onPointerMove={reduceMotion ? undefined : point}
-      onPointerLeave={reduceMotion ? undefined : () => sceneRef.current?.unpoint()}
       aria-hidden
     >
       <svg ref={backdropRef} className="ti-menu-art-layer" viewBox="0 0 600 800">
