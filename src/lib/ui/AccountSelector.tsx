@@ -54,8 +54,7 @@ export function AccountSelector() {
           size="sm"
           fullWidth
           justify="space-between"
-          className="ti-account-well"
-          // A dark band sunk into the menu, no border, taller than a button (its inner shadows: dashboard.css).
+          // A band across the menu, darker than it (--ti-well), no border, taller than a button.
           vars={() => ({
             root: {
               '--button-bg': 'var(--ti-well)',

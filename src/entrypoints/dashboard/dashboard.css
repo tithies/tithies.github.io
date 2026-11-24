@@ -6,10 +6,9 @@
   --ti-navbar-shadow: 1px 0 10px rgba(16, 24, 40, 0.04);
   --ti-card-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 14px rgba(16, 24, 40, 0.05);
   --ti-art-opacity: 0.1;
-  /* The account selector's band across the top of the menu, sunk into it (see .ti-account-well). */
-  --ti-well: #dfe2e6;
-  --ti-well-hover: #d6dade;
-  --ti-well-shadow: rgba(16, 24, 40, 0.22);
+  /* The account selector's band across the top of the menu (see AccountSelector). */
+  --ti-well: #eceef1;
+  --ti-well-hover: #e4e7eb;
   /* Opacity of every surface in the page content (see "Glass" below)… */
   --ti-glass: 70%;
   /* …and of what floats over it: dialogs, drawers, popovers, menus, dropdowns, tooltips. */
@@ -33,7 +32,6 @@
   --ti-art-opacity: 0.16;
   --ti-well: #0a0b0d;
   --ti-well-hover: #0e1013;
-  --ti-well-shadow: #000;
   --ti-row-stripe: rgba(255, 255, 255, 0.03);
   --ti-row-hover: rgba(255, 255, 255, 0.065);
 }
@@ -104,14 +102,6 @@ body {
 }
 .mantine-AppShell-navbar > .mantine-AppShell-section :is(a, button, input, select, textarea, label, [tabindex]) {
   pointer-events: auto;
-}
-/* The account selector: a band across the menu's whole width, darker than the menu, with inner
-   shadows on its top and bottom edges only (not its sides), so it looks sunk into the menu. Its
-   background, height and padding are Mantine variables, set in AccountSelector. */
-.mantine-AppShell-navbar .ti-account-well {
-  box-shadow:
-    inset 0 10px 10px -7px var(--ti-well-shadow),
-    inset 0 -10px 10px -7px var(--ti-well-shadow);
 }
 /* Menu links drawn over the art's black bottom: white text in both themes, and hover/active
    backgrounds that stay dark enough for it (Mantine's light-theme ones are pale). */
