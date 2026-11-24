@@ -62,7 +62,7 @@ function deckOptions(decks: readonly DeckSummary[]) {
 export interface TargetFormProps {
   site: SiteProvider;
   draft: TargetDraft;
-  /** Its number in the list (1-based), and how many targets there are (several: framed, removable). */
+  /** Its number in the list (1-based), and how many targets there are (several: numbered, removable). */
   number: number;
   count: number;
   accounts: AccountRow[];
@@ -251,7 +251,7 @@ export function TargetForm(p: TargetFormProps) {
   const account = accounts.find((a) => a.key === d.accountKey) ?? null;
   const name = account ? accountLabel(account) : '';
   const same = !!d.accountKey && d.accountKey === sourceAccountKey && !p.sameNoted;
-  const framed = p.count > 1;
+  const several = p.count > 1;
   // Five kinds don't fit side by side on a phone.
   const orientation = useMatches<'vertical' | 'horizontal'>({ base: 'vertical', sm: 'horizontal' });
   const body: ReactNode = (
@@ -370,19 +370,21 @@ export function TargetForm(p: TargetFormProps) {
       )}
     </Stack>
   );
-  if (!framed) return body;
+  // Framed even when it is the only one: adding a target then adds a frame like it.
   return (
     <Paper withBorder p="sm" radius="md">
       <Stack gap="xs">
-        <Group justify="space-between">
+        <Group justify="space-between" mih={28}>
           <Text fw={600} size="sm">
-            Target {p.number}
+            {several ? `Target ${p.number}` : 'Target'}
           </Text>
-          <Tooltip label="Remove this target">
-            <ActionIcon variant="subtle" color="gray" onClick={p.onRemove} disabled={p.busy} aria-label={`Remove target ${p.number}`}>
-              <IconX size={16} />
-            </ActionIcon>
-          </Tooltip>
+          {several && (
+            <Tooltip label="Remove this target">
+              <ActionIcon variant="subtle" color="gray" onClick={p.onRemove} disabled={p.busy} aria-label={`Remove target ${p.number}`}>
+                <IconX size={16} />
+              </ActionIcon>
+            </Tooltip>
+          )}
         </Group>
         {body}
       </Stack>
