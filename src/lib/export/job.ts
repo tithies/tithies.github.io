@@ -168,7 +168,7 @@ export function cleanTarget(t: unknown): ExportTarget | null {
     const grouping = cleanGrouping(x.grouping);
     if (!grouping || !visibility) return null;
     if (x.kind === 'folder') return id(x.folderId) ? { accountKey, kind: 'folder', folderId: x.folderId, visibility, grouping } : null;
-    const name = typeof x.name === 'string' && x.name.length <= 100 && x.name.trim() !== '' ? x.name : null;
+    const name = typeof x.name === 'string' && x.name.length <= 500 && x.name.trim() !== '' ? x.name : null;
     return name ? { accountKey, kind: 'newFolder', name, parentFolderId: (folder as string | null | undefined) ?? null, visibility, grouping } : null;
   }
   return null;

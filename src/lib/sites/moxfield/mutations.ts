@@ -28,11 +28,10 @@ export const MAX_DECK_TEXT = 200_000;
 export const MIN_DECK_NAME = 2;
 export const MAX_DECK_NAME = 100;
 /**
- * A folder's own name has at most 100 characters, and its full path (its parents' names and the
- * "/" between them included) at most 500: Moxfield refuses a folder deeper than that (seen by the
- * user 2026-11-24).
+ * A folder's full path (its parents' names and the "/" between them included) has at most 500
+ * characters: Moxfield refuses a folder deeper than that (seen by the user 2026-11-24). Its own
+ * name has no other limit.
  */
-export const MAX_FOLDER_NAME = 100;
 export const MAX_FOLDER_PATH = 500;
 
 /**
@@ -51,8 +50,6 @@ export function folderPathProblem(path: string): string | null {
   if (!full || segs.some((s) => !s)) return 'Give the folder a name.';
   const bad = segs.find((s) => !FOLDER_NAME.test(s));
   if (bad) return 'A Moxfield folder name can only have letters, numbers, spaces and hyphens.';
-  const long = segs.find((s) => s.length > MAX_FOLDER_NAME);
-  if (long) return `A Moxfield folder name has at most ${MAX_FOLDER_NAME} characters (this one has ${long.length}).`;
   if (full.length > MAX_FOLDER_PATH) {
     return `The folder's full path would have ${full.length} characters (its parent folders' names and the “/” between them included): Moxfield takes at most ${MAX_FOLDER_PATH}. Put it in a folder higher up, or give it a shorter name.`;
   }

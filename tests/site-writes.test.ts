@@ -384,7 +384,7 @@ describe('Moxfield deck writes', () => {
     expect(describeMoxMutation(IMPORT_DECK)).toMatchObject({ headers: { 'x-deck-version': '7' } });
   });
 
-  it('takes folder names of up to 100 characters, and full paths of up to 500 (the "/" included)', () => {
+  it('takes folder paths of up to 500 characters, the "/" included', () => {
     const seg = (c: string, len: number) => c.repeat(len);
     // Five folders of 99 characters: 5 × 99 + 4 "/" = 499.
     const deep = Array.from({ length: 5 }, (_, i) => seg(String(i), 99)).join('/');
@@ -392,13 +392,16 @@ describe('Moxfield deck writes', () => {
     expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: deep })).not.toBeNull();
     expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: `${deep}x` })).not.toBeNull();
     expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: `${deep}/x` })).toBeNull();
-    expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: seg('a', 101) })).toBeNull();
+    // One name alone can be as long as the whole path.
+    expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: seg('a', 500) })).not.toBeNull();
+    expect(buildMoxMutation({ site: 'moxfield', op: 'createDeckFolder', name: seg('a', 501) })).toBeNull();
     // A new folder in a deep one: the user's case, 4 × 100 + 4 "/" + 95 = 499 leaves room for nothing more.
     const parent = Array.from({ length: 4 }, () => seg('a', 100)).join('/') + '/' + seg('b', 95);
     expect(newFolderProblem(parent, 'c')).toMatch(/full path would have 501 characters .*at most 500/);
     expect(newFolderProblem(parent.slice(0, -2), 'c')).toBeNull();
     expect(newFolderProblem(null, 'Sets/Rares')).toBe('A Moxfield folder name can only have letters, numbers, spaces and hyphens.');
-    expect(newFolderProblem(null, seg('a', 101))).toMatch(/at most 100 characters \(this one has 101\)/);
+    expect(newFolderProblem(null, seg('a', 500))).toBeNull();
+    expect(newFolderProblem(null, seg('a', 501))).toMatch(/full path would have 501 characters/);
     expect(newFolderProblem(null, '  ')).toBe('Give the folder a name.');
   });
 

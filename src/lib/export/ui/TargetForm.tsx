@@ -128,7 +128,7 @@ function FolderChoice({ p }: { p: TargetFormProps }) {
             description="Letters, numbers, spaces and hyphens"
             value={d.folderName}
             onChange={(e) => p.onChange({ folderName: e.currentTarget.value })}
-            maxLength={100}
+            maxLength={500}
             error={pathProblem ?? undefined}
           />
           <Select
