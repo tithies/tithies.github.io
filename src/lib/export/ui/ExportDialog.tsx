@@ -266,7 +266,8 @@ export function ExportDialog({ opened, onClose, site, items, sourceAccountKey, s
         </Group>
       }
     >
-      <Stepper active={step} size="sm" allowNextStepsSelect={false} onStepClick={(s) => step < 3 && s < step && setStep(s)}>
+      {/* Room under the modal's sticky header: without it the header covers the top of the step icons. */}
+      <Stepper active={step} size="sm" pt={6} allowNextStepsSelect={false} onStepClick={(s) => step < 3 && s < step && setStep(s)}>
         <Stepper.Step label={several ? 'Targets' : 'Target'} description="Where the cards go">
           <Stack mt="md">
             {!accounts.length ? (
