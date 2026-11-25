@@ -167,6 +167,14 @@ body {
 :is(.mantine-AppShell-main, [data-portal]) :is(.mantine-Button-root, .mantine-ActionIcon-root):is(:disabled, [data-disabled]):not([data-loading]) {
   background-color: color-mix(in srgb, var(--mantine-color-disabled) var(--ti-glass), transparent);
 }
+/* Light theme: coloured fills (filled, Mantine's default, and light variants) stay opaque. Over
+   the pale page a see-through blue washes out and looks disabled; white and outlined ones keep
+   the glass. */
+[data-mantine-color-scheme='light']
+  :is(.mantine-AppShell-main, [data-portal])
+  :is(.mantine-Button-root, .mantine-ActionIcon-root, .mantine-Badge-root, .mantine-ThemeIcon-root):is(:not([data-variant]), [data-variant='filled'], [data-variant='light']) {
+  --ti-glass: 100%;
+}
 
 /* Inputs, checkboxes, switches, segmented controls, progress bars, pills, pagination, tree,
    dropdown options, close buttons. */
