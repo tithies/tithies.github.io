@@ -7,7 +7,7 @@ import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
 import { AccountSelector } from '@/lib/ui/AccountSelector';
 import { ActivityButton } from '@/lib/ui/ActivityButton';
 import { InitialSyncButton, InitialSyncProvider } from '@/lib/ui/InitialSync';
-import { UpdateBanner } from '@/lib/ui/UpdateBanner';
+import { UpdateMenuButton, UpdateToast } from '@/lib/ui/UpdateNotice';
 import { UpdateCheckButton } from '@/lib/ui/UpdateCheck';
 import iconUrl from '@/assets/tithies-icon.webp';
 import { MenuArt } from './MenuArt';
@@ -62,6 +62,8 @@ export function Layout() {
               <Box mx="-xs">
                 <AccountSelector />
               </Box>
+              {/* While a newer Tithies is published: its download, and how to update. */}
+              <UpdateMenuButton />
               <InitialSyncButton />
               <ActivityButton />
             </Stack>
@@ -117,7 +119,8 @@ export function Layout() {
             <img src={iconUrl} width={28} height={28} alt="" />
             <Title order={4}>Tithies</Title>
           </Group>
-          <UpdateBanner />
+          {/* A newer Tithies: a toast floating at the top, until closed. */}
+          <UpdateToast />
           {/* Every page remounts when the account changes: no state of one account survives into another's view. */}
           {!loading && <Outlet key={accountKey ?? 'none'} />}
         </AppShell.Main>

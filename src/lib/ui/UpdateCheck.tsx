@@ -28,7 +28,7 @@ export function useUpdateState(): UpdateCheckState | null {
 /**
  * Bottom of the menu: when Tithies last looked for a new version, with a refresh icon; a click looks now.
  * It also runs the automatic check (every CHECK_EVERY_MS while a dashboard page is open); the
- * banner (UpdateBanner) shows what it finds.
+ * toast and the button under the account selector (UpdateNotice) show what it finds.
  */
 export function UpdateCheckButton() {
   const current = browser.runtime.getManifest().version;
