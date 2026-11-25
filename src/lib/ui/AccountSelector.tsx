@@ -54,11 +54,13 @@ export function AccountSelector() {
           size="sm"
           fullWidth
           justify="space-between"
-          // A band across the menu, darker than it (--ti-well), no border, taller than a button.
+          // A dark crimson band across the menu, no border, taller than a button (its shadows: dashboard.css).
+          className="ti-account-band"
           vars={() => ({
             root: {
-              '--button-bg': 'var(--ti-well)',
-              '--button-hover': 'var(--ti-well-hover)',
+              '--button-bg': 'var(--ti-band)',
+              '--button-hover': 'var(--ti-band-hover)',
+              '--button-color': 'var(--mantine-color-white)',
               '--button-bd': 'none',
               '--button-radius': '0',
               '--button-height': '52px',
@@ -77,7 +79,7 @@ export function AccountSelector() {
               {liveKeys.has(account.key) && <LiveDot label={liveLabel(account)} />}
             </Group>
           ) : (
-            <Text size="sm" c="dimmed">
+            <Text size="sm" opacity={0.75}>
               No account yet
             </Text>
           )}
