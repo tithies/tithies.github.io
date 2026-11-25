@@ -1,5 +1,9 @@
 remove "only my prints" from hugging face, scanner-trainer project and extension project. From now on, we only train models for all prints. Let the possibility to use it though but only at dev time with "build here (my prints)". Also rework the UI to add a button that would open a side panel only at dev time. It will contains the "engine and mode" selector, "what cards are named against" and also some options are probably not user friendly like detector threshold etc... Basically move everything that's not user friendly there. I don't think user would tweak those complicated configurations. When visiting the page, we should display a loading that scanner is initializing. Model should auto start. In settings, have a section dedicated for the scanner. Remove "find cards with" option, we only use trained detector now.
 
+in light mode, blue buttons are not colorful enough, so it feels like they are disabled.
+
+when checking for new update and there is one, display a floating toast at the top instead of inside the content 
+
 Your steps:
 1. Push the trainer repo. The Tithies push can wait, since it's a release.
 2. On the PC:
