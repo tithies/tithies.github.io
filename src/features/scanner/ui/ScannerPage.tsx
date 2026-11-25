@@ -154,7 +154,7 @@ export function ScannerPage() {
           const source: ModelSource = pub ? 'published' : tuned ? 'dropped' : 'dino';
           setModelSource(source);
           setRecognizer(source === 'dino' ? 'dino' : 'tuned');
-          await loadDetectorFor(engine, source, inst);
+          await loadDetectorFor(engine, source);
           if (source === 'published' && !cancelled) await loadModel('published');
         })().catch((e: Error) => setError(`The saved models didn't load: ${e.message}`));
         // Prototype tuning from the console: await scannerEngine.call({ type: 'bench', ep: 'webgpu', opt: 'all', runs: 5 })
@@ -313,12 +313,17 @@ export function ScannerPage() {
     }
   }, []);
 
-  /** The detector of a model source: the published one, else the one dropped on the page (DINOv2 has none of its own). */
-  const loadDetectorFor = async (engine: ScannerEngine, source: ModelSource, inst: Installed | null) => {
-    const bytes = source === 'published' && inst ? await readFile(inst.manifest.files.detector) : await cachedDetector();
+  /**
+   * The detector of a model source: the published one, else the one dropped on the page (DINOv2 has none of its own).
+   * The published files are read from the stored install: right after a download, the page's `installed` is not
+   * updated yet (it would give no detector, or after a model update the old one, already removed).
+   */
+  const loadDetectorFor = async (engine: ScannerEngine, source: ModelSource) => {
+    const pub = source === 'published' ? ((await installedFiles()) ?? null) : null;
+    const bytes = pub ? await readFile(pub.manifest.files.detector) : source === 'published' ? null : await cachedDetector();
     if (!bytes) return setDetector(null);
     const r = await engine.call({ type: 'loadDetector', bytes }, [bytes]);
-    setDetector({ ...r, from: source === 'published' ? `published ${inst?.manifest.version}` : 'dropped file' });
+    setDetector({ ...r, from: pub ? `published ${pub.manifest.version}` : 'dropped file' });
     setDetectMethod('model');
   };
 
@@ -329,7 +334,8 @@ export function ScannerPage() {
       let key = MODEL_KEY;
       let sha: string | null = null;
       if (which === 'published') {
-        const inst = installedRef.current ?? (await installedFiles());
+        // The stored install, as for the detector (loadDetectorFor).
+        const inst = await installedFiles();
         const pub = inst ? await readFile(inst.manifest.files.recognizer) : null;
         if (!inst || !pub) throw new Error('The published recognition model is not downloaded');
         bytes = pub;
@@ -362,7 +368,7 @@ export function ScannerPage() {
     setRecognizer(which === 'dino' ? 'dino' : 'tuned');
     if (!engine) return;
     try {
-      await loadDetectorFor(engine, which, installedRef.current);
+      await loadDetectorFor(engine, which);
     } catch (e) {
       setError((e as Error).message);
     }
