@@ -54,8 +54,7 @@ export function AccountSelector() {
           size="sm"
           fullWidth
           justify="space-between"
-          // A dark crimson band across the menu, no border, taller than a button (its shadows: dashboard.css).
-          className="ti-account-band"
+          // A dark crimson band across the menu (--ti-band), no border, taller than a button.
           vars={() => ({
             root: {
               '--button-bg': 'var(--ti-band)',
@@ -63,7 +62,7 @@ export function AccountSelector() {
               '--button-color': 'var(--mantine-color-white)',
               '--button-bd': 'none',
               '--button-radius': '0',
-              '--button-height': '52px',
+              '--button-height': '44px',
               '--button-padding-x': '22px',
             },
           })}
