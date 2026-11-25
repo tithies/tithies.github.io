@@ -18,7 +18,7 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, in or
 
 **Goal:** recognize any card, not only the owned ones. The Scanner is for adding cards to the collection, so mostly cards that aren't in it yet.
 
-**Status (2026-11-25): published.** The v2 index of 2026-11-24 is on Hugging Face (104,896 pictures, int8-384). Against every print, 98.0 % names and 76.4 % prints (`SCANNER_DEV.md` section 1). No v3: the lost prints are same-art reprints, phase 3's job. Left: steps 5 and 6 below (the page against the real files; the first daily run).
+**Status (2026-11-25): published.** The v2 index of 2026-11-24 is on Hugging Face (104,896 pictures, int8-384). Against every print, 98.0 % names and 76.4 % prints (`SCANNER_DEV.md` section 1). No v3: the lost prints are same-art reprints, phase 3's job. Step 5 is done (the page downloads the files, gives `evaluate`'s numbers, opens in 8 s). Left: step 6, the first daily run that publishes. The first one (2026-11-24) failed at the upload because the job got no `HF_TOKEN`, and opened issue #1.
 - **Decided with the user:**
   - Hugging Face hosts the files (`tithies/card-scanner`, under a `tithies` account with a neutral e-mail);
   - the index carries the print list;

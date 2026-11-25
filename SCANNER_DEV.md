@@ -53,6 +53,8 @@
 | Name right | 98.5 % (196) | **98.0 % (195)** | 98.5 % (196) |
 | Print right | 96.5 % (192) | **76.4 % (152)** | 96.5 % (192) |
 
+- **On the page** (2026-11-25, in Chrome, downloaded from Hugging Face): exactly `evaluate --index` on the published index, photo for photo. The right print is in the top 5 for 98 % of the cards.
+- **Download and opening:** the first download (181 MB) took 9.5 s; after that the page is ready 7.7–8.0 s after a reload (the full index opens in 2.1–2.7 s, alongside the models).
 - **Formats:** int8-384 gives exactly the f32 numbers; int8-256 loses 4 prints, f16 nothing.
 - **The wrong prints are same-art reprints:**
   - 28 have the same artwork and the same frame (The List, Commander and Jumpstart reprints): only the set symbol and the bottom line differ;
