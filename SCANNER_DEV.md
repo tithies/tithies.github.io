@@ -45,7 +45,22 @@
   - 12 extra shapes, all orange (0.46–0.59).
 - **Training photos:** the weak spots (fans, offset stacks, binder pages from further away, piles, sleeves at an angle) are mostly training photos now, so the test set measures them little.
 
-**Every print** (phase 1, built 2026-11-23; not measured against every print yet, see `SCANNER_PLAN.md`):
+**Against every print** (phase 1; v2 index of 2026-11-24 on Hugging Face: 104,896 pictures, int8-384, 40.7 MB plus 4.8 MB of prints):
+
+| On the 33 test photos (199 cards) | Owned collection | Every print | Only my prints |
+|---|---|---|---|
+| Found | 99.5 % | 99.5 % | 99.5 % |
+| Name right | 98.5 % (196) | **98.0 % (195)** | 98.5 % (196) |
+| Print right | 96.5 % (192) | **76.4 % (152)** | 96.5 % (192) |
+
+- **Formats:** int8-384 gives exactly the f32 numbers; int8-256 loses 4 prints, f16 nothing.
+- **The wrong prints are same-art reprints:**
+  - 28 have the same artwork and the same frame (The List, Commander and Jumpstart reprints): only the set symbol and the bottom line differ;
+  - 15 more have the same artwork with a small difference, almost always a promo stamp; one is a real frame difference (M11 against CMR);
+  - 3 are wrong names.
+  - The right print is usually second, a few hundredths behind. Retraining can't fix most of these: the bottom line can (phase 3).
+
+**Every print, technical checks** (2026-11-23):
 - **Same numbers as the trainer:** with an index of the owned collection (int8, 384 dimensions), the page's results on the 33 test photos equal `evaluate v2 --format i8-384`, photo for photo. Against the collection, every format holds the same scores; the best scores move by at most 0.0013 in int8-384 and 0.016 at 128 dimensions.
 - **Search** (a card is 2 searches: upright and turned): 105,000 rows on WebGPU take 34 ms for 4 cards, 45 ms for 8 and 124 ms for 16, against 1.3 s for 4 cards on the CPU in Chrome.
 - **Opening:** the page is ready 7–9 s after a reload, models started and index open (small index).
