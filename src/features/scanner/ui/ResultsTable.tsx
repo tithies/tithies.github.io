@@ -1,5 +1,5 @@
 import { Table, Text } from '@mantine/core';
-import { ALL_METHODS } from '../models';
+import { SHOWN_METHODS } from '../models';
 import type { Labels } from '../labels';
 import { HEIGHT_BUCKETS, heightBucket, scorePhotos, type ScoredPhoto } from '../score';
 
@@ -32,7 +32,7 @@ export function ResultsTable({ photos, labels }: { photos: ScoredPhoto[]; labels
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>
-        {ALL_METHODS.map((m) => {
+        {SHOWN_METHODS.filter((m) => labelled.some((p) => p.detections.some((d) => d.byModel[m.id]))).map((m) => {
           const s = scorePhotos(labelled, labels, m.id);
           return (
             <Table.Tr key={m.id}>

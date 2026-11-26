@@ -25,6 +25,13 @@ export interface ManifestFile {
 export const ROLES = ['detector', 'recognizer', 'index', 'prints'] as const;
 export type FileRole = (typeof ROLES)[number];
 
+/** The OCR files (phase 3), optional: the detector, Latin recognizer and dictionaries come with the other files;
+ * the other scripts' recognizers are downloaded on first need. */
+export const OCR_EAGER = ['ocrDet', 'ocrLatin', 'ocrDicts'] as const;
+export const OCR_LAZY = ['ocrMain', 'ocrKorean', 'ocrCyrillic'] as const;
+export type OcrRole = (typeof OCR_EAGER)[number] | (typeof OCR_LAZY)[number];
+export type AnyRole = FileRole | OcrRole;
+
 export interface Manifest {
   format: number;
   version: string;
@@ -35,7 +42,7 @@ export interface Manifest {
   gallery: string;
   count: number;
   index: { kind: string; dims: number; modelDims: number; method: string };
-  files: Record<FileRole, ManifestFile>;
+  files: Record<FileRole, ManifestFile> & Partial<Record<OcrRole, ManifestFile>>;
 }
 
 /** The files installed on this browser. */
@@ -62,7 +69,8 @@ export function parseManifest(text: string): Manifest {
     typeof m.version === 'string' &&
     typeof m.count === 'number' &&
     m.index?.method === 'dino-pad-cls' &&
-    ROLES.every((r) => typeof m.files?.[r]?.path === 'string' && /^[0-9a-f]{64}$/.test(m.files[r].sha256) && typeof m.files[r].bytes === 'number');
+    ROLES.every((r) => typeof m.files?.[r]?.path === 'string' && /^[0-9a-f]{64}$/.test(m.files[r].sha256) && typeof m.files[r].bytes === 'number') &&
+    [...OCR_EAGER, ...OCR_LAZY].every((r) => !m.files[r] || (typeof m.files[r]!.path === 'string' && /^[0-9a-f]{64}$/.test(m.files[r]!.sha256)));
   if (!ok) throw new Error('Not a Scanner manifest (or one this Tithies can\'t read)');
   return m;
 }
@@ -122,13 +130,21 @@ export function indexOnlyUpdate(installed: Installed | null | undefined, latest:
   if (!installed || !m || !latest?.commit || latest.commit === installed.commit) return false;
   const a = installed.manifest.files;
   const b = m.files;
-  return a.detector.sha256 === b.detector.sha256 && a.recognizer.sha256 === b.recognizer.sha256 && (a.index.sha256 !== b.index.sha256 || a.prints.sha256 !== b.prints.sha256);
+  // Same models; another index, prints or OCR file (small: downloaded by itself).
+  const others = (f: Manifest['files']) => JSON.stringify(Object.entries(f).filter(([k]) => k !== 'detector' && k !== 'recognizer').map(([k, v]) => [k, v?.sha256]).sort());
+  return a.detector.sha256 === b.detector.sha256 && a.recognizer.sha256 === b.recognizer.sha256 && others(a) !== others(b);
 }
 
-/** The manifest's files this browser doesn't have yet. */
-export async function missingFiles(manifest: Manifest, roles: readonly FileRole[] = ROLES): Promise<FileRole[]> {
-  const out: FileRole[] = [];
-  for (const r of roles) if (!(await cached(manifest.files[r].sha256))) out.push(r);
+/** The roles a manifest's first download fetches: the four files, and the eager OCR files it lists. */
+export const eagerRoles = (m: Manifest): AnyRole[] => [...ROLES, ...OCR_EAGER.filter((r) => m.files[r])];
+
+/** The manifest's files this browser doesn't have yet (among `roles`; those it lists). */
+export async function missingFiles(manifest: Manifest, roles: readonly AnyRole[] = eagerRoles(manifest)): Promise<AnyRole[]> {
+  const out: AnyRole[] = [];
+  for (const r of roles) {
+    const f = manifest.files[r];
+    if (f && !(await cached(f.sha256))) out.push(r);
+  }
   return out;
 }
 
@@ -145,7 +161,7 @@ async function store(f: ManifestFile, bytes: ArrayBuffer, what: string) {
 
 /** Removes the stored files the installed manifest doesn't list. */
 async function prune(manifest: Manifest) {
-  const keep = new Set(ROLES.map((r) => fileKey(manifest.files[r].sha256)));
+  const keep = new Set(Object.values(manifest.files).flatMap((f) => (f ? [fileKey(f.sha256)] : [])));
   const cache = await caches.open(MODEL_CACHE);
   for (const req of await cache.keys()) if (req.url.startsWith(KEY_PREFIX) && !keep.has(req.url)) await cache.delete(req);
 }
@@ -163,10 +179,10 @@ export async function downloadPublished(
 ): Promise<void> {
   const fetchFn = opts.fetchFn ?? fetch;
   const todo = await missingFiles(manifest);
-  const total = todo.reduce((s, r) => s + manifest.files[r].bytes, 0);
+  const total = todo.reduce((s, r) => s + manifest.files[r]!.bytes, 0);
   let done = 0;
   for (const role of todo) {
-    const f = manifest.files[role];
+    const f = manifest.files[role]!;
     const res = await fetchFn(fileUrl(commit, f.path), { signal: opts.signal });
     if (!res.ok || !res.body) throw new Error(`Downloading ${f.path} failed: HTTP ${res.status}`);
     const bytes = new Uint8Array(f.bytes);
@@ -179,11 +195,25 @@ export async function downloadPublished(
       bytes.set(value, o);
       o += value.length;
       done += value.length;
-      opts.onProgress?.(done, total, role);
+      opts.onProgress?.(done, total, role as FileRole);
     }
     await store(f, bytes.buffer.slice(0, o), f.path);
   }
   await install(manifest, commit);
+}
+
+/** A file of the installed manifest: from storage, else downloaded now at the install's commit (the lazy OCR files). */
+export async function ensureFile(installed: Installed, role: AnyRole, fetchFn: typeof fetch = fetch): Promise<ArrayBuffer> {
+  const f = installed.manifest.files[role];
+  if (!f) throw new Error(`The installed Scanner files have no ${role}`);
+  const have = await readFile(f);
+  if (have) return have;
+  if (!installed.commit) throw new Error(`${f.path} is not stored (files dropped on the page: drop it too)`);
+  const res = await fetchFn(fileUrl(installed.commit, f.path));
+  if (!res.ok) throw new Error(`Downloading ${f.path} failed: HTTP ${res.status}`);
+  const bytes = await res.arrayBuffer();
+  await store(f, bytes, f.path);
+  return bytes;
 }
 
 /**
@@ -195,8 +225,9 @@ export async function installDropped(files: readonly File[]): Promise<Manifest |
   if (!mf) return null;
   const manifest = parseManifest(await mf.text());
   const bySize = (f: ManifestFile) => files.filter((x) => x.size === f.bytes);
-  for (const role of ROLES) {
+  for (const role of [...ROLES, ...OCR_EAGER, ...OCR_LAZY] as AnyRole[]) {
     const f = manifest.files[role];
+    if (!f) continue;
     const name = f.path.split('/').pop()!;
     const candidates = [...files.filter((x) => x.name === name), ...bySize(f)];
     let stored = await cached(f.sha256);
@@ -220,6 +251,6 @@ export async function measurePublished(): Promise<number> {
   const inst = await installedFiles();
   if (!inst) return 0;
   let bytes = 0;
-  for (const r of ROLES) if (await cached(inst.manifest.files[r].sha256)) bytes += inst.manifest.files[r].bytes;
+  for (const f of Object.values(inst.manifest.files)) if (f && (await cached(f.sha256))) bytes += f.bytes;
   return bytes;
 }

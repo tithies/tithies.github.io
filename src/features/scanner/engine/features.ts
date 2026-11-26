@@ -90,12 +90,12 @@ export async function loadModel(bytes: ArrayBuffer): Promise<'webgpu' | 'wasm'> 
 }
 
 /** Flattens the card under `quad` from the full photo into 488 × 680 RGBA. */
-export function warpCard(cv: CV, full: Mat, quad: Quad): Mat {
+export function warpCard(cv: CV, full: Mat, quad: Quad, W = CARD_W, H = CARD_H): Mat {
   const { h } = quadSize(quad);
   // Large cards: warp at up to 2× the target, then shrink with area averaging (sharper, no aliasing).
-  const k = Math.min(2, Math.max(1, h / CARD_H));
-  const ww = Math.round(CARD_W * k);
-  const hh = Math.round(CARD_H * k);
+  const k = Math.min(2, Math.max(1, h / H));
+  const ww = Math.round(W * k);
+  const hh = Math.round(H * k);
   const src = cv.matFromArray(4, 1, cv.CV_32FC2, quad.flatMap((p) => [p.x, p.y]));
   const dst = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, ww, 0, ww, hh, 0, hh]);
   const m = cv.getPerspectiveTransform(src, dst);
@@ -104,7 +104,7 @@ export function warpCard(cv: CV, full: Mat, quad: Quad): Mat {
     cv.warpPerspective(full, warped, m, new cv.Size(ww, hh), cv.INTER_LINEAR, cv.BORDER_REPLICATE);
     if (k === 1) return warped.clone();
     const out = new cv.Mat();
-    cv.resize(warped, out, new cv.Size(CARD_W, CARD_H), 0, 0, cv.INTER_AREA);
+    cv.resize(warped, out, new cv.Size(W, H), 0, 0, cv.INTER_AREA);
     return out;
   } finally {
     free(src, dst, m, warped);

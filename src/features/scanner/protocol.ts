@@ -70,6 +70,18 @@ export interface CardFeatures {
   turned: Features;
 }
 
+/** The OCR models (engine/text.ts): the text detector and the recognizers. */
+export type TextModelName = 'det' | 'latin' | 'main' | 'korean' | 'cyrillic';
+
+/** A line of text on a card cut-out: its centre height, left edge and height as shares of the card. */
+export interface TextLineRead {
+  y: number;
+  x: number;
+  h: number;
+  text: string;
+  conf: number;
+}
+
 export type EngineRequest =
   | { type: 'init'; ortWasm: ArrayBuffer }
   | { type: 'loadModel'; bytes: ArrayBuffer }
@@ -80,6 +92,16 @@ export type EngineRequest =
   | { type: 'cardFeatures'; photoId: string; quads: Quad[] }
   | { type: 'imageFeatures'; bitmaps: ImageBitmap[] }
   | { type: 'releasePhoto'; photoId: string }
+  /** An OCR model; a recognizer comes with its characters (its inference.yml's). */
+  | { type: 'loadTextModel'; name: TextModelName; bytes: ArrayBuffer; chars?: string[] }
+  /** A card's 672 × 936 cut-out from a loaded photo, kept in the engine for readText and checkPrint. */
+  | { type: 'cardDetail'; photoId: string; detailId: string; quad: Quad }
+  /** The cut-out's text lines: found and read with `model` the first time; `lines` reads those again with another model. */
+  | { type: 'readText'; detailId: string; model: Exclude<TextModelName, 'det'>; lines?: number[] }
+  /** Which of the candidates' pictures (same art) the cut-out is (engine/print-visual.ts). */
+  | { type: 'checkPrint'; detailId: string; pictures: ImageBitmap[] }
+  /** Frees a cut-out (all of them without an id). */
+  | { type: 'releaseDetail'; detailId?: string }
   /** Prototype tuning, from the console: times the model with other session options. */
   | { type: 'bench'; ep: 'webgpu' | 'wasm'; opt: 'disabled' | 'basic' | 'extended' | 'all'; runs: number; gpuOutputs?: boolean; batch?: number };
 
@@ -92,6 +114,11 @@ export interface EngineResults {
   cardFeatures: { cards: CardFeatures[]; ms: number };
   imageFeatures: { features: Features[]; ms: number };
   releasePhoto: null;
+  loadTextModel: { backend: 'webgpu' | 'wasm'; ms: number };
+  cardDetail: { ms: number };
+  readText: { lines: TextLineRead[]; ms: number };
+  checkPrint: { winner: number | null; margin: number; pairs: number[][]; ms: number };
+  releaseDetail: null;
   bench: { create: number; runs: number[]; reads: number[] };
 }
 

@@ -6,7 +6,8 @@ import { accountLabel } from '@/lib/accounts/types';
 import { downloadText } from '@/lib/ui/download';
 import { ScannerEngine } from '../engine-client';
 import { cacheDetector, cachedDetector, cachedRecognizer, cacheRecognizer, isModelCached, loadModelFile } from '../model-cache';
-import { ALL_METHODS, DINO_FILE } from '../models';
+import { DINO_FILE, SHOWN_METHODS } from '../models';
+import { TextModels } from '../scanner-check';
 import { confidence, disposePhoto, nameQuads, photoToJson, refNamer, scanPhoto, type Namer, type Recognizer, type ScannedPhoto } from '../pipeline';
 import { openPrintIndex, printIndexNamer, setOwnedOnly, type PrintIndex } from '../print-index';
 import { checkLatest, downloadPublished, indexOnlyUpdate, installDropped, installedFiles, missingFiles, readFile, sha256Hex, type Installed, type LatestCheck } from '../published';
@@ -130,6 +131,9 @@ export function ScannerPage() {
   // Off by default: the edge map of every scanned photo takes ~12 MB (many photos when labelling).
   const [debug, setDebug] = useState(false);
   const [cleanup, setCleanup] = useState(true);
+  /** Phase 3 (every-print index, with the OCR files installed): the print among same-art reprints, the language. */
+  const [checkPrints, setCheckPrints] = useState(true);
+  const [readLanguage, setReadLanguage] = useState(true);
   const [showEdges, setShowEdges] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
   const [minHeightPx, setMinHeightPx] = useState<number>(0);
@@ -256,6 +260,9 @@ export function ScannerPage() {
   }, [matchAgainst, printIndex, indexFits, index]);
   const namerRef = useRef(namer);
   namerRef.current = namer;
+  // The OCR models of the installed files, loaded into the engine on first use (a new install, new models).
+  const textModels = useMemo(() => (info && engineRef.current && installed ? new TextModels(engineRef.current, installed) : null), [info, installed]);
+  const canCheck = !!(textModels?.available && namer && printIndex && indexFits && matchAgainst !== 'built');
   // How long the page took to be ready to scan (models started, index open).
   useEffect(() => {
     if (readyIn === null && backend && detector && (!installed || printIndex)) setReadyIn(performance.now() - openedAt.current);
@@ -429,8 +436,14 @@ export function ScannerPage() {
         for (const [i, p] of list.entries()) {
           setBusy({ label: `Scanning ${p.file.name} (${i + 1} of ${list.length})…` });
           try {
-            const scan = await scanPhoto(engine, p.file, namer, { scale: Number(scale), maxSide, debug, method: detectMethod, modelThreshold, cleanup }, (done, total) =>
-              setBusy({ label: `Scanning ${p.file.name} (${i + 1} of ${list.length}): card ${done} of ${total}…`, progress: (100 * done) / total }),
+            const check = canCheck && (checkPrints || readLanguage) ? { models: textModels!, prints: checkPrints, language: readLanguage } : null;
+            const scan = await scanPhoto(
+              engine,
+              p.file,
+              namer,
+              { scale: Number(scale), maxSide, debug, method: detectMethod, modelThreshold, cleanup, check },
+              (done, total) => setBusy({ label: `Scanning ${p.file.name} (${i + 1} of ${list.length}): card ${done} of ${total}…`, progress: (100 * done) / total }),
+              (done, total) => setBusy({ label: `Checking ${p.file.name} (${i + 1} of ${list.length}): card ${done} of ${total}…`, progress: (100 * done) / total }),
             );
             setPhotos((ps) =>
               ps.map((x) => {
@@ -445,7 +458,7 @@ export function ScannerPage() {
         }
       });
     },
-    [namer, scale, maxSide, debug, detectMethod, modelThreshold, recognizer, cleanup, run],
+    [namer, scale, maxSide, debug, detectMethod, modelThreshold, recognizer, cleanup, run, canCheck, checkPrints, readLanguage, textModels],
   );
 
   const addFiles = async (files: File[]) => {
@@ -920,6 +933,22 @@ export function ScannerPage() {
             <NumberInput size="xs" w={170} label="Warn below (card px tall)" value={minHeightPx} onChange={(v) => setMinHeightPx(Number(v) || 0)} min={0} step={50} />
             <Checkbox size="xs" label="Keep debug layers" checked={debug} onChange={(e) => setDebug(e.currentTarget.checked)} />
             <Checkbox size="xs" label="Drop bad shapes" checked={cleanup} onChange={(e) => setCleanup(e.currentTarget.checked)} title="Once named: an outline around neighbours, or a second outline of one card (see Rejected shapes)" />
+            <Checkbox
+              size="xs"
+              label="Check prints"
+              checked={checkPrints}
+              disabled={!canCheck}
+              onChange={(e) => setCheckPrints(e.currentTarget.checked)}
+              title={canCheck ? 'Among same-art reprints: the bottom line read, then the pictures compared' : 'Needs the every-print index with its OCR files'}
+            />
+            <Checkbox
+              size="xs"
+              label="Read language"
+              checked={readLanguage}
+              disabled={!canCheck}
+              onChange={(e) => setReadLanguage(e.currentTarget.checked)}
+              title={canCheck ? "From the card's own text (type line, rules text, script, bottom line, name)" : 'Needs the every-print index with its OCR files'}
+            />
             <Button size="xs" variant="default" disabled={!ready || !photos.length || !!busy} onClick={() => void scanAll(photos)}>
               Scan all again
             </Button>
@@ -981,7 +1010,7 @@ export function ScannerPage() {
                   ]}
                 />
               </Stack>
-              <Select size="xs" w={240} label="Method shown" value={method} onChange={(v) => v && setMethod(v)} data={ALL_METHODS.map((m) => ({ value: m.id, label: m.label }))} />
+              <Select size="xs" w={240} label="Method shown" value={method} onChange={(v) => v && setMethod(v)} data={SHOWN_METHODS.map((m) => ({ value: m.id, label: m.label }))} />
               <Checkbox size="xs" label="Edges" checked={showEdges} onChange={(e) => setShowEdges(e.currentTarget.checked)} />
               <Checkbox size="xs" label="Rejected shapes" checked={showRejected} onChange={(e) => setShowRejected(e.currentTarget.checked)} />
               {!hasTruth && !!scanned.length && (

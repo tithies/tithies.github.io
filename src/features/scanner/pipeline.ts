@@ -11,6 +11,7 @@ import { nameMargin, type Hit } from './match';
 import { ALL_METHODS } from './models';
 import type { CardFeatures, CardSource, DetectOptions, RejectedShape } from './protocol';
 import type { PrintInfo } from './reference';
+import { CHECK_METHOD, CHECKED_METHOD, checkCard, type CardCheck, type TextModels } from './scanner-check';
 import { searchIndex, type RefIndex } from './search-index';
 
 export const TOP_K = 5;
@@ -23,6 +24,8 @@ export interface CardMatch extends PrintInfo {
 
 export interface MethodResult {
   candidates: CardMatch[];
+  /** The every-print index's top 20 (phase 3 picks among the same-art prints there). */
+  more?: CardMatch[];
   /** Lead of the best hit over the first other card name. */
   margin: number;
   /** The card matched better turned 180° (it was upside down in the photo). */
@@ -41,6 +44,8 @@ export interface ScannedCard {
   byMethod: Record<string, MethodResult>;
   /** Features + search time (its share of its group's). */
   ms: number;
+  /** Phase 3: the print among same-art reprints and the language (scanner-check.ts). */
+  check?: CardCheck;
 }
 
 export interface ScannedPhoto {
@@ -66,6 +71,8 @@ export interface ScanOptions extends DetectOptions {
   scale: number;
   /** Drop bad shapes once named (cleanup.ts; default on). */
   cleanup?: boolean;
+  /** Phase 3 (every-print index only): the print among same-art reprints, the language. */
+  check?: { models: TextModels; prints: boolean; language: boolean } | null;
 }
 
 /** The method the cleanup reads names and scores from (the one kept: padded · CLS). */
@@ -129,7 +136,10 @@ export function pairResults(hits: readonly Hit[][], prints: readonly PrintInfo[]
     const down = hits[i + 1];
     const turned = (down[0]?.score ?? -Infinity) > (up[0]?.score ?? -Infinity);
     const h = turned ? down : up;
-    out.push({ candidates: h.map((x) => ({ ...prints[x.index], score: x.score })), margin: nameMargin(h, (j) => prints[j].name), turned });
+    const all = h.map((x) => ({ ...prints[x.index], score: x.score }));
+    // Shown, scored and used for the margin: the first TOP_K, as always; the rest is phase 3's pool.
+    const top = h.slice(0, TOP_K);
+    out.push({ candidates: all.slice(0, TOP_K), ...(h.length > TOP_K ? { more: all } : {}), margin: nameMargin(top, (j) => prints[j].name), turned });
   }
   return out;
 }
@@ -150,6 +160,7 @@ export async function scanPhoto(
   namer: Namer | null,
   opts: ScanOptions,
   onProgress?: (done: number, total: number) => void,
+  onCheck?: (done: number, total: number) => void,
 ): Promise<ScannedPhoto> {
   const t0 = performance.now();
   let bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -200,6 +211,17 @@ export async function scanPhoto(
         ? cleanupShapes(cards.map((c) => ({ quad: c.quad, score: c.byMethod[CLEANUP_METHOD]?.candidates[0]?.score ?? 0, name: c.byMethod[CLEANUP_METHOD]?.candidates[0]?.name })))
         : new Map<number, CleanupReason>();
     const kept = cards.filter((_, i) => !drop.has(i)).map((c, k) => ({ ...c, n: k + 1 }));
+    // Phase 3, on the kept cards, while the photo is still in the engine.
+    if (opts.check && (opts.check.prints || opts.check.language)) {
+      for (const [k, c] of kept.entries()) {
+        const r = c.byMethod[CHECKED_METHOD];
+        if (!r?.more) continue;
+        const { result, check } = await checkCard(engine, opts.check.models, id, c.quad, r, opts.check);
+        c.byMethod = { ...c.byMethod, [CHECK_METHOD]: result };
+        c.check = check;
+        onCheck?.(k + 1, kept.length);
+      }
+    }
     const dropped: RejectedShape[] = [...drop].map(([i, reason]) => {
       cards[i].crop.close();
       return { quad: cards[i].quad, reason };
@@ -263,6 +285,15 @@ export function photoToJson(p: ScannedPhoto) {
       source: c.source,
       heightPx: Math.round(c.heightPx),
       ms: Math.round(c.ms),
+      ...(c.check
+        ? {
+            check: {
+              print: c.check.print && { how: c.check.print.how, margin: c.check.print.margin === undefined ? undefined : round(c.check.print.margin), read: c.check.print.read },
+              language: c.check.language,
+              ms: Math.round(c.check.ms),
+            },
+          }
+        : {}),
       byMethod: Object.fromEntries(
         Object.entries(c.byMethod).map(([m, r]) => [
           m,

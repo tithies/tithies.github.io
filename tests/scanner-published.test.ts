@@ -1,4 +1,4 @@
-import { checkLatest, downloadPublished, fileKey, indexOnlyUpdate, installDropped, installedFiles, MANIFEST_URL, measurePublished, missingFiles, parseManifest, readFile, sha256Hex, type Manifest } from '@/features/scanner/published';
+import { checkLatest, downloadPublished, eagerRoles, ensureFile, fileKey, indexOnlyUpdate, installDropped, installedFiles, MANIFEST_URL, measurePublished, missingFiles, parseManifest, readFile, sha256Hex, type Manifest } from '@/features/scanner/published';
 import { MODEL_CACHE } from '@/features/scanner/model-cache';
 import { scannerDb } from '@/features/scanner/store';
 
@@ -165,5 +165,51 @@ describe('index-only updates', () => {
     expect(indexOnlyUpdate(installed, { at: 2, manifest: m3, commit: COMMIT2 })).toBe(false);
     expect(indexOnlyUpdate(undefined, { at: 2, manifest: m2, commit: COMMIT2 })).toBe(false);
     expect(indexOnlyUpdate(installed, { at: 2, error: 'offline' })).toBe(false);
+  });
+});
+
+describe('OCR files (phase 3)', () => {
+  beforeEach(async () => {
+    store.clear();
+    await scannerDb.meta.clear();
+  });
+
+  async function withOcr() {
+    const files = { ...v1files(), 'det.onnx': file('det'), 'latin.onnx': file('latin'), 'dicts.json': file('{"latin":["a"]}'), 'main.onnx': file('main') };
+    const m = await manifestFor(files);
+    const entry = async (name: keyof typeof files) => ({ path: `ocr/${name}`, sha256: await sha256Hex(files[name]), bytes: files[name].byteLength });
+    m.files.ocrDet = await entry('det.onnx');
+    m.files.ocrLatin = await entry('latin.onnx');
+    m.files.ocrDicts = await entry('dicts.json');
+    m.files.ocrMain = await entry('main.onnx');
+    // The hub stand-in serves ocr/ paths too.
+    const fetched: string[] = [];
+    const fn = (async (url: string) => {
+      fetched.push(url);
+      const m2 = url.match(/\/resolve\/([0-9a-f]{40})\/(?:v\d+|ocr)\/(.+)$/);
+      const b = m2 && m2[1] === COMMIT ? files[decodeURIComponent(m2[2]) as keyof typeof files] : undefined;
+      return b ? new Response(b.slice(0)) : new Response('missing', { status: 404 });
+    }) as typeof fetch;
+    return { m, fn, fetched };
+  }
+
+  it('downloads the detector, Latin recognizer and dictionaries with the rest; the other scripts on first need', async () => {
+    const { m, fn, fetched } = await withOcr();
+    expect(eagerRoles(m)).toEqual(['detector', 'recognizer', 'index', 'prints', 'ocrDet', 'ocrLatin', 'ocrDicts']);
+    await downloadPublished(m, COMMIT, { fetchFn: fn });
+    expect(fetched.map((u) => u.split('/').pop())).toEqual(['card-detector.onnx', 'card-recognizer.onnx', 'index-1.bin', 'prints-1.json.gz', 'det.onnx', 'latin.onnx', 'dicts.json']);
+    const inst = (await installedFiles())!;
+    expect(new TextDecoder().decode(await ensureFile(inst, 'ocrMain', fn))).toBe('main');
+    expect(fetched.at(-1)).toMatch(/ocr\/main\.onnx$/);
+    // Stored now: no second download.
+    await ensureFile(inst, 'ocrMain', fn);
+    expect(fetched.filter((u) => u.endsWith('main.onnx'))).toHaveLength(1);
+    expect(cache().entries.size).toBe(8);
+  });
+
+  it('counts a new OCR file alone as an update to download by itself', async () => {
+    const { m } = await withOcr();
+    const installed = { manifest: { ...m, files: { ...m.files, ocrDet: undefined } }, commit: COMMIT, installedAt: 1 };
+    expect(indexOnlyUpdate(installed, { at: 2, manifest: m, commit: COMMIT2 })).toBe(true);
   });
 });

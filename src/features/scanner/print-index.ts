@@ -3,7 +3,10 @@
  * Namer that names cards with it (padded · CLS, the method the tuned recognizer was trained for).
  */
 import { gunzipText, parsePrints, printMask, type IndexPrint } from './index-file';
-import { pairResults, sideQueries, TOP_K, type Namer } from './pipeline';
+import { pairResults, sideQueries, type Namer } from './pipeline';
+
+/** Hits searched per card: phase 3's pool of same-art candidates. */
+const CHECK_POOL = 20;
 import { readFile, type Installed } from './published';
 import type { PrintInfo } from './reference';
 import { SearchClient } from './search-client';
@@ -56,7 +59,8 @@ export function printIndexNamer(idx: PrintIndex): Namer {
     name: async (cards) => {
       const queries = sideQueries(cards, INDEX_METHOD);
       if (!cards.length || queries.some((q) => !q)) return cards.map(() => ({}));
-      const { hits } = await idx.client.search(queries, TOP_K);
+      // 20: phase 3 picks the print among the same-art ones there (pairResults keeps TOP_K as candidates).
+      const { hits } = await idx.client.search(queries, CHECK_POOL);
       return pairResults(hits, idx.prints).map((r) => ({ [INDEX_METHOD]: r }));
     },
   };

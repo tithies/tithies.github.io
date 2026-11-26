@@ -1,7 +1,7 @@
 import { Badge, Group, Stack, Table, Text, Tooltip } from '@mantine/core';
 import { CardThumb } from '@/lib/ui/CardThumb';
 import { scryfallImage } from '@/lib/f2f/links';
-import { ALL_METHODS } from '../models';
+import { SHOWN_METHODS } from '../models';
 import { confidence, type ScannedPhoto } from '../pipeline';
 import { sameName, type LabelCard } from '../labels';
 import { BitmapCanvas } from './BitmapCanvas';
@@ -31,7 +31,7 @@ export function CardsTable({ photo, method, labels, selected, onSelect, minHeigh
           <Table.Th>#</Table.Th>
           <Table.Th>Crop</Table.Th>
           <Table.Th>Shape</Table.Th>
-          <Table.Th>Top 5 ({ALL_METHODS.find((m) => m.id === method)?.label})</Table.Th>
+          <Table.Th>Top 5 ({SHOWN_METHODS.find((m) => m.id === method)?.label})</Table.Th>
           <Table.Th>Best per method</Table.Th>
         </Table.Tr>
       </Table.Thead>
@@ -86,10 +86,18 @@ export function CardsTable({ photo, method, labels, selected, onSelect, minHeigh
                     margin {r.margin.toFixed(3)}
                   </Text>
                 )}
+                {c.check && (
+                  <Text size="xs" c={c.check.print?.how === 'unsure' ? 'orange' : 'dimmed'}>
+                    {c.check.print && `print: ${c.check.print.how}${c.check.print.margin !== undefined ? ` (${c.check.print.margin.toFixed(3)})` : ''}`}
+                    {c.check.print?.read?.text ? ` · read “${c.check.print.read.text.slice(-40)}”` : ''}
+                    {c.check.language && ` · ${c.check.language.lang.toUpperCase()} (${c.check.language.how})`}
+                    {` · ${Math.round(c.check.ms)} ms`}
+                  </Text>
+                )}
               </Table.Td>
               <Table.Td>
                 <Stack gap={0}>
-                  {ALL_METHODS.map((m) => {
+                  {SHOWN_METHODS.filter((m) => c.byMethod[m.id]).map((m) => {
                     const top = c.byMethod[m.id]?.candidates[0];
                     const hit = top ? inLabels(top.name) : undefined;
                     return (

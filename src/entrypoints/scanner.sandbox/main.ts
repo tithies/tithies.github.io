@@ -9,6 +9,8 @@ import { detectCards } from '@/features/scanner/engine/detect';
 import { bench, currentBackend, featuresMany, initOrt, loadModel, matToImageData, ortVersion, toCardSize, warpCard } from '@/features/scanner/engine/features';
 import { loadDetector, runDetector } from '@/features/scanner/engine/detector';
 import { free, loadOpenCv, type CV, type Mat } from '@/features/scanner/engine/opencv';
+import { CHECK_H, CHECK_W, visualCheck } from '@/features/scanner/engine/print-visual';
+import { cropBox, detectText, loadTextModel, recognize, type TextBox } from '@/features/scanner/engine/text';
 import { quadIoU, quadSize } from '@/features/scanner/geometry';
 import { CHANNEL, type CardFeatures, type DetectedCard, type EngineCall, type EngineReply, type EngineRequest, type EngineResults, type Features } from '@/features/scanner/protocol';
 
@@ -19,6 +21,26 @@ interface Photo {
 }
 
 const photos = new Map<string, Photo>();
+
+/** Cards cut out for the print and language checks: the 672 × 936 cut-out, and its text lines once found. */
+interface Detail {
+  card: Mat;
+  boxes?: TextBox[];
+  crops?: Mat[];
+}
+const details = new Map<string, Detail>();
+
+function detail(id: string): Detail {
+  const d = details.get(id);
+  if (!d) throw new Error(`Unknown card cut-out ${id}`);
+  return d;
+}
+
+function dropDetail(id: string) {
+  const d = details.get(id);
+  if (d) free(d.card, ...(d.crops ?? []));
+  details.delete(id);
+}
 let cv: CV | null = null;
 let imageLogs = 12;
 
@@ -152,6 +174,58 @@ async function handle(req: EngineRequest): Promise<Handled<EngineRequest['type']
     }
     case 'bench':
       return { result: await bench(req) };
+    case 'loadTextModel': {
+      needCv();
+      const t0 = performance.now();
+      const backend = await loadTextModel(req.name, req.bytes, req.chars);
+      return { result: { backend, ms: performance.now() - t0 } };
+    }
+    case 'cardDetail': {
+      const c = needCv();
+      const t0 = performance.now();
+      dropDetail(req.detailId);
+      details.set(req.detailId, { card: warpCard(c, photo(req.photoId).full, req.quad, CHECK_W, CHECK_H) });
+      return { result: { ms: performance.now() - t0 } };
+    }
+    case 'readText': {
+      const c = needCv();
+      const t0 = performance.now();
+      const d = detail(req.detailId);
+      if (!d.boxes) {
+        d.boxes = await detectText(c, d.card);
+        d.crops = d.boxes.map((b) => cropBox(c, d.card, b.pts));
+      }
+      const idx = req.lines ?? d.boxes.map((_, i) => i);
+      const reads = await recognize(c, req.model, idx.map((i) => d.crops![i]));
+      const lines = idx.map((i, k) => {
+        const p = d.boxes![i].pts;
+        return {
+          y: p.reduce((s2, q) => s2 + q[1], 0) / 4 / CHECK_H,
+          x: Math.min(...p.map((q) => q[0])) / CHECK_W,
+          h: (p[3][1] - p[0][1]) / CHECK_H,
+          text: reads[k].text,
+          conf: reads[k].conf,
+        };
+      });
+      return { result: { lines, ms: performance.now() - t0 } };
+    }
+    case 'checkPrint': {
+      const c = needCv();
+      const t0 = performance.now();
+      const d = detail(req.detailId);
+      const pics = req.pictures.map((b) => bitmapToMat(c, b));
+      try {
+        const r = visualCheck(c, d.card, pics);
+        return { result: { ...r, ms: performance.now() - t0 } };
+      } finally {
+        free(...pics);
+      }
+    }
+    case 'releaseDetail': {
+      if (req.detailId) dropDetail(req.detailId);
+      else for (const id of [...details.keys()]) dropDetail(id);
+      return { result: null };
+    }
     case 'releasePhoto': {
       const p = photos.get(req.photoId);
       if (p) free(p.full);

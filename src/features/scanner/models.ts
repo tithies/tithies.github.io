@@ -59,6 +59,11 @@ export const VARIANTS: Variant[] = [
 export const PHASH_ID = 'phash';
 export const ALL_METHODS: { id: string; label: string }[] = [...VARIANTS, { id: PHASH_ID, label: 'pHash (baseline)' }];
 
+/** Phase 3: padded · CLS, then the print among same-art reprints checked (scanner-check.ts). */
+export const CHECK_METHOD = 'dino-pad-cls+check';
+/** The methods the tables show: the searched ones and the checked one. */
+export const SHOWN_METHODS: { id: string; label: string }[] = [...ALL_METHODS, { id: CHECK_METHOD, label: 'Padded · CLS + print check' }];
+
 /** DINOv2's expected pixel normalization (ImageNet). */
 export const MEAN = [0.485, 0.456, 0.406] as const;
 export const STD = [0.229, 0.224, 0.225] as const;
