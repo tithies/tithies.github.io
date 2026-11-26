@@ -165,6 +165,8 @@ describe('index-only updates', () => {
     expect(indexOnlyUpdate(installed, { at: 2, manifest: m3, commit: COMMIT2 })).toBe(false);
     expect(indexOnlyUpdate(undefined, { at: 2, manifest: m2, commit: COMMIT2 })).toBe(false);
     expect(indexOnlyUpdate(installed, { at: 2, error: 'offline' })).toBe(false);
+    // Files dropped on the page stay until the user updates.
+    expect(indexOnlyUpdate({ ...installed, commit: null }, { at: 2, manifest: m2, commit: COMMIT2 })).toBe(false);
   });
 });
 

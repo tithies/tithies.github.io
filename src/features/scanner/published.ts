@@ -127,7 +127,8 @@ async function cached(sha: string): Promise<boolean> {
  */
 export function indexOnlyUpdate(installed: Installed | null | undefined, latest: LatestCheck | null | undefined): boolean {
   const m = latest?.manifest;
-  if (!installed || !m || !latest?.commit || latest.commit === installed.commit) return false;
+  // Files dropped on the page (developer path, no commit) stay until the user updates.
+  if (!installed?.commit || !m || !latest?.commit || latest.commit === installed.commit) return false;
   const a = installed.manifest.files;
   const b = m.files;
   // Same models; another index, prints or OCR file (small: downloaded by itself).
