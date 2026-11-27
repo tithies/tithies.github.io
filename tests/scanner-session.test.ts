@@ -103,10 +103,17 @@ describe('scanned cards as a list', () => {
     expect(cardLang(card(1))).toBe('en');
     expect(cardLang(card(1, { check: { language: { lang: 'ja', how: 'script' }, ms: 1, times: {} } }))).toBe('ja');
     expect(cardLang(card(1, { edit: { lang: 'fr' }, check: { language: { lang: 'ja', how: 'script' }, ms: 1, times: {} } }))).toBe('fr');
+    // The scan takes its cards to be in one language: cards nothing was read on.
+    expect(cardLang(card(1), 'ja')).toBe('ja');
+    expect(cardLang(card(1, { check: { language: { lang: 'de', how: 'words' }, ms: 1, times: {} } }), 'ja')).toBe('de');
   });
 
   it('is sure when the name is sure and the print decided', () => {
     expect(cardStatus(card(1))).toBe('review');
+    // While the scan reads its cards, one still to check is pending (not "to review").
+    expect(cardStatus(card(1), { checking: true })).toBe('pending');
+    expect(cardStatus(card(1, { check: { print: { pick: 1, how: 'read' }, ms: 1, times: {} } }), { checking: true })).toBe('sure');
+    expect(cardStatus(card(1, { edit: { lang: 'fr' } }), { checking: true })).toBe('user');
     expect(cardStatus(card(1, { check: { print: { pick: 1, how: 'read' }, ms: 1, times: {} } }))).toBe('sure');
     expect(cardStatus(card(1, { check: { print: { pick: 0, how: 'unsure' }, ms: 1, times: {} } }))).toBe('review');
     expect(cardStatus(card(1, { result: result([hit('m3c', '213', 0.86), hit('otc', '168', 0.8, { art: 2 })]) }))).toBe('sure');
@@ -131,6 +138,7 @@ describe('scanned cards as a list', () => {
         ],
       }),
     ];
+    expect(toExportItems(photos, 'it').map((i) => i.lang)).toEqual(['fr', 'it']);
     expect(toExportItems(photos)).toEqual([
       { key: 'p1:1', cardId: '', scryfallId: 'tdc-216', name: 'Grenzo, Havoc Raiser', set: 'tdc', setName: 'TDC', cn: '216', finish: 'nonFoil', lang: 'fr', printLang: 'en', qty: 1, note: 'Scanned' },
       { key: 'p1:4', cardId: '', scryfallId: 'm3c-213', name: 'Grenzo, Havoc Raiser', set: 'm3c', setName: 'M3C', cn: '213', finish: 'foil', lang: 'en', printLang: 'en', qty: 1, note: 'Scanned' },

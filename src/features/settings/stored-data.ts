@@ -86,7 +86,7 @@ export const PREFERENCE_LABELS: Record<string, string> = {
   updateCheck: 'Update check: last check and dismissed update banners',
   // dashboard localStorage
   'tithies:f2f:pageSize': 'Rows per page in run tables',
-  'tithies:scanner:check': 'Scanner: check prints and languages, on or off',
+  'tithies:scanner:cards': 'Scanner: read each card’s print and language, or take every card to be in one language',
   'tithies:decks:pageSize': 'Rows per page in the Comparator table',
   'mantine-color-scheme-value': 'Theme (dark, light or system)',
 };

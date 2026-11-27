@@ -188,16 +188,24 @@
   - the photo file itself;
   - its cards: quad in full-resolution pixels, cut-out as WebP (ImageBitmaps can't be stored), the search's top 20, the check without its text lines, the user's corrections (`edit`), when sent.
   - It stays until "Clear scan", listed in Settings → Stored data as "Scanner photos" (its own group, cleared by Remove all data too).
+- **How cards are taken** (a selector, kept per browser):
+  - "Read each card" (the default): the print and language check runs;
+  - or "All in <language>": nothing is read (faster), and every card nothing was read on takes that language. Cards already read keep what was read.
 - **Job order** (`scan-queue.ts`), one engine job at a time:
   - every queued photo is found and named first, so its rows show at once;
   - then its cards are checked, photo by photo (`checkPhoto` loads the photo again);
-  - a check job stops between two cards when a new photo waits.
+  - a check job stops between two cards when a new photo waits, the selector leaves "Read each card", or its photo goes.
+- **Stopping:** a generation counter is bumped when the page goes or "Clear scan" is clicked (at any time).
+  - The running job stops at its next card (`scanPhoto`'s `stop`, `checkPhoto`'s), and its results are dropped.
+  - The photo stays queued, or its cards to check, for the next time.
+  - The engine and the search worker answer a call made after they're closed at once (`ClosedError`): a terminated worker never would.
+  - The install read again from storage is kept as the same object when it is the same install, so the open index isn't reopened under a running search (that was the "stall" after coming back).
 - **One tab at a time:** a Web Lock (`tithies-scanner-page`). Another tab shows a notice, and takes over when the first one closes.
 - **What a card says** (`scan-export.ts`):
   - **print:** the user's pick, else the check's, else the search's best;
   - **language:** the user's, else the one read, else English;
   - **finish:** the user's when the print has it, else non-foil, or foil or etched when the print exists only so (the index's `finishes` bitmask).
-  - **Colour:**
+  - **Colour** (while the scan reads its cards, one still to read is pending: grey, with a spinning ring around its number on the photo and in the table, as is a card being named again):
     - **green:** the name is sure (the tuned model's limits, its lead taken over the first other name among the top 20, since a card with many reprints fills the top 5 with its own name) and the print decided: only print, read, or picture check;
     - **orange:** to review;
     - **red:** not recognized;

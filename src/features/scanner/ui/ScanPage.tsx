@@ -1,15 +1,17 @@
-import { ActionIcon, Alert, Badge, Button, Card, Group, Image, Kbd, Loader, Progress, SegmentedControl, Stack, Switch, Text, Title, Tooltip } from '@mantine/core';
+import { ActionIcon, Alert, Badge, Button, Card, Group, Image, Kbd, Loader, Progress, SegmentedControl, Select, Stack, Switch, Text, Title, Tooltip } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
-import { IconArrowRight, IconPhotoPlus, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconArrowRight, IconPhotoPlus, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
+import { LANGUAGE_LABELS } from '@/lib/cards/languages';
 import { useRecentExports } from '@/lib/export/client';
 import { ExportDialog } from '@/lib/export/ui/ExportDialog';
 import { ExportProgressModal, RecentExportsModal } from '@/lib/export/ui/ExportProgress';
 import { siteOf } from '@/lib/sites/registry';
 import type { Quad } from '../geometry';
 import type { LabelCard } from '../labels';
-import { checkPhoto, disposePhoto, loadPhoto, nameQuads, scanPhoto } from '../pipeline';
+import { checkPhoto, disposePhoto, loadPhoto, nameQuads, scanPhoto, ScanStopped } from '../pipeline';
+import { ClosedError } from '../protocol';
 import { CHECKED_METHOD, checkCard, type CardCheck } from '../scanner-check';
 import { cardStatus, chosenPrint, listed, toExportItems } from '../scan-export';
 import { nextJob, shouldYield, type ScanJob } from '../scan-queue';
@@ -21,6 +23,7 @@ import {
   putSessionCard,
   removeSessionPhoto,
   replaceSessionPhoto,
+  saveSessionPhoto,
   sessionPhotos,
   updateSessionCard,
   type StoredCard,
@@ -54,6 +57,12 @@ function useBlobUrls(): (b: Blob) => string {
 }
 
 type RunningJob = ScanJob & { done: number; total: number };
+
+/** How the scan takes its cards' print and language: read on each card, or every card in one language (nothing read). */
+const CARDS_MODES = [
+  { group: 'Read each card', items: [{ value: 'read', label: 'Read each card: print and language' }] },
+  { group: 'All in one language: faster, nothing read', items: Object.entries(LANGUAGE_LABELS).map(([value, label]) => ({ value, label: `All in ${label}` })) },
+];
 
 /**
  * Whether this tab runs the Scanner: one tab at a time (they'd share the session's queue, and each would load the
@@ -111,15 +120,36 @@ function ScanSession() {
   photosRef.current = photos ?? [];
   const [job, setJob] = useState<RunningJob | null>(null);
   const rt = useScanner(!job);
-  const [checkOn, setCheckOn] = useLocalStorage({ key: 'tithies:scanner:check', defaultValue: true });
-  const checkOnRef = useRef(checkOn);
-  checkOnRef.current = checkOn;
+  /** 'read' (the print and language check), or the language every card is taken to be in (nothing read). */
+  const [cardsMode, setCardsMode] = useLocalStorage<string>({ key: 'tithies:scanner:cards', defaultValue: 'read' });
+  const reading = cardsMode === 'read';
+  const assumed = reading ? null : cardsMode;
+  const readingRef = useRef(reading);
+  readingRef.current = reading;
+  /** Bumped when the page goes or the scan is cleared: the work started before stops, and its results are dropped. */
+  const gen = useRef(0);
+  useEffect(
+    () => () => {
+      gen.current++;
+    },
+    [],
+  );
+  // The switch this mode replaced (2026-11-27).
+  useEffect(() => {
+    try {
+      localStorage.removeItem('tithies:scanner:check');
+    } catch {
+      // Storage refused: nothing to clean.
+    }
+  }, []);
   const [shownId, setShownId] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [zoom, setZoom] = useState('1');
   const [picking, setPicking] = useState<number | null>(null);
   const [editing, setEditing] = useState(0);
+  /** Cards being named again (photo id:number). */
+  const [renaming, setRenaming] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const urlOf = useBlobUrls();
@@ -144,7 +174,7 @@ function ScanSession() {
   }, []);
   const editCard = useCallback((photoId: string, n: number, change: (c: StoredCard) => StoredCard) => void updateSessionCard(photoId, n, change).then(show), [show]);
 
-  const checkable = checkOn && !!rt.textModels?.available;
+  const checkable = reading && !!rt.textModels?.available;
   const checkOpts = useMemo(() => (rt.textModels ? { models: rt.textModels, prints: true, language: true } : null), [rt.textModels]);
 
   // The work, one job at a time: every photo named first, then the checks.
@@ -154,12 +184,14 @@ function ScanSession() {
     if (!next) return;
     const engine = rt.engine;
     const p = photos.find((x) => x.id === next.photoId)!;
+    const my = gen.current;
+    const live = () => gen.current === my;
     setJob({ ...next, done: 0, total: next.kind === 'check' ? next.cards.length : 0 });
     void (async () => {
       try {
         if (next.kind === 'name') {
-          const scan = await scanPhoto(engine, new File([p.blob], p.name, { type: p.type }), rt.namer, { scale: 1, modelThreshold: 0.2, cleanup: true, check: null }, (done, total) =>
-            setJob((j) => j && { ...j, done, total }),
+          const scan = await scanPhoto(engine, new File([p.blob], p.name, { type: p.type }), rt.namer, { scale: 1, modelThreshold: 0.2, cleanup: true, check: null, stop: () => !live() }, (done, total) =>
+            setJob((j) => live() && j ? { ...j, done, total } : j),
           );
           try {
             const cards: StoredCard[] = [];
@@ -168,7 +200,7 @@ function ScanSession() {
               if (result) cards.push({ n: c.n, quad: c.quad, heightPx: c.heightPx, source: c.source, crop: await cropBlob(c.crop), result });
             }
             const named: StoredPhoto = { ...p, width: scan.width, height: scan.height, status: 'named', cards };
-            if (await replaceSessionPhoto(named)) show(named);
+            if (live() && (await replaceSessionPhoto(named))) show(named);
           } finally {
             disposePhoto(scan);
           }
@@ -180,22 +212,26 @@ function ScanSession() {
             cards.map((c) => ({ quad: c.quad, result: c.result })),
             checkOpts,
             async (k, { check }) => {
+              if (!live()) return;
               const card = cards[k];
               // The card as it is now: an outline moved meanwhile is checked again on its own.
               show(await updateSessionCard(p.id, card.n, (c) => (sameQuad(c.quad, card.quad) ? { ...c, check: withoutLines(check) } : c)));
               setJob((j) => j && { ...j, done: k + 1 });
             },
-            () => shouldYield(photosRef.current) || !checkOnRef.current || !photosRef.current.some((x) => x.id === p.id),
+            () => !live() || shouldYield(photosRef.current) || !readingRef.current || !photosRef.current.some((x) => x.id === p.id),
           );
         }
       } catch (e) {
+        // Stopped (cleared, the page left, or the engine or index closed under it): the photo stays queued, or its
+        // cards to check, for the next job.
+        if (!live() || e instanceof ScanStopped || e instanceof ClosedError) return;
         const msg = (e as Error).message;
         if (next.kind === 'name') {
           const failed: StoredPhoto = { ...p, status: 'failed', error: msg };
           if (await replaceSessionPhoto(failed)) show(failed);
         } else setError(`Checking ${p.name}: ${msg}`);
       } finally {
-        setJob(null);
+        if (live()) setJob(null);
       }
     })();
   }, [rt.state, rt.engine, rt.namer, job, photos, checkable, checkOpts, show]);
@@ -214,16 +250,21 @@ function ScanSession() {
   const outline = async (p: StoredPhoto, quad: Quad, n: number | null) => {
     const engine = rt.engine;
     if (!engine || !rt.namer) return;
+    const my = gen.current;
+    const key = `${p.id}:${n}`;
     setEditing((k) => k + 1);
-    const { id } = await loadPhoto(engine, p.blob);
+    if (n !== null) setRenaming((s) => new Set(s).add(key));
+    let id: string | null = null;
     try {
+      id = (await loadPhoto(engine, p.blob)).id;
       const [named] = await nameQuads(engine, id, [quad], rt.namer);
       const result = named.byMethod[CHECKED_METHOD];
       const crop = await cropBlob(named.crop);
       named.crop.close();
       if (!result) return;
       let check: StoredCard['check'];
-      if (checkOnRef.current && checkOpts && rt.textModels?.available && result.more) check = withoutLines((await checkCard(engine, checkOpts.models, id, quad, result, checkOpts)).check);
+      if (readingRef.current && checkOpts && rt.textModels?.available && result.more) check = withoutLines((await checkCard(engine, checkOpts.models, id, quad, result, checkOpts)).check);
+      if (gen.current !== my) return;
       const old = n === null ? undefined : p.cards.find((c) => c.n === n);
       const saved = await putSessionCard(p.id, { n: n ?? 0, quad, heightPx: named.heightPx, source: old?.source ?? 'user', crop, result, ...(check ? { check } : {}) });
       if (saved) {
@@ -231,16 +272,25 @@ function ScanSession() {
         setSelected(saved.n);
       }
     } catch (e) {
-      setError(`Naming the card: ${(e as Error).message}`);
+      if (gen.current === my) setError(`Naming the card: ${(e as Error).message}`);
     } finally {
-      await engine.call({ type: 'releasePhoto', photoId: id }).catch(() => undefined);
-      setEditing((k) => k - 1);
+      if (id) await engine.call({ type: 'releasePhoto', photoId: id }).catch(() => undefined);
+      if (gen.current === my) {
+        setEditing((k) => k - 1);
+        setRenaming((s) => {
+          const next = new Set(s);
+          next.delete(key);
+          return next;
+        });
+      }
     }
   };
 
   // Cards to review, in photo order: "Next to review" goes through them.
   const listedCards = useMemo(() => (photos ?? []).flatMap((p) => p.cards.filter(listed).map((c) => ({ p, c }))), [photos]);
-  const toReview = listedCards.filter(({ c }) => !c.sentAt && (cardStatus(c) === 'review' || cardStatus(c) === 'unknown'));
+  const statusOf = (c: StoredCard) => cardStatus(c, { checking: checkable });
+  const toReview = listedCards.filter(({ c }) => !c.sentAt && (statusOf(c) === 'review' || statusOf(c) === 'unknown'));
+  const pending = listedCards.filter(({ c }) => statusOf(c) === 'pending').length;
   const nextToReview = () => {
     if (!toReview.length) return;
     const at = toReview.findIndex(({ p, c }) => p.id === shownId && selected !== null && c.n === selected);
@@ -248,7 +298,7 @@ function ScanSession() {
     setShownId(p.id);
     setSelected(c.n);
   };
-  const items = useMemo(() => toExportItems(photos ?? []), [photos]);
+  const items = useMemo(() => toExportItems(photos ?? [], assumed ?? 'en'), [photos, assumed]);
 
   // Keys: A adds a missed card, Esc stops, N goes to the next card to review.
   useEffect(() => {
@@ -268,18 +318,28 @@ function ScanSession() {
     setPhotos((ps) => ps?.filter((p) => p.id !== id) ?? null);
     if (shownId === id) setShownId(photosRef.current.find((p) => p.id !== id)?.id ?? null);
   };
+  /** Stops everything (the running job stops at its next card) and empties the scan. */
   const clearScan = async () => {
-    await clearScannerSession();
+    gen.current++;
+    setJob(null);
     setPhotos([]);
     setShownId(null);
     setSelected(null);
+    setRenaming(new Set());
+    setEditing(0);
+    await clearScannerSession();
+  };
+  const retryPhoto = async (p: StoredPhoto) => {
+    const again: StoredPhoto = { ...p, status: 'queued', error: undefined };
+    await saveSessionPhoto(again);
+    show(again);
   };
 
   const jobPhoto = job ? photos?.find((p) => p.id === job.photoId) : undefined;
   const jobText = job
     ? job.kind === 'name'
       ? `Finding the cards in ${jobPhoto?.name ?? 'a photo'}${job.total ? ` (${job.done} of ${job.total})` : ''}…`
-      : `Checking prints and languages in ${jobPhoto?.name ?? 'a photo'}: card ${Math.min(job.done + 1, job.total)} of ${job.total}…`
+      : `Reading prints and languages in ${jobPhoto?.name ?? 'a photo'}: card ${Math.min(job.done + 1, job.total)} of ${job.total}…`
     : null;
   const waiting = (photos ?? []).filter((p) => p.status === 'queued').length;
   const pickingCard = shown && picking !== null ? shown.cards.find((c) => c.n === picking) : undefined;
@@ -294,7 +354,11 @@ function ScanSession() {
   const colorOf = (l: LabelCard) => {
     const c = shown?.cards.find((x) => String(x.n) === l.id);
     if (!c || !listed(c)) return 'var(--mantine-color-gray-5)';
-    return `var(--mantine-color-${STATUS_COLOR[cardStatus(c)]}-6)`;
+    return `var(--mantine-color-${STATUS_COLOR[statusOf(c)]}-6)`;
+  };
+  const busyOf = (l: LabelCard) => {
+    const c = shown?.cards.find((x) => String(x.n) === l.id);
+    return !!c && listed(c) && (statusOf(c) === 'pending' || renaming.has(`${shown!.id}:${c.n}`));
   };
   const checkingShown: 'now' | 'waiting' | 'off' = !checkable ? 'off' : job?.kind === 'check' && job.photoId === shownId ? 'now' : 'waiting';
 
@@ -389,8 +453,12 @@ function ScanSession() {
               </Text>
             </Group>
             <Group gap="md">
-              <Tooltip label="Reads each card's bottom line and text: the right print among reprints with the same art, and the language. About 3 s a card." multiline w={300}>
-                <Switch size="sm" label="Check prints and languages" checked={checkOn} onChange={(e) => setCheckOn(e.currentTarget.checked)} />
+              <Tooltip
+                label="Read each card: its bottom line and text give the right print among reprints with the same artwork, and its language (about 3 s a card). Or take every card to be in one language: faster, and the prints among same-art reprints are left to you."
+                multiline
+                w={340}
+              >
+                <Select size="xs" w={270} data={CARDS_MODES} value={cardsMode} onChange={(v) => v && setCardsMode(v)} allowDeselect={false} searchable comboboxProps={{ withinPortal: true }} aria-label="How the scan takes the cards' print and language" />
               </Tooltip>
               <Tooltip label="Name cards only against the prints of your collection" withinPortal>
                 <Switch size="sm" label="Only my prints" checked={rt.onlyMine} onChange={(e) => rt.setOnlyMine(e.currentTarget.checked)} />
@@ -416,6 +484,21 @@ function ScanSession() {
                       <Badge size="xs" variant="light" color={p.status === 'failed' ? 'red' : p.status === 'queued' ? 'gray' : 'blue'}>
                         {p.status === 'queued' ? 'waiting' : p.status === 'failed' ? 'failed' : `${p.cards.filter(listed).length} cards`}
                       </Badge>
+                      {p.status === 'failed' && (
+                        <Tooltip label="Try again" withinPortal>
+                          <ActionIcon
+                            size="xs"
+                            variant="subtle"
+                            aria-label="Try again"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void retryPhoto(p);
+                            }}
+                          >
+                            <IconRefresh size={12} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
                       <ActionIcon
                         size="xs"
                         variant="subtle"
@@ -440,6 +523,7 @@ function ScanSession() {
                 <Text size="sm">
                   {listedCards.length} card{listedCards.length === 1 ? '' : 's'} in {photos.length} photo{photos.length === 1 ? '' : 's'}
                   {toReview.length ? ` · ${toReview.length} to review` : ''}
+                  {pending ? ` · ${pending} being read` : ''}
                 </Text>
                 {toReview.length > 0 && (
                   <Button size="compact-sm" variant="subtle" rightSection={<IconArrowRight size={14} />} onClick={nextToReview}>
@@ -453,13 +537,17 @@ function ScanSession() {
                     Recent exports
                   </Button>
                 )}
-                <Button size="xs" variant="default" color="red" onClick={() => void clearScan()} disabled={!!job}>
-                  Clear scan
-                </Button>
-                {canExport && (
-                  <Button size="xs" onClick={() => setExporting(true)} disabled={!items.length}>
-                    Add {items.length} card{items.length === 1 ? '' : 's'} to {site.label}…
+                <Tooltip label="Stops the scan and empties it: photos, cards and corrections" withinPortal>
+                  <Button size="xs" variant="default" color="red" onClick={() => void clearScan()}>
+                    Clear scan
                   </Button>
+                </Tooltip>
+                {canExport && (
+                  <Tooltip label={`${pending} card${pending === 1 ? ' is' : 's are'} still being read: ${pending === 1 ? 'its' : 'their'} print and language may change`} disabled={!pending} withinPortal>
+                    <Button size="xs" onClick={() => setExporting(true)} disabled={!items.length}>
+                      Add {items.length} card{items.length === 1 ? '' : 's'} to {site.label}…
+                    </Button>
+                  </Tooltip>
                 )}
               </Group>
             </Group>
@@ -500,6 +588,7 @@ function ScanSession() {
                 height={shown.height}
                 cards={labelCards}
                 colorOf={colorOf}
+                busy={busyOf}
                 numberOf={(c) => Number(c.id)}
                 selected={selected === null ? null : String(selected)}
                 onSelect={(id) => setSelected(id === null ? null : Number(id))}
@@ -519,6 +608,8 @@ function ScanSession() {
                 onEdit={(n, change) => editCard(shown.id, n, change)}
                 onPickPrint={setPicking}
                 checking={checkingShown}
+                assumed={assumed}
+                renaming={new Set(shown.cards.filter((c) => renaming.has(`${shown.id}:${c.n}`)).map((c) => c.n))}
               />
             </>
           ) : (

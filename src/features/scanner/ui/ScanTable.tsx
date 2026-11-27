@@ -1,6 +1,6 @@
-import { ActionIcon, Badge, Button, Group, Image, Select, Stack, Table, Text, Tooltip } from '@mantine/core';
+import { ActionIcon, Badge, Box, Button, Group, Image, Loader, Select, Stack, Table, Text, Tooltip } from '@mantine/core';
 import { IconArrowBackUp, IconTrash } from '@tabler/icons-react';
-import { LANGUAGE_LABELS } from '@/lib/cards/languages';
+import { LANGUAGE_LABELS, langLabel } from '@/lib/cards/languages';
 import type { Finish } from '@/lib/cards/types';
 import { scryfallImage } from '@/lib/f2f/links';
 import { finishLabel } from '@/lib/format';
@@ -9,8 +9,20 @@ import { cardFinish, cardLang, cardStatus, chosenPrint, finishesOf, listed, same
 import { needsCheck } from '../scan-queue';
 import type { StoredCard, StoredPhoto } from '../scan-session';
 
-export const STATUS_COLOR: Record<CardStatus, string> = { sure: 'green', review: 'orange', unknown: 'red', user: 'blue' };
-export const STATUS_LABEL: Record<CardStatus, string> = { sure: 'Sure', review: 'To review', unknown: 'Not recognized', user: 'Corrected by you' };
+export const STATUS_COLOR: Record<CardStatus, string> = { pending: 'gray', sure: 'green', review: 'orange', unknown: 'red', user: 'blue' };
+export const STATUS_LABEL: Record<CardStatus, string> = { pending: 'Being checked', sure: 'Sure', review: 'To review', unknown: 'Not recognized', user: 'Corrected by you' };
+
+/** A card's number in its colour; a spinning ring around it while the card is being checked or named again. */
+export function CardNumber({ n, color, busy }: { n: number; color: string; busy: boolean }) {
+  return (
+    <Box pos="relative" w={34} h={34} style={{ display: 'grid', placeItems: 'center' }}>
+      {busy && <Loader size={34} color="gray" pos="absolute" top={0} left={0} />}
+      <Badge color={color} variant="filled" size="lg" circle>
+        {n}
+      </Badge>
+    </Box>
+  );
+}
 
 const LANGUAGES = Object.entries(LANGUAGE_LABELS).map(([value, label]) => ({ value, label }));
 
@@ -41,10 +53,10 @@ function printHow(c: StoredCard, checking: 'now' | 'waiting' | 'off'): { text: s
   return checking === 'now' ? { text: 'Checking…', color: 'dimmed' } : checking === 'waiting' ? { text: 'Waiting for its check', color: 'dimmed' } : { text: 'Not checked', color: 'orange' };
 }
 
-function langHow(c: StoredCard): string | undefined {
+function langHow(c: StoredCard, assumed: string | null): string | undefined {
   if (c.edit?.lang) return 'Set by you';
   const l = c.check?.language;
-  if (!l) return undefined;
+  if (!l) return assumed ? `The scan takes its cards to be in ${langLabel(assumed)}` : undefined;
   if (l.how === 'nothing read') return 'Nothing readable: English by default';
   if (l.how.startsWith('words')) return 'From the card’s words';
   if (l.how.startsWith('script')) return 'From the card’s script';
@@ -63,10 +75,14 @@ export interface ScanTableProps {
   onPickPrint: (n: number) => void;
   /** The check: running on this photo's cards now, waiting for its turn, or off. */
   checking: 'now' | 'waiting' | 'off';
+  /** The language the scan takes cards to be in when it doesn't read them (null: it reads them). */
+  assumed: string | null;
+  /** Cards being named again (a moved outline). */
+  renaming: ReadonlySet<number>;
 }
 
 /** One row per card of a photo: its cut-out, the card it's taken for, how its print and language were found, its finish. */
-export function ScanTable({ photo, urlOf, selected, onSelect, onEdit, onPickPrint, checking }: ScanTableProps) {
+export function ScanTable({ photo, urlOf, selected, onSelect, onEdit, onPickPrint, checking, assumed, renaming }: ScanTableProps) {
   if (!photo.cards.length) return <Text size="sm">{photo.status === 'named' ? 'No card found in this photo: add one with “Add a missed card”.' : null}</Text>;
   return (
     <Table striped highlightOnHover verticalSpacing={4} fz="sm">
@@ -84,19 +100,19 @@ export function ScanTable({ photo, urlOf, selected, onSelect, onEdit, onPickPrin
       <Table.Tbody>
         {photo.cards.map((c) => {
           const print = chosenPrint(c);
-          const status = cardStatus(c);
+          const status = cardStatus(c, { checking: checking !== 'off' });
           const on = listed(c);
           const how = printHow(c, checking);
           const finishes = finishesOf(print);
-          const lh = langHow(c);
+          const lh = langHow(c, assumed);
           const pic = print ? scryfallImage(print.scryfallId, 'small', print.back ? 'back' : 'front') : null;
           return (
             <Table.Tr key={c.n} onClick={() => onSelect(selected === c.n ? null : c.n)} bg={selected === c.n ? 'var(--mantine-color-blue-light)' : undefined} style={{ cursor: 'pointer', opacity: on ? 1 : 0.45 }}>
               <Table.Td>
                 <Tooltip label={on ? STATUS_LABEL[status] : 'Not a card: left out'}>
-                  <Badge color={on ? STATUS_COLOR[status] : 'gray'} variant="filled" size="lg" circle>
-                    {c.n}
-                  </Badge>
+                  <div>
+                    <CardNumber n={c.n} color={on ? STATUS_COLOR[status] : 'gray'} busy={on && (status === 'pending' || renaming.has(c.n))} />
+                  </div>
                 </Tooltip>
               </Table.Td>
               <Table.Td>
@@ -140,7 +156,7 @@ export function ScanTable({ photo, urlOf, selected, onSelect, onEdit, onPickPrin
                     size="xs"
                     w={150}
                     data={LANGUAGES}
-                    value={cardLang(c)}
+                    value={cardLang(c, assumed ?? 'en')}
                     allowDeselect={false}
                     searchable
                     disabled={!on}

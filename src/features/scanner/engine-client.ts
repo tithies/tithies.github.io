@@ -5,13 +5,14 @@
  */
 import { browser } from 'wxt/browser';
 import ortWasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url';
-import { CHANNEL, type EngineCall, type EngineInfo, type EngineReply, type EngineRequest, type EngineResults } from './protocol';
+import { CHANNEL, ClosedError, type EngineCall, type EngineInfo, type EngineReply, type EngineRequest, type EngineResults } from './protocol';
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void };
 
 export class ScannerEngine {
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
+  private closed = false;
   private readonly onMessage = (e: MessageEvent) => {
     if (e.source !== this.iframe.contentWindow) return;
     const msg = e.data as EngineReply;
@@ -58,6 +59,7 @@ export class ScannerEngine {
   }
 
   call<T extends EngineRequest['type']>(request: Extract<EngineRequest, { type: T }>, transfer: Transferable[] = []): Promise<EngineResults[T]> {
+    if (this.closed) return Promise.reject(new ClosedError('The scanner engine'));
     const id = this.nextId++;
     const msg: EngineCall = { channel: CHANNEL, id, request };
     return new Promise((resolve, reject) => {
@@ -68,8 +70,9 @@ export class ScannerEngine {
   }
 
   dispose() {
+    this.closed = true;
     window.removeEventListener('message', this.onMessage);
-    for (const p of this.pending.values()) p.reject(new Error('The scanner engine was closed'));
+    for (const p of this.pending.values()) p.reject(new ClosedError('The scanner engine'));
     this.pending.clear();
     this.iframe.remove();
   }

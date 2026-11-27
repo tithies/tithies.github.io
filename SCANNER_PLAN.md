@@ -47,7 +47,7 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, most 
 - **Decided with the user:**
   - English when the text says nothing;
   - the classic detection passes and pHash deleted;
-  - "Check prints and languages" as a switch, on by default;
+  - "Check prints and languages" as a switch, on by default; then, at the user's request, a selector: "Read each card" or "All in <language>" (nothing read);
   - the table is the export list.
 - The prototype is the developer page, `#/collection/scanner/dev`.
 
@@ -90,7 +90,7 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, most 
 
 1. ~~Phase 2: the language of cards whose text says nothing~~: English (2026-11-27).
 2. ~~Phase 2: the classic detection passes~~: deleted, with the pHash baseline (2026-11-27).
-3. ~~Phase 2: can the check be turned off~~: yes, "Check prints and languages", on by default (2026-11-27).
+3. ~~Phase 2: can the check be turned off~~: yes, a selector, "Read each card" (the default) or "All in <language>" (2026-11-27).
 4. **Phase 3 follow-ups:** which speed option, if any, and whether promo and List prints are worth a trained verifier.
 
 **Prices** used above: Opus 5.5 list prices, $20 per million output tokens, $5 per million cache writes, $0.20 per million cache reads. Actual billing depends on the plan.

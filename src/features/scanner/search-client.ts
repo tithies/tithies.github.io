@@ -3,6 +3,7 @@
  * the "only my prints" mask, search a batch of queries.
  */
 import type { Hit } from './match';
+import { ClosedError } from './protocol';
 import type { SearchInfo } from './search-core';
 
 export type SearchRequest =
@@ -23,6 +24,7 @@ export class SearchClient {
   private worker: Worker;
   private next = 1;
   private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+  private closed = false;
 
   constructor() {
     this.worker = new Worker(new URL('./search.worker.ts', import.meta.url), { type: 'module' });
@@ -40,6 +42,8 @@ export class SearchClient {
   }
 
   private call<T extends SearchRequest>(request: T, transfer: Transferable[] = []): Promise<Results[T['type']]> {
+    // A terminated worker never answers: a call after dispose fails at once.
+    if (this.closed) return Promise.reject(new ClosedError('The search worker'));
     const id = this.next++;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
@@ -61,8 +65,9 @@ export class SearchClient {
   }
 
   dispose() {
+    this.closed = true;
     this.worker.terminate();
-    for (const p of this.pending.values()) p.reject(new Error('The search worker was closed'));
+    for (const p of this.pending.values()) p.reject(new ClosedError('The search worker'));
     this.pending.clear();
   }
 }

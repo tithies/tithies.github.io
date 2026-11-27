@@ -7,6 +7,14 @@
 import type { CleanupReason } from './cleanup';
 import type { Quad } from './geometry';
 
+/** A call to the engine or the search worker after it was closed (the page left, or the index was replaced). */
+export class ClosedError extends Error {
+  constructor(what: string) {
+    super(`${what} was closed`);
+    this.name = 'ClosedError';
+  }
+}
+
 export interface EngineInfo {
   opencv: string;
   ort: string;

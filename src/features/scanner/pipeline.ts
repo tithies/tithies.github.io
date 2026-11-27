@@ -72,6 +72,15 @@ export interface ScanOptions extends DetectOptions {
   cleanup?: boolean;
   /** Phase 3 (every-print index only): the print among same-art reprints, the language. */
   check?: CheckOptions | null;
+  /** Stops between two groups of cards (throws ScanStopped): the user cleared the scan, or left the page. */
+  stop?: () => boolean;
+}
+
+/** A scan stopped by its `stop` option. */
+export class ScanStopped extends Error {
+  constructor() {
+    super('Stopped');
+  }
 }
 
 /** The method the cleanup reads names and scores from (the one kept: padded · CLS). */
@@ -232,13 +241,15 @@ export async function scanPhoto(
   const t0 = performance.now();
   const { id, width, height } = await loadPhoto(engine, file, opts.scale);
   const t1 = performance.now();
+  const cards: ScannedCard[] = [];
+  let done = false;
   try {
     const det = await engine.call({ type: 'detect', photoId: id, options: { modelThreshold: opts.modelThreshold } });
     const t2 = performance.now();
     const ordered = readingOrder(det.cards);
-    const cards: ScannedCard[] = [];
     const feats: CardFeatures[] = [];
     for (let g = 0; g < ordered.length; g += CARD_GROUP) {
+      if (opts.stop?.()) throw new ScanStopped();
       const group = ordered.slice(g, g + CARD_GROUP);
       const tc = performance.now();
       const res = await engine.call({ type: 'cardFeatures', photoId: id, quads: group.map((c) => c.quad) });
@@ -251,6 +262,7 @@ export async function scanPhoto(
       onProgress?.(cards.length, ordered.length);
     }
     // Every card of the photo named in one search; its time shared among them.
+    if (opts.stop?.()) throw new ScanStopped();
     const tn = performance.now();
     if (namer?.size && feats.length) {
       const named = await namer.name(feats);
@@ -280,6 +292,7 @@ export async function scanPhoto(
       cards[i].crop.close();
       return { quad: cards[i].quad, reason };
     });
+    done = true;
     return {
       id,
       file: file.name,
@@ -291,6 +304,8 @@ export async function scanPhoto(
       timings: { loadMs: t1 - t0, detectMs: t2 - t1, cardsMs: t3 - t2, totalMs: t3 - t0 },
     };
   } finally {
+    // Stopped or failed: the cut-outs made so far are freed.
+    if (!done) for (const c of cards) c.crop.close();
     await engine.call({ type: 'releasePhoto', photoId: id }).catch(() => undefined);
   }
 }

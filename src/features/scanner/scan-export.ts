@@ -7,6 +7,7 @@ import type { Finish } from '@/lib/cards/types';
 import type { ExportItem } from '@/lib/export/types';
 import { confidence, type CardMatch, type Confidence, type MethodResult } from './pipeline';
 import { candidates, type PrintHow } from './print-check';
+import { needsCheck } from './scan-queue';
 import type { StoredCard, StoredPhoto } from './scan-session';
 
 /** The finishes bitmask of the every-print index (index-file.ts): 1 non-foil, 2 foil, 4 etched (8 glossy is a kind of non-foil). */
@@ -37,8 +38,11 @@ export function chosenPrint(c: StoredCard): PrintRow | undefined {
   return c.result.candidates[0];
 }
 
-/** Scryfall language code: the user's, else the one read on the card, else English. */
-export const cardLang = (c: StoredCard): string => c.edit?.lang ?? c.check?.language?.lang ?? 'en';
+/**
+ * Scryfall language code: the user's, else the one read on the card, else `assumed` (the language the scan takes its
+ * cards to be in when it doesn't read them, else English).
+ */
+export const cardLang = (c: StoredCard, assumed = 'en'): string => c.edit?.lang ?? c.check?.language?.lang ?? assumed;
 
 /** The user's finish when the chosen print exists in it, else the print's default. */
 export function cardFinish(c: StoredCard): Finish {
@@ -66,14 +70,16 @@ export function nameConfidence(r: MethodResult): Confidence {
 /**
  * How sure a card is, for its colour:
  * - 'user': the user corrected it;
+ * - 'pending': its check is still to come (`checking`: the scan reads its cards);
  * - 'sure': the name is sure, and its print decided (the only print with that artwork, read on the card, or the picture check);
  * - 'review': the name needs a look, or the print is unsure (or not checked among several same-art prints);
  * - 'unknown': no good match.
  */
-export type CardStatus = 'user' | 'sure' | 'review' | 'unknown';
+export type CardStatus = 'user' | 'pending' | 'sure' | 'review' | 'unknown';
 
-export function cardStatus(c: StoredCard): CardStatus {
+export function cardStatus(c: StoredCard, opts: { checking?: boolean } = {}): CardStatus {
   if (c.edit?.print || c.edit?.lang || c.edit?.finish) return 'user';
+  if (opts.checking && needsCheck(c)) return 'pending';
   const name = nameConfidence(c.result);
   if (name !== 'sure') return name;
   if (sameArtPrints(c).length < 2) return 'sure';
@@ -83,8 +89,8 @@ export function cardStatus(c: StoredCard): CardStatus {
 /** A card in the list: not removed. */
 export const listed = (c: StoredCard): boolean => !c.edit?.removed;
 
-/** The session's cards to export: listed, not sent yet, one item each (key photo id:number). */
-export function toExportItems(photos: readonly StoredPhoto[]): ExportItem[] {
+/** The session's cards to export: listed, not sent yet, one item each (key photo id:number); `assumed` as for cardLang. */
+export function toExportItems(photos: readonly StoredPhoto[], assumed = 'en'): ExportItem[] {
   const out: ExportItem[] = [];
   for (const p of photos) {
     for (const c of p.cards) {
@@ -101,7 +107,7 @@ export function toExportItems(photos: readonly StoredPhoto[]): ExportItem[] {
         setName: print.setName,
         cn: print.cn,
         finish: cardFinish(c),
-        lang: cardLang(c),
+        lang: cardLang(c, assumed),
         // The print's own language (the index's prints: English but for the few printed only in another language).
         printLang: print.lang ?? 'en',
         qty: 1,

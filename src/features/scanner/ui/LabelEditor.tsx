@@ -23,6 +23,8 @@ export interface LabelEditorProps {
   zoom: number;
   /** The number drawn on each card (default: its place in `cards`, from 1). */
   numberOf?: (c: LabelCard, i: number) => number;
+  /** Cards still being worked on: a spinning ring around their number. */
+  busy?: (c: LabelCard) => boolean;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface LabelEditorProps {
  * The selected card shows its 4 corners as handles to drag; the card's own top-left corner is
  * the filled one. In "adding" mode, clicks place 4 corners (any order).
  */
-export function LabelEditor({ src, width, height, cards, colorOf, selected, onSelect, onQuadChange, adding, onAdded, zoom, numberOf = (_, i) => i + 1 }: LabelEditorProps) {
+export function LabelEditor({ src, width, height, cards, colorOf, selected, onSelect, onQuadChange, adding, onAdded, zoom, numberOf = (_, i) => i + 1, busy }: LabelEditorProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<{ id: string; corner: number; quad: Quad } | null>(null);
   const [clicks, setClicks] = useState<Point[]>([]);
@@ -118,6 +120,11 @@ export function LabelEditor({ src, width, height, cards, colorOf, selected, onSe
                   <title>{`#${numberOf(c, i)} ${c.name}${c.set ? ` (${c.set.toUpperCase()} #${c.cn})` : ''}`}</title>
                 </polygon>
                 <circle cx={center.x} cy={center.y} r={font * 0.9} fill={color} pointerEvents="none" />
+                {busy?.(c) && (
+                  <circle cx={center.x} cy={center.y} r={font * 1.3} fill="none" stroke={color} strokeWidth={stroke * 1.5} strokeLinecap="round" strokeDasharray={`${font * 2} ${font * 6.2}`} pointerEvents="none">
+                    <animateTransform attributeName="transform" type="rotate" from={`0 ${center.x} ${center.y}`} to={`360 ${center.x} ${center.y}`} dur="1s" repeatCount="indefinite" />
+                  </circle>
+                )}
                 <text x={center.x} y={center.y} fill="white" fontSize={font} fontWeight={700} textAnchor="middle" dominantBaseline="central" pointerEvents="none">
                   {numberOf(c, i)}
                 </text>

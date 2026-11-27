@@ -45,6 +45,9 @@ export interface ScannerRuntime {
   readyIn: number | null;
 }
 
+/** The same install (read again from storage): kept as is, so what depends on it (the open index) stays. */
+const sameInstall = (a: Installed | null, b: Installed | null) => !!a && !!b && a.commit === b.commit && a.installedAt === b.installedAt && a.manifest.created === b.manifest.created;
+
 /** Bytes of the files a manifest needs that aren't stored here yet. */
 async function bytesNeeded(m: Manifest): Promise<number> {
   const missing = await missingFiles(m, eagerRoles(m));
@@ -91,7 +94,7 @@ export function useScanner(idle: boolean): ScannerRuntime {
       const r = await eng.call({ type: 'loadModel', bytes: rec }, [rec]);
       setBackend(r.backend);
       setModelsSha(inst.manifest.files.recognizer.sha256);
-      setInstalled(inst);
+      setInstalled((cur) => (sameInstall(cur, inst) ? cur : inst));
     } finally {
       setLoading(false);
     }
@@ -109,7 +112,7 @@ export function useScanner(idle: boolean): ScannerRuntime {
         const inst = (await installedFiles()) ?? null;
         const complete = !!inst && !(await missingFiles(inst.manifest)).length;
         if (cancelled) return;
-        setInstalled(inst);
+        setInstalled((cur) => (sameInstall(cur, inst) ? cur : inst));
         setCheckedInstall(true);
         if (complete) await startModels(eng);
       })
