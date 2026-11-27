@@ -17,7 +17,7 @@ const NAV = [
   {
     label: 'Selling',
     icon: IconCash,
-    links: [{ to: '/f2f/runs', label: 'Runs', icon: IconHistory }],
+    links: [{ to: '/f2f/runs', label: 'F2F', icon: IconHistory }],
   },
   {
     label: 'Collection',
