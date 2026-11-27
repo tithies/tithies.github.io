@@ -1,6 +1,6 @@
 # Scanner — plan of the remaining phases
 
-What's built and how it works: `SCANNER_DEV.md`. This file is what's left, in order: **phase 1 → phase 2 → phase 3**, one phase per session.
+What's built and how it works: `SCANNER_DEV.md`. This file is what's left: phase 1 (every print) and phase 3 (same-art reprints and the language) are built; **phase 2** (the real page) is next.
 
 **Starting a fresh session:**
 1. Read `SCANNER_DEV.md` section 1 (where it stands), then the next phase below.
@@ -18,7 +18,7 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, in or
 
 **Goal:** recognize any card, not only the owned ones. The Scanner is for adding cards to the collection, so mostly cards that aren't in it yet.
 
-**Status (2026-11-25): published.** The v2 index of 2026-11-24 is on Hugging Face (104,896 pictures, int8-384). Against every print, 98.0 % names and 76.4 % prints (`SCANNER_DEV.md` section 1). No v3: the lost prints are same-art reprints, phase 3's job. Step 5 is done (the page downloads the files, gives `evaluate`'s numbers, opens in 8 s). Left: step 6, the first daily run that publishes. The first one (2026-11-24) failed at the upload because the job got no `HF_TOKEN`, and opened issue #1.
+**Status (2026-11-27): published and refreshed daily.** The v2 index is on Hugging Face (first published 2026-11-24 with 104,896 pictures; 104,897 on 2026-11-26; int8-384). Against every print, 98.0 % names and 76.4 % prints (`SCANNER_DEV.md` section 1). No v3: the lost prints are same-art reprints, phase 3's job. Step 5 is done (the page downloads the files, gives `evaluate`'s numbers, opens in 8 s). Step 6 is done too: once the `HF_TOKEN` secret was set, the daily run published (the index of 2026-11-26 is the refresh's). The first run (2026-11-24) had failed at the upload without the token.
 - **Decided with the user:**
   - Hugging Face hosts the files (`tithies/card-scanner`, under a `tithies` account with a neutral e-mail);
   - the index carries the print list;
@@ -95,7 +95,7 @@ The steps below are the original plan, kept for the details.
    - **First use:** the manifest, then the model files (Cache Storage, as today) and the index (IndexedDB, a new Dexie version), with progress.
    - **Updates:** a manifest check at most once a day. A newer version replaces model and index together.
    - **Search:** about 100k dot products per side of each card, in the sandboxed engine or a worker; tens of milliseconds expected.
-   - **Non-English prints:** the index holds the default (mostly English) prints. The page reports the print (set and number); the language is a phase 2 default or phase 3's reading.
+   - **Non-English prints:** the index holds the default (mostly English) prints. The page reports the print (set and number); the language is phase 3's reading, else a phase 2 default.
    - **The owned reference set:** kept as an option or as the tie-breaker (decision 3), otherwise removed.
    - **Settings → Stored data** lists the index and the models, and *Remove all data* clears them.
    - Dropping model files on the page stays, as a developer path.
@@ -127,7 +127,7 @@ The steps below are the original plan, kept for the details.
   - "Missed card": click its 4 corners, as in the labelling mode, and it's named.
 - **Defaults:**
   - finish non-foil, set automatically for foil-only or etched-only prints;
-  - language English unless changed. Decide: maybe the collection's usual language.
+  - language as phase 3 read it (English when nothing was read), unless changed. Decide: when nothing was read, maybe the collection's usual language.
 
 **Keeping the work:** the scan session (photos, outlines, corrections) stays in IndexedDB until cleared, so a reload doesn't lose 20 photos' worth of fixes. It's listed under *Settings → Stored data* and removed by *Remove all data*.
 
@@ -163,34 +163,27 @@ The steps below are the original plan, kept for the details.
 
 ---
 
-## Phase 3 — The bottom line
+## Phase 3 — Same-art reprints and the language (built 2026-11-27)
 
-**Goal:** tell same-art reprints apart, and read the language.
+**Status:** built and measured. The numbers are in `SCANNER_DEV.md` section 1, how it works in section 2 ("Print and language check").
+- **Prints** on the 33 test photos, against every print: 76.4 % → 90.5 % (152 → 180); names unchanged. The page gives the trainer's numbers.
+- **Languages:** from the card's own words, the script, the bottom line's code and the printed name. Reading the type line and rules text, not only the code, was the user's idea.
 
-**Why:**
-- All 4 wrong prints with the right name on today's test photos are same-art reprints:
-  - Bonders' Enclave OTC against M3C (twice);
-  - Sakura-Tribe Elder M3C against MKC;
-  - Path of Ancestry CMM against M3C.
-- The right print scored within 0.002–0.016 of the wrong one, so the picture can't tell them apart.
-- Among every print (phase 1) there are more of them.
+**Decisions:**
+- **2026-11-25:** the print from both the bottom line's text and a visual check; the language from the card's own text.
+- **2026-11-27:** the bottom line's code doesn't decide before the words. Deciding it first would save about 0.15 s a card, but then a misread code would decide alone.
 
-**What the cards carry:**
-- Since 2014, the number, rarity, set code and language at the bottom left (e.g. `0123 R · MH3 · EN`; 2014–2022 cards print `123/269 R` over `M15 · EN`).
-- Cards from 2003–2014 carry a number only, and cards before 1998 none.
+**What's left** (none of it blocks phase 2):
+1. **Speed:** 3.2 s per card with both checks (33 s per photo, against 6.4 s for finding and naming). The options, cheapest first:
+   - **The visual check in 3–4 Web Workers:** the same results, that step about 3 times faster (it's 46 % of the checking time). The sandboxed engine would start workers, each with its own OpenCV.js.
+   - **The candidates' pictures aligned onto one of them,** instead of pair by pair: 11 alignments instead of 21 with 6 pictures. Measured again in the trainer.
+   - **At most 4 pictures instead of 6:** about twice as fast there. Measured again in the trainer.
+   - **On phase 2's page,** the checks run while the user reviews the cards already done.
+2. **Promo stamps and The List:** the visual check keeps most stamped and List prints as the regular one (8 of the 12 still wrong). If they matter, the next step is a trained same-art verifier at high resolution, on the PC.
+3. **Small cards:** under about 400 px the number can be misread (Artisan of Kozilek at 318 px went wrong). A minimum card height for reading would keep the search's choice there, measured again.
+4. **Real foreign photos:** the languages were measured on Scryfall's foreign pictures "photographed" in generated scenes. A few photos of the user's 13 foreign cards would check them.
 
-**How:**
-- **When:** only when the best match has same-art reprints (several prints share its `illustration_id`), or to read the language.
-- **Reading:**
-  - re-cut that corner from the full-resolution photo at about 3× scale, sharpen and binarize it;
-  - read it with Tesseract.js (bundled: no remote code), limited to the characters that can appear there;
-  - parse number, rarity, set code and language (EN FR DE IT ES PT JA KO RU ZHS ZHT PH…), then pick the reprint whose set and number match.
-- **Showing it:** the row says what was read (e.g. "read MH3 · 0123 · EN"), so the user sees why a print was chosen.
-- **Small cards:** a card too small to read (under about 700 px tall) falls back to the print picker.
-
-**Done when:** print accuracy is measured before and after, on the test photos (offline with `evaluate` and on the page), modern cards apart.
-
-**Tokens:** about 100–200k output, 1–3M cache writes, 30–60M cache reads (≈ $15–30).
+Phase 2 then uses each card's `check`: "print unsure" for its print picker, and the language for its language column.
 
 ---
 
@@ -198,7 +191,7 @@ The steps below are the original plan, kept for the details.
 1. ~~Phase 1: where the public files live~~: Hugging Face (2026-11-23).
 2. ~~Phase 1: licences and Scryfall's terms~~: read 2026-11-23 (`SCANNER_DEV.md` section 7); the model card says where everything comes from.
 3. ~~Phase 1: what to match against~~: every print, "only my prints" as a filter, no tie-breaker.
-4. **Phase 2:** the default language of scanned cards.
+4. **Phase 2:** the default language of scanned cards whose text says nothing (phase 3 reads the others).
 5. **Phase 2:** keep or drop the classic detection passes.
 6. **Optional, any time:** a Claude vision second opinion on low-confidence cards, with the user's own API key (photos would leave the browser, and it costs per photo). Not planned.
 
