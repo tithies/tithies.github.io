@@ -1,6 +1,6 @@
 # Scanner — what's left
 
-What's built and how it works: `SCANNER_DEV.md`. This file is what's left, most important first. Phases 1 and 3 are done; **phase 2, the real Scanner page, is next.**
+What's built and how it works: `SCANNER_DEV.md`. This file is what's left, most important first. Phases 1, 2 and 3 are done: the Scanner is in the menu (*Collection → Scanner*). What's left is improvements, none urgent.
 
 **Starting a fresh session:**
 1. Read `SCANNER_DEV.md` section 1 (where it stands), then "Remaining work" below.
@@ -12,7 +12,7 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, most 
    - Training runs on the user's Windows PC: I prepare the code and the commands, they run them and push `models/vN` (`python -m trainer release vN`).
    - The print and language rules live in two places that must agree: the page (`print-check.ts`, `language.ts`) and the trainer (`trainer/verify.py`). Change both, run `python -m trainer verify fixture --out ../tithies/tests/fixtures/scanner-check` and `npm test`, then measure with `verify prints` (`SCANNER_DEV.md` section 5).
    - The user's Chrome is live: read the Scanner's stored data (label drafts, installed files) before changing any of it.
-4. **Plan mode first** for phase 2, with the open decisions below asked before building.
+4. **Plan mode first** for any big step below, with its open decisions asked before building.
 
 ---
 
@@ -36,65 +36,33 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, most 
   - the language from the card's own text: name, type line, rules text, not only the bottom line's code (the user's idea), plus the printed-name lookup.
 - **Decided while measuring:** the bottom line's code doesn't decide before the words. Deciding it first would save about 0.15 s a card, but then a misread code would decide alone.
 
+**Phase 2 — the Scanner page** (2026-11-27):
+- *Collection → Scanner*:
+  - photos in (pick or drop);
+  - one row per card, its rows shown once named, its print and language checked after;
+  - the user's corrections: print picker, language, finish, "Not a card", outlines, missed cards;
+  - the cards exported through the existing export dialog;
+  - the scan kept in IndexedDB until "Clear scan".
+- Checked in the user's Chrome: a real export to a private test binder, all 18 copies verified by the export's own check.
+- **Decided with the user:**
+  - English when the text says nothing;
+  - the classic detection passes and pHash deleted;
+  - "Check prints and languages" as a switch, on by default;
+  - the table is the export list.
+- The prototype is the developer page, `#/collection/scanner/dev`.
+
 ---
 
 ## Remaining work
 
-### 1. Phase 2 — the Scanner page (next)
+### 1. Scanner page follow-ups (optional)
 
-**Goal:** the whole flow works: photos in, list corrected, cards added to the Moxfield collection or a binder.
-
-**Processing:**
-- Photos are queued one after another, with progress for each, and the page stays responsive (the engine already runs in a sandboxed iframe).
-- WebGPU when available, WASM otherwise.
-- **The print and language check** (phase 3) takes about 3.2 s per card, against under 1 s to find and name it. So a row appears as soon as the card is named, and its check fills in afterwards, while the user reviews the rows already done.
-
-**Page** *Collection → Scanner* (`/collection/scanner`, in the menu):
-- **Photo view:** outlines coloured green (sure), orange (needs review) or red (unknown), numbered. Clicking an outline highlights its row, and the other way round. The prototype's `PhotoView` and `CardsTable` are the start.
-- **Table:**
-  - the cut-out next to the matched card's picture, then name, set, number, language, finish, quantity, confidence;
-  - the print and language come from the card's `check` (`scanner-check.ts`), with how they were found (e.g. "read 0216 TDC");
-  - a print the check marks "unsure" is orange;
-  - the same print can merge into one row with a quantity.
-- **Corrections:**
-  - "Pick print": the check's candidates first (same-art prints), then every print of that name with pictures. The labelling mode's `PrintPicker` is the start.
-  - "Not a card" removes a row.
-  - "Missed card": click its 4 corners, as in the labelling mode, and it's named and checked.
-  - The language can be changed per row.
-- **Defaults:**
-  - finish non-foil, set automatically for foil-only or etched-only prints;
-  - language as phase 3 read it. When nothing was read it's English for now (decision 1 below).
-
-**Keeping the work:** the scan session (photos, outlines, checks, corrections) stays in IndexedDB until cleared, so a reload doesn't lose 20 photos' worth of fixes. It's listed under *Settings → Stored data* and removed by *Remove all data*.
-
-**Export:**
-- Rows become `ExportItem`s (note "Scanned") and go through the existing export list, bar and dialog, as on the Comparator.
-- Moxfield's import finds each print by set and number; the Language field carries the language.
-
-**Also:**
-- **The prototype's tools** (labelling mode, scores table, methods, "Copy results JSON") move to a developer view that stays hidden. OpenCV.js is still needed to flatten the cards.
-- **Settings:** index status (version, date, size, update now), backend in use.
-- **Tests (vitest):** rows to export items, merging and quantities, the stored session, the corrections.
-- **README:** a *Scanner* section. The website is updated separately by the user.
-
-**Code to reuse:**
-
-| Need | Where |
-|---|---|
-| Export list, bar and dialog to Moxfield | `src/lib/export/list.ts` (`useExportList`), `src/lib/export/ui/ExportBar.tsx`, `ExportDialog.tsx`, used as in `ComparisonPage.tsx` |
-| Export item shape | `ExportItem` in `src/lib/export/types.ts` (set, number, finish, language, quantity, Scryfall id; `cardId` can stay empty: Moxfield's CSV import finds the print by set and number) |
-| The owned prints | Dexie table `collectionEntries` (the account's collection snapshot) |
-| A card's print and language check | `checkCard` in `src/features/scanner/scanner-check.ts`, as `scanPhoto` calls it in `pipeline.ts` |
-| Menu entry, route | `src/entrypoints/dashboard/Layout.tsx` (*Collection* section), `src/entrypoints/dashboard/main.tsx` |
-| Stored data listing and clearing | `src/features/settings/stored-data.ts` |
-| Language badge, card thumbnails | `src/lib/ui/LangBadge.tsx`, `src/lib/ui/CardThumb.tsx` |
-| Scryfall picture URL from an id | `src/lib/f2f/links.ts` (`scryfallImage`) |
-
-**Done when:**
-- a real photo goes through to a test binder on Moxfield, checked on Moxfield;
-- `npm run typecheck` and `npm test` pass.
-
-**Tokens:** about 250–400k output, 3–6M cache writes, 80–150M cache reads (≈ $40–70).
+1. **Speed:** see 2.1. The rows already show before the checks, so the wait is mostly while reviewing.
+2. **One row per print with a quantity:** today it's one row per card (each tied to its outline), and the export merges the same print, finish and language. A grouped view would help with big scans of duplicates.
+3. **Several scan sessions,** named (one per binder page batch, say). Today there's one, until "Clear scan".
+4. **Index status in Settings** (version, date, size, "Check for update"): today it's on the Scanner page only, with the files' size in Stored data.
+5. **The website** (`site/`) doesn't mention the Scanner yet; the user updates it.
+6. **A Selling run from a scanned list** (F2F buy prices), see 4.
 
 ### 2. Phase 3 follow-ups (optional, any order)
 
@@ -105,7 +73,7 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, most 
 2. **Promo stamps and The List:** 8 of the 11 prints still wrong are stamped promos or The List's prints, which the visual check keeps as the regular print. If they matter, the next step is a trained same-art verifier at high resolution, on the PC (its own plan).
 3. **Small cards:** under about 400 px the number can be misread; Artisan of Kozilek at 318 px went wrong. A minimum card height for reading would keep the search's choice there. Measured again in the trainer.
 4. **Real foreign photos:** the languages were measured on Scryfall's foreign pictures "photographed" in generated scenes. Photos of some of the user's 13 foreign cards (8 French, 4 Japanese, 1 German), labelled as usual, would check them on real ones.
-5. **The prototype's "Method shown"** still defaults to the search alone ("DINOv2 padded · CLS"), so its top 5 hides the check's pick. One line, if the prototype stays in use before phase 2.
+5. **The developer page's "Method shown"** still defaults to the search alone ("DINOv2 padded · CLS"), so its top 5 hides the check's pick. One line.
 
 ### 3. Models (optional)
 
@@ -120,9 +88,9 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, most 
 
 ## Open decisions
 
-1. **Phase 2:** the language of scanned cards whose text says nothing: English, or the collection's usual language.
-2. ~~Phase 2: keep or drop the classic detection passes~~: deleted, with the pHash baseline (2026-11-27).
-3. **Phase 2:** whether the print and language check can be turned off on the real page (it's most of the time per card).
+1. ~~Phase 2: the language of cards whose text says nothing~~: English (2026-11-27).
+2. ~~Phase 2: the classic detection passes~~: deleted, with the pHash baseline (2026-11-27).
+3. ~~Phase 2: can the check be turned off~~: yes, "Check prints and languages", on by default (2026-11-27).
 4. **Phase 3 follow-ups:** which speed option, if any, and whether promo and List prints are worth a trained verifier.
 
 **Prices** used above: Opus 5.5 list prices, $20 per million output tokens, $5 per million cache writes, $0.20 per million cache reads. Actual billing depends on the plan.

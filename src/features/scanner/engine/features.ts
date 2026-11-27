@@ -78,7 +78,8 @@ export async function loadModel(bytes: ArrayBuffer): Promise<'webgpu' | 'wasm'> 
   let lastError: unknown;
   for (const ep of tries) {
     try {
-      session = await ort.InferenceSession.create(modelBytes, { executionProviders: [ep], graphOptimizationLevel: 'all' });
+      // logSeverityLevel 3: onnxruntime's notice that shape ops run on the CPU is not an error.
+      session = await ort.InferenceSession.create(modelBytes, { executionProviders: [ep], graphOptimizationLevel: 'all', logSeverityLevel: 3 });
       backend = ep;
       return ep;
     } catch (e) {

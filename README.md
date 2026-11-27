@@ -108,6 +108,34 @@ A binder is read with Moxfield's own binder search (`/v1/trade-binders/{publicId
 
 The export is reusable by other pages: `src/lib/export/` (export list, dialog, plan, check, background job) with each site's writes in `src/lib/sites/<type>/export.ts`. One Moxfield job runs at a time: a sync waits for an export (or the exports started together) and the other way round.
 
+## Feature 3 — Scanner
+
+**Collection → Scanner** adds cards from photos. Drop photos of your cards (spread on a table, a binder page, a hand of cards…), and Tithies finds every card in them, names it among every Magic print, and reads its print and language from the card itself. You correct what needs it, then add the list to a Moxfield binder or collection.
+
+1. **The first time**, **Get the Scanner** downloads its models and card index from Hugging Face (about 195 MB, once). They're kept in the browser (Settings → Stored data) and stay current: a new card index (new sets) downloads by itself; new models wait for **Update**.
+2. **Add photos** (pick or drop them, several at once). Full camera resolution reads the most. Each photo's cards are found and named first, so its rows show within seconds. Then, with **Check prints and languages** (on by default), each card's print and language are read, about 3 s a card on a graphics card. Photos never leave the browser.
+3. **Review.** The photo shows numbered outlines, and the table one row per card: green when sure, orange to review (**Next to review**, key N), red when not recognized, blue once you corrected it.
+   - **Pick print**: the prints with the same artwork first (they differ only by the set symbol, the collector line at the bottom and stamps), then every print of that card, then any card by name.
+   - **Language** and **finish** per row: only the finishes the print exists in, and a print that exists only in foil (or etched) starts so.
+   - **Not a card** leaves a row out (the same button puts it back).
+   - Drag the corners of the selected card to **fix its outline**, or **Add a missed card** (key A) by clicking its 4 corners: the card is named and checked again.
+4. **Add N cards to Moxfield…** opens the export dialog (see *Exporting to Moxfield* above): a new or existing binder, or the collection, of the account logged in on Moxfield. Cards are added Near Mint, each in its language, with their exact set, collector number and finish; copies of the same print, finish and language become one line with a quantity. Exported rows are marked **Sent** and aren't sent again.
+
+**How it decides.**
+- **The card:** its picture against every print's (Scryfall's, about 105,000 pictures), with a model trained for it.
+- **The print among reprints with the same artwork:** the bottom line's set code and collector number when they're readable; otherwise a comparison with each candidate's picture, only where those pictures differ. When neither decides, the row says *Unsure: pick the print*.
+- **The language:** the card's own words (type line, rules text), its script (Japanese, Korean, Russian, Chinese), the bottom line's language code, or its printed name; English when nothing is readable.
+- On 33 test photos (199 cards): 98 % of the cards named right, 91 % of the prints; no English card read as another language.
+
+**Kept until cleared.** The scan (photos, cards, corrections) stays in the browser until **Clear scan**, so a reload loses nothing. Settings → Stored data lists it as *Scanner photos*. The Scanner runs in one tab at a time: another tab waits, and takes over when the first one closes.
+
+**Limits.**
+- Foil isn't detected: set it per row.
+- Promo-stamped prints and The List's prints are often taken for the regular print: pick them.
+- Cards under about 400 px tall in the photo may get the wrong print; mostly covered cards may be missed or misnamed.
+
+The Scanner's developer page (`#/collection/scanner/dev`, not in the menu) has the labelling mode and the measurements: see `SCANNER_DEV.md`.
+
 ## Change log
 
 **Change log** (above Settings) lists everything Tithies changed on your sites, newest first, for every account: each action (an export…), its status, and every request it sent, exactly as sent (method, URL, body or CSV, status, the start of the answer, duration; sessions and tokens are never logged). An action waiting for the one before it shows as *waiting*. An action stopped by a browser restart shows as *interrupted* and is never resumed (a waiting one never starts: nothing was changed for it); a request without an answer shows as *unknown*. For an export it also shows the check, and keeps the entries it deleted with a **CSV to import them back** on Moxfield (Moxfield has no undo). Download any action as JSON. Every write goes through one logged path (`SiteClient.mutate`), so future features' changes are logged the same way. Clear the log in **Settings → Stored data**.

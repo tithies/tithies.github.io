@@ -25,7 +25,8 @@ export async function loadDetector(bytes: ArrayBuffer): Promise<{ size: number; 
   let lastError: unknown;
   for (const ep of tries) {
     try {
-      const s = await ort.InferenceSession.create(new Uint8Array(bytes), { executionProviders: [ep], graphOptimizationLevel: 'all' });
+      // logSeverityLevel 3: onnxruntime's notice that shape ops run on the CPU is not an error.
+      const s = await ort.InferenceSession.create(new Uint8Array(bytes), { executionProviders: [ep], graphOptimizationLevel: 'all', logSeverityLevel: 3 });
       const meta = s.inputMetadata?.[0];
       const shape = meta && 'shape' in meta ? meta.shape : [];
       const size = Number(shape[2]);

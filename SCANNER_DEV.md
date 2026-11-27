@@ -2,20 +2,21 @@
 
 **Feature:** you upload one or more photos, and Tithies finds every Magic card in them: each card's outline (its 4 corners), the card and its print. You correct the list, then add it to the Moxfield collection or a binder. This is the "Scanner cards" item of `todo-future.txt`.
 **Out of scope:** telling foil from non-foil in a photo. Finish defaults to non-foil and you change it per row.
-**What's left:** `SCANNER_PLAN.md`, "Remaining work". Phases 1 (every print) and 3 (same-art reprints and the language) are built; phase 2, the real Scanner page, is next.
+**What's left:** `SCANNER_PLAN.md`, "Remaining work". Phases 1 (every print), 2 (the Scanner page) and 3 (same-art reprints and the language) are built.
 
 ---
 
 ## 1. Where it stands (2026-11-27)
 
-**Built** (on master; a hidden prototype page, `dashboard.html#/collection/scanner`, not in the menu):
+**Built** (on master): the **Scanner page**, *Collection → Scanner* (`dashboard.html#/collection/scanner`), and the **developer page** (`#/collection/scanner/dev`, not in the menu: other model sources, the labelling mode, the scores):
 - **Engines:** OpenCV.js 4.12 and onnxruntime-web 1.31.1 on WebGPU, in a sandboxed iframe.
 - **Detection:** a trained detector (`card-detector.onnx`). The first classic passes (contours, lines, binder grid) and the pHash baseline were deleted on 2026-11-27, at the user's choice: the detector and the image vectors beat them by far.
 - **Recognition:** a fine-tuned DINOv2-small (`card-recognizer.onnx`), or DINOv2-small as downloaded.
 - **Matching:** against every print, from an index made by the trainer and published with the models on Hugging Face ("only my prints" is a filter on it). The reference set built in the browser from the owned prints stays, as the developer path.
 - **Print and language check** (phase 3): the print among same-art reprints, from the bottom line's text or a comparison with the candidates' pictures, and the card's language from its own text. It uses PaddlePaddle's OCR models, published with the index.
 - **Cleanup:** bad shapes are dropped once the cards are named.
-- **Labelling mode:** it makes the labelled photos that measure and train the models.
+- **The Scanner page** (phase 2): photos in, one row per card, the user's corrections, the cards exported to a Moxfield binder or collection; the scan kept in IndexedDB until cleared.
+- **Labelling mode** (developer page): it makes the labelled photos that measure and train the models.
 - **Training kit:** the private repo `tithies-scanner-trainer`, cloned next to this one. It holds the code, the labelled photos and the model versions (`models/vN`). The training runs on the user's PC.
 
 **How it got here** (names right at the first try):
@@ -108,6 +109,12 @@
   - where it goes: the visual check 46 % (4.2 s each on the 80 cards that needed it, up to 23 s with 6 pictures), the first Latin reading 29 %, the text detection 14 %, the later readings for the language 6 %.
   - Reading the text in stages took a 6-card photo from 58 s to 25 s. It costs one print against reading every line (181).
 
+**Phase 2: the Scanner page** (2026-11-27, in the user's Chrome, AMD RDNA2 GPU):
+- **Opening:** ready 7.8 s after a reload, with the published files already installed (nothing downloaded again).
+- **Two test photos (19 cards):** the first photo's rows showed after 15 s, the second's after 25 s; every check was done after 68 s. A missed card, added by its 4 corners, is named and checked in about 10 s.
+- **Corrections** (picked print, language, "Not a card", a moved outline, a missed card) are all there after a reload.
+- **Export:** 18 cards to a new private test binder, through the export dialog: the check after the export found all 18 copies in the binder, a French one included, and nothing else changed.
+
 **Every print, technical checks** (2026-11-23):
 - **Same numbers as the trainer:** with an index of the owned collection (int8, 384 dimensions), the page's results on the 33 test photos equal `evaluate v2 --format i8-384`, photo for photo. Against the collection, every format holds the same scores; the best scores move by at most 0.0013 in int8-384 and 0.016 at 128 dimensions.
 - **Search** (a card is 2 searches: upright and turned): 105,000 rows on WebGPU take 34 ms for 4 cards, 45 ms for 8 and 124 ms for 16, against 1.3 s for 4 cards on the CPU in Chrome.
@@ -156,7 +163,7 @@
      - the cut-out is aligned onto each picture (ECC homography at 1/4, then 1/2 size);
      - for each pair of pictures, only where they differ (blurred difference above 0.08, inside the card, not where the photo is near white), the photo's windowed correlation (15 × 15) with each;
      - the winner leads every other picture; its margin is its smallest lead.
-     - It overrides the search only above 0.04 (the best on the train split): "checked". "checked: kept" when it agrees, "unsure" when it can't decide (for phase 2's print picker).
+     - It overrides the search only above 0.04 (the best on the train split): "checked". "checked: kept" when it agrees, "unsure" when it can't decide (the Scanner page then asks the user to pick the print).
 - **The language** (`languages.json`, the trainer's word lists):
   1. **Latin words** between 45 % and 90 % of the height:
      - type words (Creature, Créature, Kreatur…) count 3 points, common words (you, vous, Sie…) 1, a word shared by languages is split between them;
@@ -171,6 +178,37 @@
   5. **Otherwise English**, and the user changes it.
 - **Results:** a new method in `byMethod` (`dino-pad-cls+check`), so the scores table shows before and after. Each card also gets `check`: how the print was decided and its margin, the text read, the language and how it was found, and the time of each step. All of it is in "Copy results JSON".
 - **The same rules as the trainer** (`trainer/verify.py`): `tests/fixtures/scanner-check` holds real cards read and decided there (`python -m trainer verify fixture`). The page's rules must read the same boxes and decide the same.
+
+**The Scanner page** (phase 2: `ui/ScanPage.tsx`, `ui/useScanner.ts`, `scan-session.ts`, `scan-queue.ts`, `scan-export.ts`):
+- **Files:** `useScanner` runs the published files only.
+  - "Get the Scanner" downloads them, with their size shown.
+  - A new index alone downloads by itself and is swapped in between jobs; new models wait for "Update".
+  - "Only my prints" is the index's mask.
+- **The session** (`tithies-scanner` → `scanPhotos`, Dexie version 4): one row per photo. It holds:
+  - the photo file itself;
+  - its cards: quad in full-resolution pixels, cut-out as WebP (ImageBitmaps can't be stored), the search's top 20, the check without its text lines, the user's corrections (`edit`), when sent.
+  - It stays until "Clear scan", listed in Settings → Stored data as "Scanner photos" (its own group, cleared by Remove all data too).
+- **Job order** (`scan-queue.ts`), one engine job at a time:
+  - every queued photo is found and named first, so its rows show at once;
+  - then its cards are checked, photo by photo (`checkPhoto` loads the photo again);
+  - a check job stops between two cards when a new photo waits.
+- **One tab at a time:** a Web Lock (`tithies-scanner-page`). Another tab shows a notice, and takes over when the first one closes.
+- **What a card says** (`scan-export.ts`):
+  - **print:** the user's pick, else the check's, else the search's best;
+  - **language:** the user's, else the one read, else English;
+  - **finish:** the user's when the print has it, else non-foil, or foil or etched when the print exists only so (the index's `finishes` bitmask).
+  - **Colour:**
+    - **green:** the name is sure (the tuned model's limits, its lead taken over the first other name among the top 20, since a card with many reprints fills the top 5 with its own name) and the print decided: only print, read, or picture check;
+    - **orange:** to review;
+    - **red:** not recognized;
+    - **blue:** corrected by the user.
+- **Corrections are final:** a check or a re-naming saves a card with its current corrections (`updateSessionCard`, `putSessionCard`, in transactions).
+- **Outlines:** a dragged corner or a missed card's 4 corners load the photo at full resolution, then `nameQuads` and `checkCard`.
+- **Export:**
+  - **items:** one per listed card not sent yet: `cardId` empty (Moxfield's CSV import finds the print by set and number), the row's language, `printLang` the print's own (English for almost all), note "Scanned";
+  - **dialog:** the existing `ExportDialog`, with `sourceAccountKey` null and source "Scanner (N photos)";
+  - **recent exports:** found by that source prefix (`useRecentExports`);
+  - **after it starts:** the cards are marked sent.
 
 **Every-print index** (`index-file.ts`, `print-index.ts`, `search-*.ts`, `gpu-search.ts`):
 - **Made** by `python -m trainer index vN` in the trainer repo, with version N's recognizer and the page's exact preparation. It only goes with its own recognizer: the page uses it only when the running recognizer's SHA-256 is the one in its manifest.
@@ -221,7 +259,8 @@
 | `geometry.ts` | Quads: IoU, coverage, area, ordering |
 | `labels.ts`, `score.ts` | `labels.json` and the scoring of scans against it |
 | `store.ts` | The Dexie database: reference rows, metadata (also the installed manifest and the last check), label drafts |
-| `ui/` | The page: `ScannerPage` (state and options), `PhotoView`, `CardsTable`, `ResultsTable` (scores), `LabelEditor`, `LabelsTable` and `PrintPicker` (labelling) |
+| `ui/` | The Scanner page: `ScanPage`, `useScanner`, `ScanTable`, `ScanPrintPicker`. The developer page: `ScannerPage` (state and options), `PhotoView`, `CardsTable`, `ResultsTable` (scores), `LabelsTable` and `PrintPicker` (labelling). `LabelEditor` (outlines, corners) serves both |
+| `scan-session.ts`, `scan-queue.ts`, `scan-export.ts` | The Scanner page's stored scan, its job order, and what each card says and exports |
 | `scanner-check.ts` | Phase 3 per card: the cut-out, the staged reading, the print and language decisions, the OCR models loaded on first use |
 | `print-check.ts`, `language.ts`, `languages.json` | The print and language rules (the trainer's) |
 | `engine/text.ts`, `engine/print-visual.ts` | In the engine: PP-OCRv5 text detection and reading, the visual print check |
@@ -331,11 +370,11 @@ Format 2:
   - `python -m trainer verify fixture --out ../tithies/tests/fixtures/scanner-check`, then `npm test`: the page must read the same boxes and decide the same;
   - measure with `verify prints --index work/hub/index-<commit> --split test` (about 15 minutes on the CPU; also `--split train`), `verify labelled-languages` and `verify languages --per-lang 30` (about 2 hours). Names must not move.
   - The published index under `work/hub/` is the one `refresh --check` downloads.
-  - On the page: the 33 test photos in batches of 6 (`input[type=file]`), then the scores table's "Print, first try" rows, summed over the batches. About 18 minutes.
+  - On the developer page: the 33 test photos in batches of 6 (`input[type=file]`), then the scores table's "Print, first try" rows, summed over the batches. About 18 minutes.
 - **Photos:** a new batch is stripped of its metadata (`python -m trainer photos strip`: GPS, motion-photo video; pixels unchanged), labelled on the page, and committed in the trainer repo's `photos/`. `photos/owned-prints.json` is read from the page's reference set, so the evaluation uses the same gallery.
 - **Running the page:**
   1. build (`npm run build:win` copies it to the Windows folder Chrome loads) and reload the extension;
-  2. open `dashboard.html#/collection/scanner`; the published models start by themselves, dropped ones with "Start the model";
+  2. open the developer page, `dashboard.html#/collection/scanner/dev`; the published models start by themselves, dropped ones with "Start the model". The user's page is `#/collection/scanner`;
   3. drop photos (full camera resolution) with `labels.json` to get the scores table.
   - "Copy results JSON" copies every result without pixels.
   - "Rejected shapes" shows the outlines the cleanup dropped.
