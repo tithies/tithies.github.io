@@ -88,6 +88,10 @@ describe('phase 3 helpers', () => {
     expect([...readBottom([line('U0040'), line('MULENWOLFSKULLIACK')]).numbers]).toEqual(['40']);
     expect([...readBottom([line('283 R'), line('C21·ENJIM NELSON')]).numbers]).toEqual(['283']);
     expect([...readBottom([line('TM & © 2013 Wizards of the Coast 29/356')]).numbers]).toEqual(['29']);
+    // A leading 0 read as Q, O or D: Viscera Seer's 'C 0199 TDC • EN' read as 'C Q199 TDCEN…'.
+    expect([...readBottom([line('C Q199 TDCENIOHN STANKO')]).numbers]).toEqual(['199']);
+    expect([...readBottom([line('RO216 TDC'), line('LO273 LTR')]).numbers]).toEqual(['216', '273']);
+    expect([...readBottom([line('DOMINIK MAYER'), line('TDCQ199'), line('Q1999')]).numbers]).toEqual([]);
   });
 
   it('tells scripts and near set codes', () => {

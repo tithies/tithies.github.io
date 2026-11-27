@@ -166,7 +166,7 @@ The steps below are the original plan, kept for the details.
 ## Phase 3 — Same-art reprints and the language (built 2026-11-27)
 
 **Status:** built and measured. The numbers are in `SCANNER_DEV.md` section 1, how it works in section 2 ("Print and language check").
-- **Prints** on the 33 test photos, against every print: 76.4 % → 90.5 % (152 → 180); names unchanged. The page gives the trainer's numbers.
+- **Prints** on the 33 test photos, against every print: 76.4 % → 91.0 % (152 → 181); names unchanged. The page gives the trainer's numbers.
 - **Languages:** from the card's own words, the script, the bottom line's code and the printed name. Reading the type line and rules text, not only the code, was the user's idea.
 
 **Decisions:**
@@ -179,7 +179,7 @@ The steps below are the original plan, kept for the details.
    - **The candidates' pictures aligned onto one of them,** instead of pair by pair: 11 alignments instead of 21 with 6 pictures. Measured again in the trainer.
    - **At most 4 pictures instead of 6:** about twice as fast there. Measured again in the trainer.
    - **On phase 2's page,** the checks run while the user reviews the cards already done.
-2. **Promo stamps and The List:** the visual check keeps most stamped and List prints as the regular one (8 of the 12 still wrong). If they matter, the next step is a trained same-art verifier at high resolution, on the PC.
+2. **Promo stamps and The List:** the visual check keeps most stamped and List prints as the regular one (8 of the 11 still wrong). If they matter, the next step is a trained same-art verifier at high resolution, on the PC.
 3. **Small cards:** under about 400 px the number can be misread (Artisan of Kozilek at 318 px went wrong). A minimum card height for reading would keep the search's choice there, measured again.
 4. **Real foreign photos:** the languages were measured on Scryfall's foreign pictures "photographed" in generated scenes. A few photos of the user's 13 foreign cards would check them.
 

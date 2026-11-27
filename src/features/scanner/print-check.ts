@@ -47,6 +47,8 @@ export function readBottom(lines: readonly TextLineRead[]): BottomRead {
     if (l.y < 0.86 || l.conf < 0.5 || l.x > 0.55) continue;
     let t = l.text.toUpperCase();
     text.push(t);
+    // A 4-digit number's leading 0 read as O, Q or D ('C Q199' for 'C 0199'), alone or after a rarity letter.
+    t = t.replace(/(?<![A-Z0-9])([CURMLST]?)[OQD](?=\d{3}(?!\d))/g, '$10');
     // A rarity letter glued to a 4-digit number ('U0040') is split off; set codes such as C21 have 2 digits.
     t = t.replace(/(?<![A-Z0-9])([CURMLST])(?=\d{4}(?!\d))/g, '$1 ');
     for (const m of t.matchAll(/(©|@|\b(?:19|20)\d\d\b)|(?<![0-9A-Z])0*(\d{1,4})(?:\/\d{1,4})?(?!\d)/g)) {

@@ -67,21 +67,21 @@
 
 | On the 33 test photos (199 cards), against every print | Search alone | With the check |
 |---|---|---|
-| Print right | 76.4 % (152) | **90.5 % (180)** |
+| Print right | 76.4 % (152) | **91.0 % (181)** |
 | Name right | 98.0 % (195) | 98.0 % (195) |
 
-- **The page gives the trainer's numbers** (`python -m trainer verify prints`, the same index): 180 on both, the same 3 cards broken.
-- **Fixed (31):**
-  - 25 by reading the bottom line's set code and number (24 alone, 1 with the visual check among the prints it allowed);
+- **The page gives the trainer's numbers** (`python -m trainer verify prints`, the same index): 180 on both on all 33 photos, the same 3 cards broken. Then a leading 0 read as O, Q or D in the bottom line fixed Viscera Seer (181); the shared test cases check the page decides the same.
+- **Fixed (32):**
+  - 26 by reading the bottom line's set code and number (25 alone, 1 with the visual check among the prints it allowed);
   - 6 by the visual check alone: The List's icon, a promo stamp, a reprint's set symbol.
 - **Broken (3):**
   - Trostani's promo-stamped print lost to the regular one (margin 0.045);
   - Suffer the Past (0.051);
   - Artisan of Kozilek, 318 px tall: its number was misread.
-- **Still wrong (12):**
+- **Still wrong (11):**
   - promo-stamped prints the check keeps as the regular one (Steel Seraph twice, Split Up, Clarion Conqueror, The Necrobloom);
   - prints of The List (Eddytrail Hawk twice, Supply Runners);
-  - bottom lines too blurred, covered or small to read, with the pictures too close to decide (Viscera Seer, Kindred Dominance, Odric, Caves of Koilos at 420 px).
+  - bottom lines too blurred, covered or small to read, with the pictures too close to decide (Kindred Dominance, Odric, Caves of Koilos at 420 px).
 - **Languages:**
   - **Test photos:** the 196 English cards read as English, and the 2 Japanese cards as Japanese.
   - **Every labelled card** (all splits), from its labelled corners: none of the 509 English cards reads as another language, and the 2 Japanese cards read as Japanese.
@@ -149,7 +149,7 @@
   - Lines are 48 px tall, read 16 at a time, padded to a fixed set of widths (`WIDTHS`): on WebGPU each new input width compiles new shaders.
 - **The print**, only when the best match's artwork has other prints (same name, same artwork, same face) among the search's top 20:
   1. **The bottom line:**
-     - its number is read (a rarity letter split off, years ignored);
+     - its number is read (a rarity letter split off, a leading 0 read as O, Q or D put back, years ignored);
      - a candidate's printed set and number are those on the card: The List's original set and number, a promo set's main set;
      - exactly one candidate agreeing gives the print ("read"); several leave only those.
   2. **Otherwise the visual check**, against up to 6 candidates' Scryfall `large` pictures:
