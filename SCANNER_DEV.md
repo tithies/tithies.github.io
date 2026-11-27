@@ -2,7 +2,7 @@
 
 **Feature:** you upload one or more photos, and Tithies finds every Magic card in them: each card's outline (its 4 corners), the card and its print. You correct the list, then add it to the Moxfield collection or a binder. This is the "Scanner cards" item of `todo-future.txt`.
 **Out of scope:** telling foil from non-foil in a photo. Finish defaults to non-foil and you change it per row.
-**What's left to build:** `SCANNER_PLAN.md` (phase 2: the real page; phases 1 and 3, every print and the print and language check, are built).
+**What's left:** `SCANNER_PLAN.md`, "Remaining work". Phases 1 (every print) and 3 (same-art reprints and the language) are built; phase 2, the real Scanner page, is next.
 
 ---
 
@@ -42,7 +42,7 @@
 - **What's left:**
   - 1 card missed: Marchesa in a fanned hand;
   - 2 wrong names, both cards mostly covered by others (scores 0.54 and 0.37: orange);
-  - 4 wrong prints, all same-art reprints (phase 3);
+  - 4 wrong prints, all same-art reprints (the kind phase 3's check now handles);
   - 12 extra shapes, all orange (0.46–0.59).
 - **Training photos:** the weak spots (fans, offset stacks, binder pages from further away, piles, sleeves at an angle) are mostly training photos now, so the test set measures them little.
 
@@ -61,7 +61,7 @@
   - 28 have the same artwork and the same frame (The List, Commander and Jumpstart reprints): only the set symbol and the bottom line differ;
   - 15 more have the same artwork with a small difference, almost always a promo stamp; one is a real frame difference (M11 against CMR);
   - 3 are wrong names.
-  - The right print is usually second, a few hundredths behind. Retraining can't fix most of these: the bottom line can (phase 3).
+  - The right print is usually second, a few hundredths behind, so retraining can't fix most of these. Phase 3's check fixes 32 of them and breaks 3 (next block).
 
 **Phase 3: the print and the language** (2026-11-27; the page's "Check prints" and "Read language", on by default):
 
@@ -323,10 +323,16 @@ Format 2:
   - **Published:** after `python -m trainer index vN` and `publish vN` on the PC, the page offers "Update" (or "Check for update" first). Index updates after that come from the daily job by themselves.
   - **Before publishing:**
     1. `git pull` the trainer repo;
-    2. drop `models/vN/index/manifest.json`, `index-*.bin` and `prints-*.json.gz` on the photos box;
+    2. drop `work/index/vN/manifest.json`, `index-*.bin` and `prints-*.json.gz` (written by `python -m trainer index vN` on the PC) on the photos box;
     3. drop the two models too. Files over 50 MB go through the browser tool in parts.
   - **A small index of the collection to try the page:** `python -m trainer index v2 --gallery owned --out work/index/v2-owned --no-eval`. It's never published: `publish` refuses it.
   - **Without an index:** "Built here (my prints)", then "Build the reference set" for the new recognizer.
+- **Changing the print or language rules** (phase 3):
+  - the page's `print-check.ts` and `language.ts` and the trainer's `trainer/verify.py` hold the same rules; change both;
+  - `python -m trainer verify fixture --out ../tithies/tests/fixtures/scanner-check`, then `npm test`: the page must read the same boxes and decide the same;
+  - measure with `verify prints --index work/hub/index-<commit> --split test` (about 15 minutes on the CPU; also `--split train`), `verify labelled-languages` and `verify languages --per-lang 30` (about 2 hours). Names must not move.
+  - The published index under `work/hub/` is the one `refresh --check` downloads.
+  - On the page: the 33 test photos in batches of 6 (`input[type=file]`), then the scores table's "Print, first try" rows, summed over the batches. About 18 minutes.
 - **Photos:** a new batch is stripped of its metadata (`python -m trainer photos strip`: GPS, motion-photo video; pixels unchanged), labelled on the page, and committed in the trainer repo's `photos/`. `photos/owned-prints.json` is read from the page's reference set, so the evaluation uses the same gallery.
 - **Running the page:**
   1. build (`npm run build:win` copies it to the Windows folder Chrome loads) and reload the extension;
@@ -337,6 +343,7 @@ Format 2:
 - **Local checks:**
   - a CPU Python environment runs the trainer's short runs and `evaluate` (about 12 minutes for a new recognizer's gallery, 1.5 minutes when cached);
   - data loaders start their workers with `spawn`, because forked ones hang on Linux;
+  - the OCR runs take about 2.5 GB each: 6 of them at once ran the dev machine out of memory, 3 were fine;
   - `SCANNER_PHOTO=<photo> npx vitest run tests/scanner-photo.debug.test.ts` runs the classic detection in Node and writes `<photo>.debug.png` and `.txt` to the temp folder's `scanner-debug/` (`SCANNER_EXPECT=x0,y0,x1,y1` reports the line quad closest to a known card).
 
 ---
