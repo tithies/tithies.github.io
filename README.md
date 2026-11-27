@@ -113,8 +113,12 @@ The export is reusable by other pages: `src/lib/export/` (export list, dialog, p
 **Collection → Scanner** adds cards from photos. Drop photos of your cards (spread on a table, a binder page, a hand of cards…), and Tithies finds every card in them, names it among every Magic print, and reads its print and language from the card itself. You correct what needs it, then add the list to a Moxfield binder or collection.
 
 1. **The first time**, **Get the Scanner** downloads its models and card index from Hugging Face (about 195 MB, once). They're kept in the browser (Settings → Stored data) and stay current: a new card index (new sets) downloads by itself; new models wait for **Update**.
-2. **Add photos** (pick or drop them, several at once). Full camera resolution reads the most. Each photo's cards are found and named first, so its rows show within seconds. Then each card's print and language are read (**Read each card**, the default), about 3 s a card on a graphics card: the card shows a spinning grey ring until then. Or pick **All in English**, **All in French**…: nothing is read, faster, every card takes that language, and the prints among same-art reprints are left to you. Photos never leave the browser. Leaving the page pauses the work; it goes on when you come back. **Clear scan** stops everything at any time.
-3. **Review.** The photo shows numbered outlines, and the table one row per card: green when sure, orange to review (**Next to review**, key N), red when not recognized, blue once you corrected it.
+2. **Add photos** (pick or drop them, several at once). Full camera resolution reads the most. Photos never leave the browser.
+   - Each photo's cards are found and named first, so its rows show within seconds.
+   - Then each card's print and language are read (**Read each card**, the default), about 3 s a card on a graphics card. Until then the card is violet, with a spinning ring around its number.
+   - Or pick **All in English**, **All in French**…: nothing is read, it's faster, every card takes that language, and the prints among same-art reprints are left to you.
+   - Leaving the page pauses the work; it goes on when you come back. **Clear scan** stops everything at any time.
+3. **Review.** The photo shows numbered outlines, and the table one row per card: violet while being read, green when sure, orange to review (**Next to review**, key N), red when not recognized, blue once you corrected it.
    - **Pick print**: the prints with the same artwork first (they differ only by the set symbol, the collector line at the bottom and stamps), then every print of that card, then any card by name.
    - **Language** and **finish** per row: only the finishes the print exists in, and a print that exists only in foil (or etched) starts so.
    - **Not a card** leaves a row out (the same button puts it back).
@@ -169,9 +173,10 @@ Every push to `master` runs `.github/workflows/pages.yml`: typecheck, tests, `np
 ### Layout
 
 ```
-src/entrypoints/          background worker, content scripts (Moxfield hook + panel, F2F mode helper), dashboard page
+src/entrypoints/          background worker, content scripts (Moxfield hook + panel, F2F mode helper), dashboard page, the Scanner's sandboxed engine page
 src/features/f2f-buylist/ runner (batches, cache, resume), matcher, bulk rates, dashboard UI
 src/features/collection-comparison/ deck ↔ collection comparison, options, comparison page
+src/features/scanner/     the Scanner: card detection and naming, print and language check, scan session, page (SCANNER_DEV.md)
 src/features/change-log/  Change log page: every change made to a site, request by request
 src/features/settings/    Settings page: accounts, Moxfield pace, stored data, reset
 src/lib/accounts/         accounts, the current account, and the access layer: the only code that touches per-account data
@@ -188,4 +193,4 @@ tests/                    Vitest specs + trimmed real API fixtures
 
 New features go in `src/features/<name>/` and add a section to the dashboard navbar (`src/entrypoints/dashboard/Layout.tsx`). Per-account data goes through `accountData(key)` (`src/lib/accounts/data.ts`): a test fails if anything else reads or writes the per-account tables.
 
-Stack: [WXT](https://wxt.dev), React 19, [Mantine 9](https://mantine.dev) (dark theme) + [mantine-datatable](https://icflorescu.github.io/mantine-datatable/), Dexie, ky, p-queue, zod, PapaParse.
+Stack: [WXT](https://wxt.dev), React 19, [Mantine 9](https://mantine.dev) (dark theme) + [mantine-datatable](https://icflorescu.github.io/mantine-datatable/), Dexie, ky, p-queue, zod, PapaParse; for the Scanner, OpenCV.js and onnxruntime-web.

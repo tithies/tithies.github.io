@@ -10,14 +10,18 @@ import { InitialSyncButton, InitialSyncProvider } from '@/lib/ui/InitialSync';
 import { UpdateMenuButton, UpdateToast } from '@/lib/ui/UpdateNotice';
 import { UpdateCheckButton } from '@/lib/ui/UpdateCheck';
 import iconUrl from '@/assets/tithies-icon.webp';
+import f2fIcon from '@/assets/sites/f2f.png';
 import { MenuArt } from './MenuArt';
 
+/** A menu entry's icon: a Tabler icon, or a picture (a site's logo, bundled). */
+type NavIcon = typeof IconHistory | string;
+
 /** Each feature contributes a section to the navbar. Its settings go in a section of the global Settings page. */
-const NAV = [
+const NAV: { label: string; icon: typeof IconCash; links: { to: string; label: string; icon: NavIcon }[] }[] = [
   {
     label: 'Selling',
     icon: IconCash,
-    links: [{ to: '/f2f/runs', label: 'F2F', icon: IconHistory }],
+    links: [{ to: '/f2f/runs', label: 'F2F', icon: f2fIcon }],
   },
   {
     label: 'Collection',
@@ -28,6 +32,12 @@ const NAV = [
     ],
   },
 ];
+
+/** A site's logo on a small white tile, so its dark lines show in the dark theme too. */
+function NavLinkIcon({ icon: Icon }: { icon: NavIcon }) {
+  if (typeof Icon !== 'string') return <Icon size={18} />;
+  return <img src={Icon} width={18} height={18} alt="" style={{ display: 'block', background: 'white', borderRadius: 4, padding: 1 }} />;
+}
 
 export function Layout() {
   const [opened, { toggle, close }] = useDisclosure();
@@ -88,7 +98,7 @@ export function Layout() {
                     component={Link}
                     to={l.to}
                     label={l.label}
-                    leftSection={<l.icon size={18} />}
+                    leftSection={<NavLinkIcon icon={l.icon} />}
                     active={pathname === l.to || (l.to === '/f2f/runs' && pathname.startsWith('/f2f/runs/'))}
                   />
                 ))}

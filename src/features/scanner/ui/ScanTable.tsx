@@ -9,14 +9,14 @@ import { cardFinish, cardLang, cardStatus, chosenPrint, finishesOf, listed, same
 import { needsCheck } from '../scan-queue';
 import type { StoredCard, StoredPhoto } from '../scan-session';
 
-export const STATUS_COLOR: Record<CardStatus, string> = { pending: 'gray', sure: 'green', review: 'orange', unknown: 'red', user: 'blue' };
+export const STATUS_COLOR: Record<CardStatus, string> = { pending: 'violet', sure: 'green', review: 'orange', unknown: 'red', user: 'blue' };
 export const STATUS_LABEL: Record<CardStatus, string> = { pending: 'Being checked', sure: 'Sure', review: 'To review', unknown: 'Not recognized', user: 'Corrected by you' };
 
 /** A card's number in its colour; a spinning ring around it while the card is being checked or named again. */
 export function CardNumber({ n, color, busy }: { n: number; color: string; busy: boolean }) {
   return (
     <Box pos="relative" w={34} h={34} style={{ display: 'grid', placeItems: 'center' }}>
-      {busy && <Loader size={34} color="gray" pos="absolute" top={0} left={0} />}
+      {busy && <Loader size={34} color="violet" pos="absolute" top={0} left={0} />}
       <Badge color={color} variant="filled" size="lg" circle>
         {n}
       </Badge>
