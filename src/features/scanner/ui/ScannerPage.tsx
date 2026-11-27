@@ -11,7 +11,7 @@ import { TextModels } from '../scanner-check';
 import { confidence, disposePhoto, nameQuads, photoToJson, refNamer, scanPhoto, type Namer, type Recognizer, type ScannedPhoto } from '../pipeline';
 import { openPrintIndex, printIndexNamer, setOwnedOnly, type PrintIndex } from '../print-index';
 import { checkLatest, downloadPublished, indexOnlyUpdate, installDropped, installedFiles, missingFiles, readFile, sha256Hex, type Installed, type LatestCheck } from '../published';
-import type { DetectMethod, EngineInfo } from '../protocol';
+import type { EngineInfo } from '../protocol';
 import { buildReferences, ownedPrints, type BuildProgress, type PrintInfo } from '../reference';
 import type { ScoredPhoto } from '../score';
 import type { Quad } from '../geometry';
@@ -67,7 +67,6 @@ export function ScannerPage() {
   const [engineError, setEngineError] = useState<string | null>(null);
   const [backend, setBackend] = useState<string | null>(null);
   const [detector, setDetector] = useState<{ size: number; backend: string; from: string } | null>(null);
-  const [detectMethod, setDetectMethod] = useState<DetectMethod>('classic');
   const [modelThreshold, setModelThreshold] = useState<number>(0.2);
   const [modelCached, setModelCached] = useState<boolean | null>(null);
   /** Which recognition model: the downloaded DINOv2, or a tuned one (published, or dropped on the page: card-recognizer.onnx). */
@@ -127,15 +126,11 @@ export function ScannerPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [method, setMethod] = useState<string>('dino-pad-cls');
   const [scale, setScale] = useState('1');
-  const [maxSide, setMaxSide] = useState<number>(2000);
-  // Off by default: the edge map of every scanned photo takes ~12 MB (many photos when labelling).
-  const [debug, setDebug] = useState(false);
   const [cleanup, setCleanup] = useState(true);
   /** Phase 3 (every-print index, with the OCR files installed): the print among same-art reprints, the language. */
   const [checkPrints, setCheckPrints] = useState(true);
   const [readLanguage, setReadLanguage] = useState(true);
   const [ocrOn, setOcrOn] = useState<'webgpu' | 'wasm'>('webgpu');
-  const [showEdges, setShowEdges] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
   const [minHeightPx, setMinHeightPx] = useState<number>(0);
   const [dragging, setDragging] = useState(false);
@@ -336,7 +331,6 @@ export function ScannerPage() {
     if (!bytes) return setDetector(null);
     const r = await engine.call({ type: 'loadDetector', bytes }, [bytes]);
     setDetector({ ...r, from: pub ? `published ${pub.manifest.version}` : 'dropped file' });
-    setDetectMethod('model');
   };
 
   const loadModel = (which: ModelSource = modelSource) =>
@@ -446,7 +440,7 @@ export function ScannerPage() {
               engine,
               p.file,
               namer,
-              { scale: Number(scale), maxSide, debug, method: detectMethod, modelThreshold, cleanup, check },
+              { scale: Number(scale), modelThreshold, cleanup, check },
               (done, total) => setBusy({ label: `Scanning ${p.file.name} (${i + 1} of ${list.length}): card ${done} of ${total}…`, progress: (100 * done) / total }),
               (done, total) => setBusy({ label: `Checking ${p.file.name} (${i + 1} of ${list.length}): card ${done} of ${total}…`, progress: (100 * done) / total }),
             );
@@ -463,7 +457,7 @@ export function ScannerPage() {
         }
       });
     },
-    [namer, scale, maxSide, debug, detectMethod, modelThreshold, recognizer, cleanup, run, canCheck, checkPrints, readLanguage, textModels],
+    [namer, scale, modelThreshold, recognizer, cleanup, run, canCheck, checkPrints, readLanguage, textModels],
   );
 
   const addFiles = async (files: File[]) => {
@@ -494,7 +488,6 @@ export function ScannerPage() {
         await cacheDetector(bytes);
         const r = await engine.call({ type: 'loadDetector', bytes }, [bytes]);
         setDetector({ ...r, from: 'dropped file' });
-        setDetectMethod('model');
       });
     }
     const json = files.find((f) => f.name.toLowerCase().endsWith('.json') && !/^card-(detector|recognizer)\.json$/i.test(f.name));
@@ -535,7 +528,8 @@ export function ScannerPage() {
     [info, backend, modelSource, installed, matchAgainst, namer, method, scanned],
   );
   const eta = build && build.done > 0 ? ((Date.now() - build.startedAt) / build.done) * (build.total - build.done - build.failed) : null;
-  const ready = !!info && !!backend;
+  // Cards are found by the trained detector only: without one (DINOv2 with no dropped detector) nothing scans.
+  const ready = !!info && !!backend && !!detector;
 
   // ---- Labelling mode ----
 
@@ -921,22 +915,8 @@ export function ScannerPage() {
                 ]}
               />
             </Stack>
-            <Select
-              size="xs"
-              w={190}
-              label="Find cards with"
-              value={detectMethod}
-              onChange={(v) => v && setDetectMethod(v as DetectMethod)}
-              data={[
-                { value: 'classic', label: 'Classic (edges, lines)' },
-                { value: 'model', label: 'Trained detector', disabled: !detector },
-                { value: 'both', label: 'Both', disabled: !detector },
-              ]}
-            />
             <NumberInput size="xs" w={130} label="Detector threshold" value={modelThreshold} onChange={(v) => setModelThreshold(Number(v) || 0.2)} min={0.05} max={0.95} step={0.05} decimalScale={2} disabled={!detector} />
-            <NumberInput size="xs" w={150} label="Detection size (px)" value={maxSide} onChange={(v) => setMaxSide(Number(v) || 2000)} min={600} max={4000} step={200} />
             <NumberInput size="xs" w={170} label="Warn below (card px tall)" value={minHeightPx} onChange={(v) => setMinHeightPx(Number(v) || 0)} min={0} step={50} />
-            <Checkbox size="xs" label="Keep debug layers" checked={debug} onChange={(e) => setDebug(e.currentTarget.checked)} />
             <Checkbox size="xs" label="Drop bad shapes" checked={cleanup} onChange={(e) => setCleanup(e.currentTarget.checked)} title="Once named: an outline around neighbours, or a second outline of one card (see Rejected shapes)" />
             <Checkbox
               size="xs"
@@ -1026,7 +1006,6 @@ export function ScannerPage() {
                 />
               </Stack>
               <Select size="xs" w={240} label="Method shown" value={method} onChange={(v) => v && setMethod(v)} data={SHOWN_METHODS.map((m) => ({ value: m.id, label: m.label }))} />
-              <Checkbox size="xs" label="Edges" checked={showEdges} onChange={(e) => setShowEdges(e.currentTarget.checked)} />
               <Checkbox size="xs" label="Rejected shapes" checked={showRejected} onChange={(e) => setShowRejected(e.currentTarget.checked)} />
               {!hasTruth && !!scanned.length && (
                 <CopyButton value={resultsJson}>{({ copied, copy }) => <Button size="xs" variant="default" onClick={copy}>{copied ? 'Copied' : 'Copy results JSON'}</Button>}</CopyButton>
@@ -1102,11 +1081,10 @@ export function ScannerPage() {
             {shown?.scan && view === 'results' && (
               <>
                 <Text size="xs" c="dimmed">
-                  {shown.scan.width} × {shown.scan.height} px scanned ({Math.round(shown.scan.scale * 100)} %) · {shown.scan.cards.length} cards ·{' '}
-                  {shown.scan.cards.filter((c) => c.source === 'grid').length} from the binder grid · load {Math.round(shown.scan.timings.loadMs)} ms · detect{' '}
+                  {shown.scan.width} × {shown.scan.height} px scanned ({Math.round(shown.scan.scale * 100)} %) · {shown.scan.cards.length} cards · load {Math.round(shown.scan.timings.loadMs)} ms · detect{' '}
                   {Math.round(shown.scan.timings.detectMs)} ms · cards {Math.round(shown.scan.timings.cardsMs)} ms
                 </Text>
-                <PhotoView photo={shown.scan} src={shown.url} method={method} selected={selected} onSelect={setSelected} showEdges={showEdges} showRejected={showRejected} />
+                <PhotoView photo={shown.scan} src={shown.url} method={method} selected={selected} onSelect={setSelected} showRejected={showRejected} />
                 <CardsTable photo={shown.scan} method={method} labels={truthOf(labels[shown.scan.file])} selected={selected} onSelect={setSelected} minHeightPx={minHeightPx} />
               </>
             )}

@@ -2,12 +2,11 @@
  * A card's picture → its vectors (sandbox). Photo cards are flattened from their 4 corners
  * (homography) into 488 × 680, Scryfall's "normal" size, so references and photos go through the
  * same steps. Each flattened card is resized for each model run (squashed, padded), its CLS
- * and mean vectors taken, and its pHash computed; then the same for the card turned 180°.
+ * and mean vectors taken; then the same for the card turned 180°.
  */
 import * as ort from 'onnxruntime-web';
 import { quadSize, type Quad } from '../geometry';
 import { CARD_H, CARD_W, DIM, INPUT, MEAN, RUNS, STD, VARIANTS, type ModelRun } from '../models';
-import { grayFromRGBA, phash } from '../phash';
 import { l2normalize } from '../match';
 import type { Features } from '../protocol';
 import { free, type CV, type Mat } from './opencv';
@@ -153,7 +152,7 @@ function fillInput(cv: CV, card: Mat, mode: ModelRun['mode'], data: Float32Array
   }
 }
 
-/** The vectors (every variant) and pHash of 488 × 680 RGBA cards, in batches of BATCH pictures. */
+/** The vectors (every variant) of 488 × 680 RGBA cards, in batches of BATCH pictures. */
 export async function featuresMany(cv: CV, cards: Mat[]): Promise<Features[]> {
   if (!session) throw new Error('The model is not loaded');
   const s = session;
@@ -187,5 +186,5 @@ export async function featuresMany(cv: CV, cards: Mat[]): Promise<Features[]> {
     for (const v of Object.values(out)) v.dispose();
   }
   if (timingLogs-- > 0) console.info(`[scanner] ${cards.length} cards (${backend}): ${times.join(', ')} ms`);
-  return cards.map((card, ci) => ({ vectors: vectors[ci], phash: phash(grayFromRGBA(card.data, card.cols, card.rows), card.cols, card.rows) }));
+  return cards.map((_, ci) => ({ vectors: vectors[ci] }));
 }

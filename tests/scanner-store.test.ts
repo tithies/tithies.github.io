@@ -2,7 +2,7 @@ import { ownedPrints } from '@/features/scanner/reference';
 import { buildIndex } from '@/features/scanner/search-index';
 import { addNoBack, clearScannerData, currentRefIds, dropOtherTuned, labelDrafts, labelsDownloadedAt, markLabelsDownloaded, MODEL_KEY, noBackIds, rowKey, saveLabelDraft, scannerDb, tunedModelKey, type RefRow } from '@/features/scanner/store';
 
-const row = (v: Partial<RefRow>): RefRow => ({ scryfallId: '', modelKey: MODEL_KEY, name: 'X', set: 's', setName: 'S', cn: '1', vectors: {}, phash: new Uint32Array(2), addedAt: 1, ...v });
+const row = (v: Partial<RefRow>): RefRow => ({ scryfallId: '', modelKey: MODEL_KEY, name: 'X', set: 's', setName: 'S', cn: '1', vectors: {}, addedAt: 1, ...v });
 
 describe('scanner reference store', () => {
   beforeEach(async () => {

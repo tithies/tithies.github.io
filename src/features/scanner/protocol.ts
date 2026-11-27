@@ -5,7 +5,7 @@
  * storage and no network of its own: the page sends it the bytes it needs and keeps the results.
  */
 import type { CleanupReason } from './cleanup';
-import type { Quad, RejectReason } from './geometry';
+import type { Quad } from './geometry';
 
 export interface EngineInfo {
   opencv: string;
@@ -15,20 +15,13 @@ export interface EngineInfo {
   backend: 'webgpu' | 'wasm' | null;
 }
 
-/** How cards are found: the classic passes (edges, threshold, lines, grid), the trained detector, or both. */
-export type DetectMethod = 'classic' | 'model' | 'both';
-
 export interface DetectOptions {
-  /** The photo is shrunk to this many pixels on its long side for detection (corners are scaled back). */
-  maxSide: number;
-  /** Also send back the edge map and every rejected shape. */
-  debug: boolean;
-  method: DetectMethod;
   /** The trained detector's score above which a card counts. */
   modelThreshold: number;
 }
 
-export type CardSource = 'edges' | 'threshold' | 'lines' | 'grid' | 'model';
+/** Found by the trained detector, or outlined by the user (4 corners). */
+export type CardSource = 'model' | 'user';
 
 export interface DetectedCard {
   /** Corners in the photo's pixels (full resolution), card upright or upside down. */
@@ -39,25 +32,20 @@ export interface DetectedCard {
 
 export interface RejectedShape {
   quad: Quad;
-  /** Not card-shaped (RejectReason), a duplicate outline, a group of touching cards, or a piece of a card. */
-  /** …or, once named (cleanup.ts), an outline around neighbours or a second outline of one card. */
-  reason: RejectReason | 'duplicate' | 'group' | 'fragment' | CleanupReason;
+  /** Once named (cleanup.ts): an outline around neighbours, or a second outline of one card. */
+  reason: CleanupReason;
 }
 
 export interface DetectResult {
   width: number;
   height: number;
   cards: DetectedCard[];
-  rejected: RejectedShape[];
-  /** Edges found (debug), at detection size. */
-  edges?: ImageBitmap;
   ms: number;
 }
 
-/** A card's vectors: one per variant (models.ts) and its pHash, for each way up. */
+/** A card's vectors: one per variant (models.ts), for each way up. */
 export interface Features {
   vectors: Record<string, Float32Array>;
-  phash: Uint32Array;
 }
 
 export interface CardFeatures {

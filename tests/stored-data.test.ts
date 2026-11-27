@@ -39,7 +39,7 @@ async function fill() {
   const opId = await startOp({ site: 'moxfield', accountKey: A.key, userName: 'alice', kind: 'export', title: 'Export', source: 'test', details: {} });
   await writeLogger(opId).begin({ method: 'POST', url: 'u', body: 'b' });
   await scannerDb.refs.clear();
-  await scannerDb.refs.add(row({ scryfallId: 's1', modelKey: MODEL_KEY, vectors: { v: new Float32Array(4) }, phash: new Uint32Array(2) }));
+  await scannerDb.refs.add(row({ scryfallId: 's1', modelKey: MODEL_KEY, vectors: { v: new Float32Array(4) } }));
 }
 
 const counts = async (data: AccountData) => ({

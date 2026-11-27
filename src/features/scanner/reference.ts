@@ -159,7 +159,7 @@ export async function buildReferences(
         ok.map(({ j }, i): RefRow => {
           const { faces: _faces, back: _back, ...print } = j.p;
           const pic = standIns.get(j.p.scryfallId);
-          return { ...print, scryfallId: j.key, printId: j.p.scryfallId, back: j.back || undefined, ...(pic ? { picture: pic } : {}), modelKey, vectors: features[i].vectors, phash: features[i].phash, addedAt: now };
+          return { ...print, scryfallId: j.key, printId: j.p.scryfallId, back: j.back || undefined, ...(pic ? { picture: pic } : {}), modelKey, vectors: features[i].vectors, addedAt: now };
         }),
       );
       progress.done += ok.length;

@@ -72,7 +72,7 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, most 
 - Moxfield's import finds each print by set and number; the Language field carries the language.
 
 **Also:**
-- **The prototype's tools** (labelling mode, scores table, methods, "Copy results JSON", debug layers) move to a developer view that stays hidden. OpenCV.js is still needed to flatten the cards.
+- **The prototype's tools** (labelling mode, scores table, methods, "Copy results JSON") move to a developer view that stays hidden. OpenCV.js is still needed to flatten the cards.
 - **Settings:** index status (version, date, size, update now), backend in use.
 - **Tests (vitest):** rows to export items, merging and quantities, the stored session, the corrections.
 - **README:** a *Scanner* section. The website is updated separately by the user.
@@ -121,7 +121,7 @@ What's built and how it works: `SCANNER_DEV.md`. This file is what's left, most 
 ## Open decisions
 
 1. **Phase 2:** the language of scanned cards whose text says nothing: English, or the collection's usual language.
-2. **Phase 2:** keep or drop the classic detection passes (contours, lines, binder grid).
+2. ~~Phase 2: keep or drop the classic detection passes~~: deleted, with the pHash baseline (2026-11-27).
 3. **Phase 2:** whether the print and language check can be turned off on the real page (it's most of the time per card).
 4. **Phase 3 follow-ups:** which speed option, if any, and whether promo and List prints are worth a trained verifier.
 

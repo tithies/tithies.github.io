@@ -1,14 +1,12 @@
 /**
- * Nearest reference prints for one card: cosine similarity over L2-normalized vectors (image
- * models), or Hamming distance over 64-bit hashes (pHash). Brute force: a few thousand to a
- * hundred thousand prints take milliseconds.
+ * Nearest reference prints for one card: cosine similarity over L2-normalized vectors. Brute force:
+ * a few thousand to a hundred thousand prints take milliseconds.
  */
-import { hamming } from './phash';
 
 export interface Hit {
   /** Row in the reference set. */
   index: number;
-  /** Higher is better: cosine similarity (−1…1), or 1 − differing bits ÷ 64 for hashes. */
+  /** Higher is better: cosine similarity (−1…1). */
   score: number;
 }
 
@@ -46,14 +44,6 @@ export function topKCosine(query: Float32Array, refs: Float32Array, dim: number,
     for (let i = 0; i < dim; i++) s += query[i] * refs[o + i];
     top.push(r, s);
   }
-  return top.hits;
-}
-
-/** `refs` holds two 32-bit words per row. */
-export function topKHamming(query: Uint32Array, refs: Uint32Array, k: number): Hit[] {
-  const top = new TopK(k);
-  const rows = refs.length / 2;
-  for (let r = 0; r < rows; r++) top.push(r, 1 - hamming(query, refs, r * 2) / 64);
   return top.hits;
 }
 

@@ -10,7 +10,7 @@
 
 **Built** (on master; a hidden prototype page, `dashboard.html#/collection/scanner`, not in the menu):
 - **Engines:** OpenCV.js 4.12 and onnxruntime-web 1.31.1 on WebGPU, in a sandboxed iframe.
-- **Detection:** a trained detector (`card-detector.onnx`), plus the first classic passes (contours, lines, binder grid), still selectable.
+- **Detection:** a trained detector (`card-detector.onnx`). The first classic passes (contours, lines, binder grid) and the pHash baseline were deleted on 2026-11-27, at the user's choice: the detector and the image vectors beat them by far.
 - **Recognition:** a fine-tuned DINOv2-small (`card-recognizer.onnx`), or DINOv2-small as downloaded.
 - **Matching:** against every print, from an index made by the trainer and published with the models on Hugging Face ("only my prints" is a filter on it). The reference set built in the browser from the owned prints stays, as the developer path.
 - **Print and language check** (phase 3): the print among same-art reprints, from the bottom line's text or a comparison with the candidates' pictures, and the card's language from its own text. It uses PaddlePaddle's OCR models, published with the index.
@@ -225,7 +225,6 @@
 | `scanner-check.ts` | Phase 3 per card: the cut-out, the staged reading, the print and language decisions, the OCR models loaded on first use |
 | `print-check.ts`, `language.ts`, `languages.json` | The print and language rules (the trainer's) |
 | `engine/text.ts`, `engine/print-visual.ts` | In the engine: PP-OCRv5 text detection and reading, the visual print check |
-| `lines.ts`, `phash.ts`, `engine/detect.ts` | The classic detection passes and the pHash baseline |
 
 ---
 
@@ -339,12 +338,11 @@ Format 2:
   2. open `dashboard.html#/collection/scanner`; the published models start by themselves, dropped ones with "Start the model";
   3. drop photos (full camera resolution) with `labels.json` to get the scores table.
   - "Copy results JSON" copies every result without pixels.
-  - "Keep debug layers" (off by default) keeps the edge maps and rejected shapes, which use a lot of memory over many photos.
+  - "Rejected shapes" shows the outlines the cleanup dropped.
 - **Local checks:**
   - a CPU Python environment runs the trainer's short runs and `evaluate` (about 12 minutes for a new recognizer's gallery, 1.5 minutes when cached);
   - data loaders start their workers with `spawn`, because forked ones hang on Linux;
   - the OCR runs take about 2.5 GB each: 6 of them at once ran the dev machine out of memory, 3 were fine;
-  - `SCANNER_PHOTO=<photo> npx vitest run tests/scanner-photo.debug.test.ts` runs the classic detection in Node and writes `<photo>.debug.png` and `.txt` to the temp folder's `scanner-debug/` (`SCANNER_EXPECT=x0,y0,x1,y1` reports the line quad closest to a known card).
 
 ---
 
@@ -403,4 +401,4 @@ Format 2:
 - **Scryfall bulk files** on 2026-11-19: `oracle_cards` 26 MB, `unique_artwork` 39 MB, `default_cards` 81 MB, `all_cards` 408 MB (`api.scryfall.com/bulk-data`).
   - `default_cards` leaves out most non-English prints, which are looked up one by one.
 - **Scryfall card fields used:** `illustration_id`, `finishes`, `games`, `image_uris` / `card_faces[].image_uris`, `image_status`, `lang`, `collector_number`, `set`.
-- **magic_card_detector** (contours + pHash, MIT): https://github.com/tmikonen/magic_card_detector. It was the starting point for the classic pass and the pHash baseline; image vectors beat it by far.
+- **magic_card_detector** (contours + pHash, MIT): https://github.com/tmikonen/magic_card_detector. It was the starting point for the classic pass and the pHash baseline (both deleted 2026-11-27); image vectors beat it by far.

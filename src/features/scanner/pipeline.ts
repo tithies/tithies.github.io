@@ -58,7 +58,6 @@ export interface ScannedPhoto {
   scale: number;
   cards: ScannedCard[];
   rejected: RejectedShape[];
-  edges?: ImageBitmap;
   timings: { loadMs: number; detectMs: number; cardsMs: number; totalMs: number };
   /** The recognition model the cards were named with (its scores need their own limits). */
   recognizer?: Recognizer;
@@ -177,7 +176,7 @@ export async function scanPhoto(
   const { width, height } = await engine.call({ type: 'loadPhoto', photoId: id, bitmap }, [bitmap]);
   const t1 = performance.now();
   try {
-    const det = await engine.call({ type: 'detect', photoId: id, options: { maxSide: opts.maxSide, debug: opts.debug, method: opts.method, modelThreshold: opts.modelThreshold } });
+    const det = await engine.call({ type: 'detect', photoId: id, options: { modelThreshold: opts.modelThreshold } });
     const t2 = performance.now();
     const ordered = readingOrder(det.cards);
     const cards: ScannedCard[] = [];
@@ -233,8 +232,7 @@ export async function scanPhoto(
       height,
       scale: opts.scale,
       cards: kept,
-      rejected: [...det.rejected, ...dropped],
-      edges: det.edges,
+      rejected: dropped,
       timings: { loadMs: t1 - t0, detectMs: t2 - t1, cardsMs: t3 - t2, totalMs: t3 - t0 },
     };
   } finally {
@@ -244,7 +242,6 @@ export async function scanPhoto(
 
 /** Frees a scanned photo's bitmaps. */
 export function disposePhoto(p: ScannedPhoto) {
-  p.edges?.close();
   for (const c of p.cards) c.crop.close();
 }
 
@@ -264,7 +261,6 @@ const LIMITS: Record<Recognizer, { sure: number; margin: number; review: number 
 export function confidence(r: MethodResult | undefined, method: string, recognizer: Recognizer = 'dino'): Confidence {
   const top = r?.candidates[0];
   if (!r || !top) return 'unknown';
-  if (method === 'phash') return top.score >= 0.8 ? 'sure' : top.score >= 0.7 ? 'review' : 'unknown';
   const l = LIMITS[recognizer];
   return top.score >= l.sure && r.margin >= l.margin ? 'sure' : top.score >= l.review ? 'review' : 'unknown';
 }

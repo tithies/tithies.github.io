@@ -1,7 +1,7 @@
 /**
  * The image models the prototype compares. One ONNX file (DINOv2-small, pinned revision) runs at
  * two input sizes; each run gives two vectors (the CLS token, and the mean of the patch tokens),
- * so each card gets four vectors, plus its pHash. Phase 0 measures which one names cards best.
+ * so each card gets four vectors. Padded · CLS names cards best and is the one kept; the others stay for the dev page.
  */
 
 export interface ModelFile {
@@ -55,9 +55,8 @@ export const VARIANTS: Variant[] = [
   { id: 'dino-pad-mean', label: 'DINOv2 padded · mean', run: 'pad', pooling: 'mean' },
 ];
 
-/** pHash is compared too, as the baseline (no model). */
-export const PHASH_ID = 'phash';
-export const ALL_METHODS: { id: string; label: string }[] = [...VARIANTS, { id: PHASH_ID, label: 'pHash (baseline)' }];
+/** Every searched method: the variants. */
+export const ALL_METHODS: { id: string; label: string }[] = VARIANTS.map(({ id, label }) => ({ id, label }));
 
 /** Phase 3: padded · CLS, then the print among same-art reprints checked (scanner-check.ts). */
 export const CHECK_METHOD = 'dino-pad-cls+check';

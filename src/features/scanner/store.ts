@@ -52,7 +52,8 @@ export interface RefRow {
   picture?: string;
   /** One normalized vector per variant (models.ts). */
   vectors: Record<string, Float32Array>;
-  phash: Uint32Array;
+  /** The pHash of rows made before 2026-11-27 (no longer used). */
+  phash?: Uint32Array;
   addedAt: number;
 }
 
@@ -120,13 +121,13 @@ export async function markLabelsDownloaded(at = Date.now()): Promise<void> {
   await scannerDb.meta.put({ key: 'labelsDownloadedAt', value: at });
 }
 
-/** Bytes the reference vectors take (vectors and hash) and the label drafts, and how many prints. */
+/** Bytes the reference vectors and the label drafts take, and how many prints. */
 export async function measureScannerData(): Promise<{ prints: number; bytes: number }> {
   let prints = 0;
   let bytes = 0;
   await scannerDb.refs.each((r) => {
     prints++;
-    bytes += Object.values(r.vectors).reduce((s, v) => s + v.byteLength, 0) + r.phash.byteLength + 120;
+    bytes += Object.values(r.vectors).reduce((s, v) => s + v.byteLength, 0) + (r.phash?.byteLength ?? 0) + 120;
   });
   await scannerDb.labels.each((d) => {
     bytes += 200 + d.labels.cards.length * 220;
