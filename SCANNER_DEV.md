@@ -9,7 +9,7 @@
 ## 1. Where it stands (2026-11-27)
 
 **Built** (on master):
-- **The Scanner page**, *Collection → Scanner* (`dashboard.html#/collection/scanner`):
+- **The Scanner page** (`dashboard.html#/collection/scanner`; hidden from the menu for now, by the user's choice):
   - photos in, one row per card (name, print, language, finish);
   - the user's corrections;
   - the cards exported to a Moxfield binder or collection;

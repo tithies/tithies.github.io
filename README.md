@@ -110,7 +110,7 @@ The export is reusable by other pages: `src/lib/export/` (export list, dialog, p
 
 ## Feature 3 — Scanner
 
-**Collection → Scanner** adds cards from photos. Drop photos of your cards (spread on a table, a binder page, a hand of cards…), and Tithies finds every card in them, names it among every Magic print, and reads its print and language from the card itself. You correct what needs it, then add the list to a Moxfield binder or collection.
+**The Scanner** adds cards from photos. It's not in the menu yet: open `dashboard.html#/collection/scanner` (the dashboard's address, ending in `#/collection/scanner`). Drop photos of your cards (spread on a table, a binder page, a hand of cards…), and Tithies finds every card in them, names it among every Magic print, and reads its print and language from the card itself. You correct what needs it, then add the list to a Moxfield binder or collection.
 
 1. **The first time**, **Get the Scanner** downloads its models and card index from Hugging Face (about 195 MB, once). They're kept in the browser (Settings → Stored data) and stay current: a new card index (new sets) downloads by itself; new models wait for **Update**.
 2. **Add photos** (pick or drop them, several at once). Full camera resolution reads the most. Photos never leave the browser.

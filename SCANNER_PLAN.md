@@ -1,6 +1,6 @@
 # Scanner — what's left
 
-What's built and how it works: `SCANNER_DEV.md`. The Scanner is done and in the menu (*Collection → Scanner*). This file lists the improvements left, most useful first; none is urgent.
+What's built and how it works: `SCANNER_DEV.md`. The Scanner is done, at `dashboard.html#/collection/scanner`; its menu entry (*Collection → Scanner*) is hidden for now, by the user's choice: putting it back is one line in `src/entrypoints/dashboard/Layout.tsx`. This file lists the improvements left, most useful first; none is urgent.
 
 **Starting a fresh session:**
 1. Read `SCANNER_DEV.md` section 1 (where it stands), then "Remaining work" below.

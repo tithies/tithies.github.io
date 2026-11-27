@@ -44,7 +44,7 @@ const router = createHashRouter([
       { path: 'changes', element: <ChangeLogPage /> },
       { path: 'f2f/settings', element: <Navigate to="/settings" replace /> },
       { path: 'collection/comparator', element: <ComparisonPage /> },
-      // The Scanner (SCANNER_DEV.md), and its developer page (labelling, scores, other models): not in the menu.
+      // The Scanner (SCANNER_DEV.md), and its developer page (labelling, scores, other models): neither is in the menu for now.
       // Lazy, so the dashboard loads the engine only when one of them opens.
       { path: 'collection/scanner', lazy: async () => ({ Component: (await import('@/features/scanner/ui/ScanPage')).ScanPage }) },
       { path: 'collection/scanner/dev', lazy: async () => ({ Component: (await import('@/features/scanner/ui/ScannerPage')).ScannerPage }) },
