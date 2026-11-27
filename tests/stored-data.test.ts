@@ -8,6 +8,7 @@ import { comparisonConfigKey } from '@/features/collection-comparison/config';
 import { sellingDeckFilterKey } from '@/features/f2f-buylist/deck-filter';
 import { clearStoredData, listStoredPreferences, measureStoredData, resetAllSettings } from '@/features/settings/stored-data';
 import { listOps, startOp, writeLogger } from '@/lib/changes/log';
+import { addSessionPhotos } from '@/features/scanner/scan-session';
 import { MODEL_KEY, scannerDb } from '@/features/scanner/store';
 import { newAccount, resetDb } from './helpers';
 
@@ -40,6 +41,8 @@ async function fill() {
   await writeLogger(opId).begin({ method: 'POST', url: 'u', body: 'b' });
   await scannerDb.refs.clear();
   await scannerDb.refs.add(row({ scryfallId: 's1', modelKey: MODEL_KEY, vectors: { v: new Float32Array(4) } }));
+  await scannerDb.scanPhotos.clear();
+  await addSessionPhotos([new File(['photo'], 'p.jpg', { type: 'image/jpeg' })]);
 }
 
 const counts = async (data: AccountData) => ({
@@ -93,7 +96,11 @@ describe('Settings → Stored data', () => {
     expect(await scannerDb.refs.count()).toBe(1);
     await clearStoredData(['scanner'], null);
     expect(await scannerDb.refs.count()).toBe(0);
-    expect(await measureStoredData(A.key)).toEqual({ f2fCache: 0, changeLog: 0, scanner: 0, decks: 0, collection: 0, runs: 0 });
+    // The Scanner page's photos are their own group too.
+    expect(await scannerDb.scanPhotos.count()).toBe(1);
+    await clearStoredData(['scanSession'], null);
+    expect(await scannerDb.scanPhotos.count()).toBe(0);
+    expect(await measureStoredData(A.key)).toEqual({ f2fCache: 0, changeLog: 0, scanner: 0, scanSession: 0, decks: 0, collection: 0, runs: 0 });
     expect(await counts(A.data)).toEqual({ runs: 0, items: 0, decks: 0, deckCards: 0, decksMeta: false, collection: 0, collectionMeta: false });
     expect(await counts(B.data)).toEqual(full);
     // Only the current-account pointer is left in the global meta table.

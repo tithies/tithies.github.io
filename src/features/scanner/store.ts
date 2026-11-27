@@ -1,12 +1,13 @@
 /**
- * The Scanner prototype's own IndexedDB database ("tithies-scanner"), apart from the main one so
- * its schema can change freely while it's a prototype. It holds the reference vectors of prints
- * (Scryfall prints: shared by every account, so forgetting an account leaves them) and the
- * labelling mode's drafts (labels.ts). Model files live in Cache Storage (model-cache.ts).
+ * The Scanner's own IndexedDB database ("tithies-scanner"), apart from the main one so its schema
+ * can change freely. It holds the reference vectors of prints (Scryfall prints: shared by every
+ * account, so forgetting an account leaves them), the labelling mode's drafts (labels.ts), and the
+ * Scanner page's scan session (scan-session.ts). Model files live in Cache Storage (model-cache.ts).
  * Settings → Remove all data deletes all of it.
  */
 import Dexie, { type EntityTable } from 'dexie';
 import type { PhotoLabels } from './labels';
+import type { StoredPhoto } from './scan-session';
 import { clearModelCache } from './model-cache';
 import { DINO_FILE, RUNS } from './models';
 
@@ -76,12 +77,15 @@ export class ScannerDB extends Dexie {
   /** 'noBack': Scryfall ids of two-named prints with no back picture (adventures, split cards). */
   meta!: EntityTable<ScannerMeta, 'key'>;
   labels!: EntityTable<LabelDraft, 'file'>;
+  /** The Scanner page's scan session: one row per photo (scan-session.ts). */
+  scanPhotos!: EntityTable<StoredPhoto, 'id'>;
 
   constructor(name = 'tithies-scanner') {
     super(name);
     this.version(1).stores({ refs: 'scryfallId, modelKey' });
     this.version(2).stores({ meta: 'key' });
     this.version(3).stores({ labels: 'file' });
+    this.version(4).stores({ scanPhotos: 'id, addedAt' });
   }
 }
 
@@ -135,7 +139,7 @@ export async function measureScannerData(): Promise<{ prints: number; bytes: num
   return { prints, bytes };
 }
 
-/** Deletes every reference vector, label draft and cached model file. */
+/** Deletes every reference vector, label draft and cached model file (the scan session stays: clearScannerSession). */
 export async function clearScannerData(): Promise<void> {
   await scannerDb.refs.clear();
   await scannerDb.meta.clear();

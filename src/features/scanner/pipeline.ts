@@ -71,7 +71,7 @@ export interface ScanOptions extends DetectOptions {
   /** Drop bad shapes once named (cleanup.ts; default on). */
   cleanup?: boolean;
   /** Phase 3 (every-print index only): the print among same-art reprints, the language. */
-  check?: { models: TextModels; prints: boolean; language: boolean } | null;
+  check?: CheckOptions | null;
 }
 
 /** The method the cleanup reads names and scores from (the one kept: padded · CLS). */
@@ -153,6 +153,74 @@ export async function nameQuads(engine: ScannerEngine, photoId: string, quads: r
 
 let nextPhoto = 1;
 
+/**
+ * Decodes a photo (phone orientation applied), shrinks it to `scale`, and loads it into the engine under a new id
+ * (release it with `releasePhoto`). Quads are in the loaded photo's pixels: full resolution at scale 1.
+ */
+export async function loadPhoto(engine: ScannerEngine, file: Blob, scale = 1): Promise<{ id: string; width: number; height: number }> {
+  let bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  if (scale < 1) {
+    const small = await createImageBitmap(bitmap, {
+      resizeWidth: Math.max(1, Math.round(bitmap.width * scale)),
+      resizeHeight: Math.max(1, Math.round(bitmap.height * scale)),
+      resizeQuality: 'high',
+    });
+    bitmap.close();
+    bitmap = small;
+  }
+  const id = `p${nextPhoto++}`;
+  const { width, height } = await engine.call({ type: 'loadPhoto', photoId: id, bitmap }, [bitmap]);
+  return { id, width, height };
+}
+
+/** Phase 3's options: the print among same-art reprints, the language. */
+export interface CheckOptions {
+  models: TextModels;
+  prints: boolean;
+  language: boolean;
+}
+
+/**
+ * Phase 3 on cards of a photo loaded in the engine: each card's print and language (scanner-check.ts), from its
+ * search result (it needs the every-print index's top 20, `more`). Cards without one are skipped.
+ */
+export async function checkCards(
+  engine: ScannerEngine,
+  photoId: string,
+  cards: readonly { quad: Quad; result: MethodResult | undefined }[],
+  opts: CheckOptions,
+  onCard: (k: number, out: { result: MethodResult; check: CardCheck }) => void | Promise<void>,
+  stop?: () => boolean,
+): Promise<void> {
+  if (!opts.prints && !opts.language) return;
+  for (const [k, c] of cards.entries()) {
+    if (stop?.()) return;
+    if (!c.result?.more) continue;
+    await onCard(k, await checkCard(engine, opts.models, photoId, c.quad, c.result, opts));
+  }
+}
+
+/**
+ * Phase 3 on a photo named earlier (the Scanner page names every photo first, then checks): the photo is loaded
+ * again at full resolution, its cards checked, then released.
+ */
+export async function checkPhoto(
+  engine: ScannerEngine,
+  file: Blob,
+  cards: readonly { quad: Quad; result: MethodResult | undefined }[],
+  opts: CheckOptions,
+  onCard: (k: number, out: { result: MethodResult; check: CardCheck }) => void | Promise<void>,
+  /** Stops between two cards (the page: a new photo waits to be named). */
+  stop?: () => boolean,
+): Promise<void> {
+  const { id } = await loadPhoto(engine, file);
+  try {
+    await checkCards(engine, id, cards, opts, onCard, stop);
+  } finally {
+    await engine.call({ type: 'releasePhoto', photoId: id }).catch(() => undefined);
+  }
+}
+
 export async function scanPhoto(
   engine: ScannerEngine,
   file: File,
@@ -162,18 +230,7 @@ export async function scanPhoto(
   onCheck?: (done: number, total: number) => void,
 ): Promise<ScannedPhoto> {
   const t0 = performance.now();
-  let bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  if (opts.scale < 1) {
-    const small = await createImageBitmap(bitmap, {
-      resizeWidth: Math.max(1, Math.round(bitmap.width * opts.scale)),
-      resizeHeight: Math.max(1, Math.round(bitmap.height * opts.scale)),
-      resizeQuality: 'high',
-    });
-    bitmap.close();
-    bitmap = small;
-  }
-  const id = `p${nextPhoto++}`;
-  const { width, height } = await engine.call({ type: 'loadPhoto', photoId: id, bitmap }, [bitmap]);
+  const { id, width, height } = await loadPhoto(engine, file, opts.scale);
   const t1 = performance.now();
   try {
     const det = await engine.call({ type: 'detect', photoId: id, options: { modelThreshold: opts.modelThreshold } });
@@ -211,15 +268,13 @@ export async function scanPhoto(
         : new Map<number, CleanupReason>();
     const kept = cards.filter((_, i) => !drop.has(i)).map((c, k) => ({ ...c, n: k + 1 }));
     // Phase 3, on the kept cards, while the photo is still in the engine.
-    if (opts.check && (opts.check.prints || opts.check.language)) {
-      for (const [k, c] of kept.entries()) {
-        const r = c.byMethod[CHECKED_METHOD];
-        if (!r?.more) continue;
-        const { result, check } = await checkCard(engine, opts.check.models, id, c.quad, r, opts.check);
+    if (opts.check) {
+      await checkCards(engine, id, kept.map((c) => ({ quad: c.quad, result: c.byMethod[CHECKED_METHOD] })), opts.check, (k, { result, check }) => {
+        const c = kept[k];
         c.byMethod = { ...c.byMethod, [CHECK_METHOD]: result };
         c.check = check;
         onCheck?.(k + 1, kept.length);
-      }
+      });
     }
     const dropped: RejectedShape[] = [...drop].map(([i, reason]) => {
       cards[i].crop.close();

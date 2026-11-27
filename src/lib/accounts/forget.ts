@@ -6,6 +6,7 @@
  */
 import { clearChangeLogOf } from '@/lib/changes/log';
 import { clearDatabase } from '@/lib/db';
+import { clearScannerSession } from '@/features/scanner/scan-session';
 import { clearScannerData } from '@/features/scanner/store';
 import { accountData, unfinishedRuns } from './data';
 import { accountStorageKeys } from './storage-keys';
@@ -65,5 +66,6 @@ export async function removeAllData(deps: RemoveAllDeps): Promise<void> {
   }
   await clearDatabase();
   await clearScannerData();
+  await clearScannerSession();
   await deps.clearStorage();
 }

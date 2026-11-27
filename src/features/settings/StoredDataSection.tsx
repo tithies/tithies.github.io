@@ -42,7 +42,7 @@ type AccountStats = Awaited<ReturnType<typeof accountStats>>;
 function useStats(ttlHours: number, keys: AccountKey[]) {
   return useLiveQuery(async () => {
     const cutoff = Date.now() - ttlHours * 3600_000;
-    const [lookups, fresh, oldest, bulk, sets, changes, scannerRefs, perAccount] = await Promise.all([
+    const [lookups, fresh, oldest, bulk, sets, changes, scannerRefs, scanPhotos, perAccount] = await Promise.all([
       db.f2fCache.count(),
       ttlHours > 0 ? db.f2fCache.where('fetchedAt').aboveOrEqual(cutoff).count() : 0,
       db.f2fCache.orderBy('fetchedAt').first(),
@@ -50,11 +50,12 @@ function useStats(ttlHours: number, keys: AccountKey[]) {
       getMeta<{ fetchedAt: number; sets: string[] }>('f2fSets'),
       changeLogCounts(),
       scannerDb.refs.count(),
+      scannerDb.scanPhotos.toArray().then((ps) => ({ photos: ps.length, cards: ps.reduce((s, p) => s + p.cards.length, 0) })),
       Promise.all(keys.map(accountStats)),
     ]);
     const scannerFiles = (await scannerDb.meta.get('published'))?.value as Installed | undefined;
     const accounts = Object.fromEntries(keys.map((k, i) => [k, perAccount[i]])) as Record<AccountKey, AccountStats>;
-    return { lookups, fresh, oldest: oldest?.fetchedAt, bulk, sets, changeOps: changes.ops, changeCalls: changes.calls, changesRunning: changes.running, scannerRefs, scannerFiles, accounts };
+    return { lookups, fresh, oldest: oldest?.fetchedAt, bulk, sets, changeOps: changes.ops, changeCalls: changes.calls, changesRunning: changes.running, scannerRefs, scannerFiles, scanPhotos, accounts };
   }, [ttlHours, keys.join(',')]);
 }
 
@@ -145,7 +146,7 @@ export function StoredDataSection() {
     void navigator.storage?.estimate?.().then((e) => setUsage(e.usage ?? null));
     void Promise.all([measureStoredData(null), ...keys.map((k) => measureStoredData(k).then((m) => [k, m] as const))])
       .then(([shared, ...perAccount]) => {
-        const out: Record<string, number> = { f2fCache: shared.f2fCache, changeLog: shared.changeLog, scanner: shared.scanner };
+        const out: Record<string, number> = { f2fCache: shared.f2fCache, changeLog: shared.changeLog, scanner: shared.scanner, scanSession: shared.scanSession };
         for (const [k, m] of perAccount) for (const g of ['decks', 'collection', 'runs'] as const) out[`${k}|${g}`] = m[g];
         setSizes(out);
       })
@@ -187,18 +188,28 @@ export function StoredDataSection() {
     id: 'scanner',
     group: 'scanner',
     account: null,
-    title: 'Scanner prototype',
+    title: 'Scanner models and index',
     kind: CACHE,
     details: [
       ...(s.scannerFiles ? [`Its every-print index (${s.scannerFiles.manifest.version}, ${n(s.scannerFiles.manifest.count)} pictures, of ${s.scannerFiles.manifest.created.slice(0, 10)}) and its models`] : []),
       `${n(s.scannerRefs)} prints with image vectors built here`,
       'Its image models, once downloaded (about 90 MB each)',
     ],
-    effect: 'Shared by every account. The Scanner prototype downloads its models and index again, and makes the vectors built here again from Scryfall images.',
+    effect: 'Shared by every account. The Scanner downloads its models and index again (about 195 MB); the developer page makes the vectors built here again from Scryfall images.',
     empty: !s.scannerRefs && !s.scannerFiles,
   };
+  const scanSession: Row = {
+    id: 'scanSession',
+    group: 'scanSession',
+    account: null,
+    title: 'Scanner photos',
+    kind: YOURS,
+    details: [`${n(s.scanPhotos.photos)} photo${s.scanPhotos.photos === 1 ? '' : 's'} scanned, ${n(s.scanPhotos.cards)} card${s.scanPhotos.cards === 1 ? '' : 's'} found, with your corrections`],
+    effect: 'The Scanner page starts empty: photos, cards and corrections not yet added to your collection are gone. Cards already added stay on the site.',
+    empty: !s.scanPhotos.photos,
+  };
   const blocks: { account: AccountRow | null; rows: Row[] }[] = [
-    { account: null, rows: [shared, changeLog, scanner] },
+    { account: null, rows: [shared, changeLog, scanner, scanSession] },
     ...accounts.filter((a) => s.accounts[a.key]).map((a) => ({ account: a, rows: accountRows(a, s.accounts[a.key]) })),
   ];
   const rows = blocks.flatMap((b) => b.rows);
@@ -219,7 +230,7 @@ export function StoredDataSection() {
   const clear = async () => {
     setBusy(true);
     try {
-      const global = chosen.filter((r) => r.group === 'f2fCache' || r.group === 'changeLog' || r.group === 'scanner').map((r) => r.group);
+      const global = chosen.filter((r) => r.account === null).map((r) => r.group);
       if (global.length) await clearStoredData(global, null);
       for (const a of accounts) {
         const groups = chosen.filter((r) => r.account?.key === a.key).map((r) => r.group);
