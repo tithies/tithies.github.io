@@ -91,7 +91,7 @@ export function CardsTable({ photo, method, labels, selected, onSelect, minHeigh
                     {c.check.print && `print: ${c.check.print.how}${c.check.print.margin !== undefined ? ` (${c.check.print.margin.toFixed(3)})` : ''}`}
                     {c.check.print?.read?.text ? ` · read “${c.check.print.read.text.slice(-40)}”` : ''}
                     {c.check.language && ` · ${c.check.language.lang.toUpperCase()} (${c.check.language.how})`}
-                    {` · ${Math.round(c.check.ms)} ms`}
+                    {` · ${Math.round(c.check.ms)} ms (${Object.entries(c.check.times).map(([k, v]) => `${k} ${v}`).join(', ')})`}
                   </Text>
                 )}
               </Table.Td>

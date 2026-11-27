@@ -10,7 +10,7 @@ import { bench, currentBackend, featuresMany, initOrt, loadModel, matToImageData
 import { loadDetector, runDetector } from '@/features/scanner/engine/detector';
 import { free, loadOpenCv, type CV, type Mat } from '@/features/scanner/engine/opencv';
 import { CHECK_H, CHECK_W, visualCheck } from '@/features/scanner/engine/print-visual';
-import { cropBox, detectText, loadTextModel, recognize, type TextBox } from '@/features/scanner/engine/text';
+import { cropBox, detectText, loadTextModel, recognize, warmText, type TextBox } from '@/features/scanner/engine/text';
 import { quadIoU, quadSize } from '@/features/scanner/geometry';
 import { CHANNEL, type CardFeatures, type DetectedCard, type EngineCall, type EngineReply, type EngineRequest, type EngineResults, type Features } from '@/features/scanner/protocol';
 
@@ -34,6 +34,15 @@ function detail(id: string): Detail {
   const d = details.get(id);
   if (!d) throw new Error(`Unknown card cut-out ${id}`);
   return d;
+}
+
+/** A box's place on the cut-out, as shares of it (the trainer's: y the mean, x the leftmost, h left side's height). */
+function boxGeo(p: [number, number][]) {
+  return {
+    y: p.reduce((s2, q) => s2 + q[1], 0) / 4 / CHECK_H,
+    x: Math.min(...p.map((q) => q[0])) / CHECK_W,
+    h: (p[3][1] - p[0][1]) / CHECK_H,
+  };
 }
 
 function dropDetail(id: string) {
@@ -177,7 +186,7 @@ async function handle(req: EngineRequest): Promise<Handled<EngineRequest['type']
     case 'loadTextModel': {
       needCv();
       const t0 = performance.now();
-      const backend = await loadTextModel(req.name, req.bytes, req.chars);
+      const backend = await loadTextModel(req.name, req.bytes, req.chars, req.prefer);
       return { result: { backend, ms: performance.now() - t0 } };
     }
     case 'cardDetail': {
@@ -187,7 +196,7 @@ async function handle(req: EngineRequest): Promise<Handled<EngineRequest['type']
       details.set(req.detailId, { card: warpCard(c, photo(req.photoId).full, req.quad, CHECK_W, CHECK_H) });
       return { result: { ms: performance.now() - t0 } };
     }
-    case 'readText': {
+    case 'findText': {
       const c = needCv();
       const t0 = performance.now();
       const d = detail(req.detailId);
@@ -195,18 +204,15 @@ async function handle(req: EngineRequest): Promise<Handled<EngineRequest['type']
         d.boxes = await detectText(c, d.card);
         d.crops = d.boxes.map((b) => cropBox(c, d.card, b.pts));
       }
-      const idx = req.lines ?? d.boxes.map((_, i) => i);
-      const reads = await recognize(c, req.model, idx.map((i) => d.crops![i]));
-      const lines = idx.map((i, k) => {
-        const p = d.boxes![i].pts;
-        return {
-          y: p.reduce((s2, q) => s2 + q[1], 0) / 4 / CHECK_H,
-          x: Math.min(...p.map((q) => q[0])) / CHECK_W,
-          h: (p[3][1] - p[0][1]) / CHECK_H,
-          text: reads[k].text,
-          conf: reads[k].conf,
-        };
-      });
+      return { result: { boxes: d.boxes.map((b) => boxGeo(b.pts)), ms: performance.now() - t0 } };
+    }
+    case 'readText': {
+      const c = needCv();
+      const t0 = performance.now();
+      const d = detail(req.detailId);
+      if (!d.boxes || !d.crops) throw new Error('findText first');
+      const reads = await recognize(c, req.model, req.lines.map((i) => d.crops![i]));
+      const lines = req.lines.map((i, k) => ({ ...boxGeo(d.boxes![i].pts), text: reads[k].text, conf: reads[k].conf }));
       return { result: { lines, ms: performance.now() - t0 } };
     }
     case 'checkPrint': {
@@ -220,6 +226,12 @@ async function handle(req: EngineRequest): Promise<Handled<EngineRequest['type']
       } finally {
         free(...pics);
       }
+    }
+    case 'warmText': {
+      const c = needCv();
+      const t0 = performance.now();
+      await warmText(c, req.model, req.widths);
+      return { result: { ms: performance.now() - t0 } };
     }
     case 'releaseDetail': {
       if (req.detailId) dropDetail(req.detailId);

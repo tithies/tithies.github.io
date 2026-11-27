@@ -73,11 +73,15 @@ export interface CardFeatures {
 /** The OCR models (engine/text.ts): the text detector and the recognizers. */
 export type TextModelName = 'det' | 'latin' | 'main' | 'korean' | 'cyrillic';
 
-/** A line of text on a card cut-out: its centre height, left edge and height as shares of the card. */
-export interface TextLineRead {
+/** Where a text box is on a card cut-out: its centre height, left edge and height as shares of the card. */
+export interface TextBoxGeo {
   y: number;
   x: number;
   h: number;
+}
+
+/** A text box read. */
+export interface TextLineRead extends TextBoxGeo {
   text: string;
   conf: number;
 }
@@ -93,13 +97,17 @@ export type EngineRequest =
   | { type: 'imageFeatures'; bitmaps: ImageBitmap[] }
   | { type: 'releasePhoto'; photoId: string }
   /** An OCR model; a recognizer comes with its characters (its inference.yml's). */
-  | { type: 'loadTextModel'; name: TextModelName; bytes: ArrayBuffer; chars?: string[] }
+  | { type: 'loadTextModel'; name: TextModelName; bytes: ArrayBuffer; chars?: string[]; prefer?: 'webgpu' | 'wasm' }
   /** A card's 672 × 936 cut-out from a loaded photo, kept in the engine for readText and checkPrint. */
   | { type: 'cardDetail'; photoId: string; detailId: string; quad: Quad }
-  /** The cut-out's text lines: found and read with `model` the first time; `lines` reads those again with another model. */
-  | { type: 'readText'; detailId: string; model: Exclude<TextModelName, 'det'>; lines?: number[] }
+  /** The cut-out's text boxes (the detector): where each line is, not read yet. */
+  | { type: 'findText'; detailId: string }
+  /** Reads boxes `lines` (indices into findText's boxes) with a recognizer. */
+  | { type: 'readText'; detailId: string; model: Exclude<TextModelName, 'det'>; lines: number[] }
   /** Which of the candidates' pictures (same art) the cut-out is (engine/print-visual.ts). */
   | { type: 'checkPrint'; detailId: string; pictures: ImageBitmap[] }
+  /** Runs the detector and a recognizer once on blank input (WebGPU compiles their shaders now). */
+  | { type: 'warmText'; model: Exclude<TextModelName, 'det'>; widths?: number[] }
   /** Frees a cut-out (all of them without an id). */
   | { type: 'releaseDetail'; detailId?: string }
   /** Prototype tuning, from the console: times the model with other session options. */
@@ -116,9 +124,11 @@ export interface EngineResults {
   releasePhoto: null;
   loadTextModel: { backend: 'webgpu' | 'wasm'; ms: number };
   cardDetail: { ms: number };
+  findText: { boxes: TextBoxGeo[]; ms: number };
   readText: { lines: TextLineRead[]; ms: number };
   checkPrint: { winner: number | null; margin: number; pairs: number[][]; ms: number };
   releaseDetail: null;
+  warmText: { ms: number };
   bench: { create: number; runs: number[]; reads: number[] };
 }
 

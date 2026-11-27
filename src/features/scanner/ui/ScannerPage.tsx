@@ -134,6 +134,7 @@ export function ScannerPage() {
   /** Phase 3 (every-print index, with the OCR files installed): the print among same-art reprints, the language. */
   const [checkPrints, setCheckPrints] = useState(true);
   const [readLanguage, setReadLanguage] = useState(true);
+  const [ocrOn, setOcrOn] = useState<'webgpu' | 'wasm'>('webgpu');
   const [showEdges, setShowEdges] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
   const [minHeightPx, setMinHeightPx] = useState<number>(0);
@@ -261,8 +262,12 @@ export function ScannerPage() {
   const namerRef = useRef(namer);
   namerRef.current = namer;
   // The OCR models of the installed files, loaded into the engine on first use (a new install, new models).
-  const textModels = useMemo(() => (info && engineRef.current && installed ? new TextModels(engineRef.current, installed) : null), [info, installed]);
+  const textModels = useMemo(() => (info && engineRef.current && installed ? new TextModels(engineRef.current, installed, ocrOn) : null), [info, installed, ocrOn]);
   const canCheck = !!(textModels?.available && namer && printIndex && indexFits && matchAgainst !== 'built');
+  // The OCR models loaded and their shaders compiled in the background, so the first card doesn't wait.
+  useEffect(() => {
+    if (canCheck && backend && (checkPrints || readLanguage)) void textModels!.warm();
+  }, [canCheck, backend, textModels, checkPrints, readLanguage]);
   // How long the page took to be ready to scan (models started, index open).
   useEffect(() => {
     if (readyIn === null && backend && detector && (!installed || printIndex)) setReadyIn(performance.now() - openedAt.current);
@@ -948,6 +953,16 @@ export function ScannerPage() {
               disabled={!canCheck}
               onChange={(e) => setReadLanguage(e.currentTarget.checked)}
               title={canCheck ? "From the card's own text (type line, rules text, script, bottom line, name)" : 'Needs the every-print index with its OCR files'}
+            />
+            <SegmentedControl
+              size="xs"
+              value={ocrOn}
+              onChange={(v) => setOcrOn(v as 'webgpu' | 'wasm')}
+              data={[
+                { value: 'webgpu', label: 'OCR on GPU' },
+                { value: 'wasm', label: 'OCR on CPU' },
+              ]}
+              disabled={!canCheck || !!busy}
             />
             <Button size="xs" variant="default" disabled={!ready || !photos.length || !!busy} onClick={() => void scanAll(photos)}>
               Scan all again

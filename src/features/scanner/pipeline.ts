@@ -291,6 +291,7 @@ export function photoToJson(p: ScannedPhoto) {
               print: c.check.print && { how: c.check.print.how, margin: c.check.print.margin === undefined ? undefined : round(c.check.print.margin), read: c.check.print.read },
               language: c.check.language,
               ms: Math.round(c.check.ms),
+              times: c.check.times,
             },
           }
         : {}),

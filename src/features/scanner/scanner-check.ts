@@ -7,7 +7,7 @@
 import PQueue from 'p-queue';
 import type { ScannerEngine } from './engine-client';
 import type { Quad } from './geometry';
-import { languageOf, otherScripts, type LanguageResult } from './language';
+import { boxesWhere, languageOf, linesOf, otherScripts, stageFirst, type LanguageResult, type TextState } from './language';
 import type { CardMatch, MethodResult } from './pipeline';
 import { afterVisual, beforeVisual, candidates, MAX_PICTURES, printed, type PrintDecision } from './print-check';
 import type { TextLineRead, TextModelName } from './protocol';
@@ -25,6 +25,8 @@ export interface CardCheck {
   /** Lines read with the Latin recognizer (for the page and the results JSON). */
   lines?: TextLineRead[];
   ms: number;
+  /** Where the time went (ms): cut-out, models loaded, text found, first Latin reading, pictures fetched, visual check, language (with its later readings). */
+  times: Record<string, number>;
 }
 
 /** Scryfall: pictures politely (4 at a time, at most 8 a second), printed names by card name (cached). */
@@ -78,6 +80,8 @@ export class TextModels {
   constructor(
     private readonly engine: ScannerEngine,
     private readonly installed: Installed,
+    /** Where the OCR models run (a developer choice while measuring). */
+    readonly prefer: 'webgpu' | 'wasm' = 'webgpu',
   ) {}
 
   /** The installed files have the OCR models (the detector and Latin recognizer at least). */
@@ -85,6 +89,18 @@ export class TextModels {
     const f = this.installed.manifest.files;
     return !!(f.ocrDet && f.ocrLatin && f.ocrDicts);
   }
+
+  /** Loads the detector and Latin recognizer and compiles their usual shapes (in the background, on page open). */
+  warm(): Promise<void> {
+    this.warming ??= (async () => {
+      await this.ensure('det');
+      await this.ensure('latin');
+      await this.engine.call({ type: 'warmText', model: 'latin', widths: [480, 960, 1280, 1600] });
+    })().catch(() => undefined);
+    return this.warming;
+  }
+
+  private warming: Promise<void> | null = null;
 
   ensure(name: TextModelName): Promise<void> {
     let p = this.loaded.get(name);
@@ -96,7 +112,7 @@ export class TextModels {
           this.dicts ??= ensureFile(this.installed, 'ocrDicts').then((b) => JSON.parse(new TextDecoder().decode(b)) as Record<string, string[]>);
           chars = (await this.dicts)[name];
         }
-        await this.engine.call({ type: 'loadTextModel', name, bytes, chars }, [bytes]);
+        await this.engine.call({ type: 'loadTextModel', name, bytes, chars, prefer: this.prefer }, [bytes]);
       })();
       p.catch(() => this.loaded.delete(name));
       this.loaded.set(name, p);
@@ -125,25 +141,44 @@ export async function checkCard(
   const t0 = performance.now();
   const hits = result.more ?? result.candidates;
   const detailId = `d${nextDetail++}`;
-  const check: CardCheck = { ms: 0 };
+  const check: CardCheck = { ms: 0, times: {} };
+  let t = performance.now();
+  const lap = (k: string) => {
+    const now = performance.now();
+    check.times[k] = Math.round((check.times[k] ?? 0) + now - t);
+    t = now;
+  };
   let pick = 0;
   await engine.call({ type: 'cardDetail', photoId, detailId, quad: upright(quad, result.turned) });
+  lap('cutOut');
   try {
     await models.ensure('det');
     await models.ensure('latin');
-    const lines = (await engine.call({ type: 'readText', detailId, model: 'latin' })).lines;
-    check.lines = lines;
+    lap('models');
+    // The text read in stages (language.ts): first the bottom band and the type line's area.
+    const state: TextState = { boxes: (await engine.call({ type: 'findText', detailId })).boxes, lines: new Map() };
+    lap('find');
+    const readLatin = async (idx: number[]) => {
+      const todo = [...new Set(idx)].sort((a, b) => a - b).filter((i) => !state.lines.has(i));
+      if (!todo.length) return;
+      const r = await engine.call({ type: 'readText', detailId, model: 'latin', lines: todo });
+      todo.forEach((i, k) => state.lines.set(i, r.lines[k]));
+    };
+    await readLatin(boxesWhere(state, stageFirst));
+    lap('read');
     if (opts.prints) {
-      const b = beforeVisual(hits, lines);
+      const b = beforeVisual(hits, linesOf(state));
       let d = b.decided;
       if (!d) {
         const pool = b.pool.slice(0, MAX_PICTURES);
         const pics = await Promise.all(pool.map((i) => picture(hits[i])));
         const used = pool.filter((_, k) => pics[k]);
         const bitmaps = pics.filter((x): x is ImageBitmap => !!x);
+        lap('pictures');
         let visual: { winner: number | null; margin: number } | null = null;
         if (bitmaps.length >= 2) visual = await engine.call({ type: 'checkPrint', detailId, pictures: bitmaps }, bitmaps);
         else bitmaps.forEach((x) => x.close());
+        lap('visual');
         d = afterVisual(b.pool, b.narrowed, used, visual, b.read);
       }
       check.print = d;
@@ -152,19 +187,22 @@ export async function checkCard(
     if (opts.language) {
       const chosen = hits[pick];
       const sets = [...new Set([pick, ...candidates(hits)].map((i) => printed(hits[i])[0]))];
-      check.language = await languageOf(lines, {
+      check.language = await languageOf(state, {
         sets,
         name: chosen?.name ?? null,
         deps: {
+          readLatin,
           otherScripts: () =>
-            otherScripts(lines, async (model, idx) => {
+            otherScripts(state.boxes, async (model, idx) => {
               await models.ensure(model);
               return (await engine.call({ type: 'readText', detailId, model, lines: idx })).lines;
             }),
           printedNames,
         },
       });
+      lap('language');
     }
+    check.lines = linesOf(state);
   } finally {
     await engine.call({ type: 'releaseDetail', detailId }).catch(() => undefined);
     check.ms = performance.now() - t0;

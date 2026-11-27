@@ -11,7 +11,7 @@
  * 4. Otherwise the name read against the card's printed name in each language (Scryfall).
  * 5. Otherwise a few words' best language, else English.
  */
-import type { TextLineRead } from './protocol';
+import type { TextBoxGeo, TextLineRead } from './protocol';
 import RULES from './languages.json';
 
 export type Lang = 'en' | 'fr' | 'de' | 'it' | 'es' | 'pt' | 'ja' | 'ko' | 'ru' | 'zhs' | 'zht' | 'ph';
@@ -71,9 +71,19 @@ const LANG_AFTER = /[·•*★.\-_]?(EN|FR|DE|IT|ES|SP|PT|JP|JA|KR|KO|RU|CS|CT|P
 export function bottomCode(lines: readonly TextLineRead[], sets: readonly string[]): Lang | null {
   for (const l of lines) {
     if (l.y < 0.86 || l.conf < 0.6) continue;
-    const t = l.text.toUpperCase().replace(/ /g, '');
+    // Read without spaces ('TDC · EN' is often 'TDCEN'), but a set code must start a word: not right after a
+    // letter, as 'RIC' in 'ERIC DESCHAMPS' (a near MIC, then DE) on a frame with no code at all.
+    const u = l.text.toUpperCase();
+    let t = '';
+    const starts: boolean[] = [];
+    for (let j = 0; j < u.length; j++) {
+      if (u[j] === ' ') continue;
+      starts.push(j === 0 || !/\p{L}/u.test(u[j - 1]));
+      t += u[j];
+    }
     for (const x of sets) {
       for (let i = 0; i < t.length; i++) {
+        if (!starts[i]) continue;
         for (const n of [x.length, x.length + 1, x.length - 1]) {
           if (n < 2 || !nearCode(t.slice(i, i + n), x)) continue;
           LANG_AFTER.lastIndex = i + n;
@@ -116,7 +126,27 @@ export function similarity(a: string, b: string): number {
   return 1 - prev[B.length] / Math.max(A.length, B.length);
 }
 
-/** Another script's reading of the card's lines (`lines`: indices into the Latin reading's lines). */
+/**
+ * A card's text as read so far: every box found, and the boxes read (by index). Read in stages, as the trainer
+ * does: stageFirst at once (the print and most cards' language), the rest of the rules text when the language is
+ * still open, the name line for the printed-name lookup.
+ */
+export interface TextState {
+  boxes: TextBoxGeo[];
+  lines: Map<number, TextLineRead>;
+}
+
+export const stageFirst = (b: TextBoxGeo) => b.y >= 0.86 || (b.y > 0.45 && b.y < 0.72);
+export const stageRules = (b: TextBoxGeo) => b.y > 0.45 && b.y < 0.9;
+export const stageName = (b: TextBoxGeo) => b.y < 0.12;
+
+/** The boxes of a stage, by index. */
+export const boxesWhere = (s: TextState, f: (b: TextBoxGeo) => boolean) => s.boxes.flatMap((b, i) => (f(b) ? [i] : []));
+
+/** The lines read so far, in box order. */
+export const linesOf = (s: TextState): TextLineRead[] => [...s.lines.entries()].sort((a, b) => a[0] - b[0]).map(([, l]) => l);
+
+/** Another script's reading of the card's boxes (`lines`: box indices). */
 export interface OtherReading {
   script: Script;
   model: 'main' | 'korean' | 'cyrillic';
@@ -132,16 +162,15 @@ export const SCRIPT_MODELS: { model: OtherReading['model']; want: Script[] }[] =
   { model: 'cyrillic', want: ['cyrillic'] },
 ];
 
-/** The lines the other scripts read again: the name, type line and rules text (above 90 %), at most 14. */
-export const otherScriptLines = (lines: readonly TextLineRead[]) =>
-  lines.flatMap((l, i) => (l.y < 0.9 ? [i] : [])).slice(0, 14);
+/** The boxes the other scripts read: the name, type line and rules text (above 90 %), at most 14. */
+export const otherScriptLines = (boxes: readonly TextBoxGeo[]) => boxes.flatMap((b, i) => (b.y < 0.9 ? [i] : [])).slice(0, 14);
 
 /**
  * The best non-Latin reading, given a function that reads the lines with one model (lazily: the next model runs
  * only when the reading so far is not clearly one script).
  */
-export async function otherScripts(lines: readonly TextLineRead[], read: (model: OtherReading['model'], idx: number[]) => Promise<{ text: string; conf: number }[]>): Promise<OtherReading | null> {
-  const idx = otherScriptLines(lines);
+export async function otherScripts(boxes: readonly TextBoxGeo[], read: (model: OtherReading['model'], idx: number[]) => Promise<{ text: string; conf: number }[]>): Promise<OtherReading | null> {
+  const idx = otherScriptLines(boxes);
   if (!idx.length) return null;
   let best: OtherReading | null = null;
   for (const { model, want } of SCRIPT_MODELS) {
@@ -162,11 +191,11 @@ export async function otherScripts(lines: readonly TextLineRead[], read: (model:
 }
 
 /** The card's name as read: the top line (above 12 %), in the script it was read in. */
-export function nameText(lines: readonly TextLineRead[], other: OtherReading | null): string | null {
+export function nameText(state: TextState, other: OtherReading | null): string | null {
   if (other) {
-    for (let k = 0; k < other.texts.length; k++) if (lines[other.lines[k]].y < 0.12 && other.texts[k]) return other.texts[k];
+    for (let k = 0; k < other.texts.length; k++) if (state.boxes[other.lines[k]].y < 0.12 && other.texts[k]) return other.texts[k];
   }
-  const tops = lines.filter((l) => l.y < 0.12 && l.conf > 0.5 && l.text.length >= 3);
+  const tops = linesOf(state).filter((l) => l.y < 0.12 && l.conf > 0.5 && l.text.length >= 3);
   if (!tops.length) return null;
   return tops.reduce((a, b) => (b.h > a.h || (b.h === a.h && b.text.length > a.text.length) ? b : a)).text;
 }
@@ -191,24 +220,42 @@ export interface LanguageResult {
 }
 
 export interface LanguageDeps {
-  /** The other scripts' reading of the lines (otherScripts with the engine's recognizers). */
+  /** Reads more boxes with the Latin recognizer, into the state (those not read yet, in box order). */
+  readLatin: (idx: number[]) => Promise<void>;
+  /** The other scripts' reading of the boxes (otherScripts with the engine's recognizers). */
   otherScripts: () => Promise<OtherReading | null>;
   /** The card's printed names, by language (Scryfall). */
   printedNames: (name: string) => Promise<Record<string, string[]> | null>;
 }
 
-export async function languageOf(lines: readonly TextLineRead[], opts: { sets: readonly string[]; name: string | null; deps: LanguageDeps; strong?: number }): Promise<LanguageResult> {
+export async function languageOf(state: TextState, opts: { sets: readonly string[]; name: string | null; deps: LanguageDeps; strong?: number }): Promise<LanguageResult> {
   const strong = opts.strong ?? 2;
-  const code = bottomCode(lines, opts.sets);
-  const scores = latinScores(lines);
-  let best = LATIN_LANGS[0] as Lang;
-  for (const l of LATIN_LANGS) if (scores[l] > scores[best]) best = l;
+  let code = bottomCode(linesOf(state), opts.sets);
+  let scores = latinScores(linesOf(state));
+  const argmax = () => {
+    let b = LATIN_LANGS[0] as Lang;
+    for (const l of LATIN_LANGS) if (scores[l] > scores[b]) b = l;
+    return b;
+  };
+  let best = argmax();
+  if (scores[best] < strong) {
+    // Still open: the rest of the rules text.
+    await opts.deps.readLatin(boxesWhere(state, stageRules));
+    code = bottomCode(linesOf(state), opts.sets);
+    scores = latinScores(linesOf(state));
+    best = argmax();
+  }
   if (scores[best] >= strong) {
     if (code && code in scores && code !== best && scores[best] < 2 * strong) best = code;
     return { lang: best, how: 'words' + (code ? ` (code ${code})` : '') };
   }
   const other = await opts.deps.otherScripts();
-  const byName = async (among?: readonly Lang[]) => (opts.name ? languageByName(nameText(lines, other), await opts.deps.printedNames(opts.name), among) : null);
+  // Scryfall is asked only when a name was read (as the trainer does).
+  const byName = async (among?: readonly Lang[]) => {
+    const text = nameText(state, other);
+    if (!text || !opts.name) return null;
+    return languageByName(text, await opts.deps.printedNames(opts.name), among);
+  };
   if (other) {
     if (other.script === 'kana') return { lang: 'ja', how: 'script' };
     if (other.script === 'hangul') return { lang: 'ko', how: 'script' };
@@ -229,6 +276,7 @@ export async function languageOf(lines: readonly TextLineRead[], opts: { sets: r
     return { lang: tr > si ? 'zht' : 'zhs', how: `script (simplified ${si}, traditional ${tr})` };
   }
   if (code) return { lang: code, how: 'code' };
+  if (opts.name) await opts.deps.readLatin(boxesWhere(state, stageName));
   const n = await byName();
   if (n) return { lang: n, how: 'name' };
   if (scores[best] > 0) return { lang: best, how: 'few words' };

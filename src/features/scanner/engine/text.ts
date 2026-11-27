@@ -6,7 +6,8 @@
  *   the probability map above 0.3 → contours; a contour's mean probability at least 0.6; its rotated rectangle
  *   grown by area × 1.5 ÷ perimeter on each side;
  * - recognition: each line straightened (perspective, cubic), 48 px tall, (x/255 − 0.5)/0.5; lines sorted by
- *   width ÷ height and read 16 at a time, padded to the batch's widest; greedy CTC decoding (0 = blank).
+ *   width ÷ height and read 16 at a time, the batch padded to a fixed width (WIDTHS: on WebGPU each new input
+ *   width compiles new shaders); greedy CTC decoding (0 = blank).
  */
 import * as ort from 'onnxruntime-web';
 import { free, type CV, type Mat } from './opencv';
@@ -30,18 +31,19 @@ const dictionaries = new Map<TextModel, string[]>();
 export const hasTextModel = (m: TextModel) => sessions.has(m);
 
 /** A recognizer's characters as its inference.yml lists them: CTC's blank comes first, a space last. */
-export async function loadTextModel(name: TextModel, bytes: ArrayBuffer, chars?: string[]): Promise<'webgpu' | 'wasm'> {
+export async function loadTextModel(name: TextModel, bytes: ArrayBuffer, chars?: string[], prefer: 'webgpu' | 'wasm' = 'webgpu'): Promise<'webgpu' | 'wasm'> {
   await sessions.get(name)?.s.release();
   sessions.delete(name);
   if (name !== 'det') {
     if (!chars?.length) throw new Error(`No characters for the ${name} recognizer`);
     dictionaries.set(name, ['', ...chars, ' ']);
   }
-  const tries: ('webgpu' | 'wasm')[] = 'gpu' in navigator ? ['webgpu', 'wasm'] : ['wasm'];
+  const tries: ('webgpu' | 'wasm')[] = prefer === 'webgpu' && 'gpu' in navigator ? ['webgpu', 'wasm'] : ['wasm'];
   let lastError: unknown;
   for (const ep of tries) {
     try {
-      const s = await ort.InferenceSession.create(new Uint8Array(bytes), { executionProviders: [ep], graphOptimizationLevel: 'all' });
+      // logSeverityLevel 3: the converted models' notices about unused weights are not errors.
+      const s = await ort.InferenceSession.create(new Uint8Array(bytes), { executionProviders: [ep], graphOptimizationLevel: 'all', logSeverityLevel: 3 });
       sessions.set(name, { s, backend: ep });
       return ep;
     } catch (e) {
@@ -56,6 +58,10 @@ function session(name: TextModel): ort.InferenceSession {
   if (!s) throw new Error(`The ${name} text model is not loaded`);
   return s.s;
 }
+
+/** The recognizers' input widths (a batch is padded to the first that holds its widest line), and lines per run. */
+export const WIDTHS = [160, 320, 480, 640, 800, 960, 1280, 1600, 2400, 3200];
+export const BATCH = 16;
 
 const MEAN = [0.485, 0.456, 0.406];
 const STD = [0.229, 0.224, 0.225];
@@ -150,6 +156,24 @@ export async function detectText(cv: CV, card: Mat, limit = 960, thresh = 0.3, b
   }
 }
 
+/** Runs the detector and a recognizer once on blank input (their WebGPU shaders compile now, not on the first card). */
+export async function warmText(cv: CV, name: TextModel, widths: readonly number[] = [1280]): Promise<void> {
+  const blank = new cv.Mat(936, 672, cv.CV_8UC4, new cv.Scalar(255, 255, 255, 255));
+  try {
+    if (sessions.has('det')) await detectText(cv, blank);
+    for (const w of widths) {
+      const crop = new cv.Mat(48, w, cv.CV_8UC4, new cv.Scalar(255, 255, 255, 255));
+      try {
+        await recognize(cv, name, [crop]);
+      } finally {
+        free(crop);
+      }
+    }
+  } finally {
+    free(blank);
+  }
+}
+
 /** A box straightened out of the cut-out (trainer: crop_box). */
 export function cropBox(cv: CV, card: Mat, pts: [number, number][]): Mat {
   const dist = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -168,7 +192,7 @@ export function cropBox(cv: CV, card: Mat, pts: [number, number][]): Mat {
 }
 
 /** Reads line crops (RGBA) with a recognizer: [text, conf] each. */
-export async function recognize(cv: CV, name: TextModel, crops: Mat[], batch = 16): Promise<{ text: string; conf: number }[]> {
+export async function recognize(cv: CV, name: TextModel, crops: Mat[], batch = BATCH): Promise<{ text: string; conf: number }[]> {
   const chars = dictionaries.get(name);
   if (!chars) throw new Error(`The ${name} recognizer is not loaded`);
   const sess = session(name);
@@ -179,9 +203,11 @@ export async function recognize(cv: CV, name: TextModel, crops: Mat[], batch = 1
   for (let start = 0; start < order.length; start += batch) {
     const idx = order.slice(start, start + batch);
     const widths = idx.map((i) => Math.min(3200, Math.max(16, Math.ceil((48 * crops[i].cols) / Math.max(1, crops[i].rows)))));
-    const W = Math.max(...widths);
+    const W = WIDTHS.find((w) => w >= Math.max(...widths)) ?? WIDTHS[WIDTHS.length - 1];
     const plane = 48 * W;
-    const x = new Float32Array(idx.length * 3 * plane);
+    // Only the lines there are (padding the batch to 16 lines on WebGPU was slower than compiling the shapes).
+    const rowsIn = idx.length;
+    const x = new Float32Array(rowsIn * 3 * plane);
     idx.forEach((i, k) => {
       const r = new cv.Mat();
       try {
@@ -192,7 +218,7 @@ export async function recognize(cv: CV, name: TextModel, crops: Mat[], batch = 1
         free(r);
       }
     });
-    const res = await sess.run({ [sess.inputNames[0]]: new ort.Tensor('float32', x, [idx.length, 3, 48, W]) });
+    const res = await sess.run({ [sess.inputNames[0]]: new ort.Tensor('float32', x, [rowsIn, 3, 48, W]) });
     const t = res[sess.outputNames[0]];
     const p = (await t.getData()) as Float32Array;
     const [, T, C] = t.dims as number[];
