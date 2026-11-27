@@ -4,8 +4,20 @@ import type { PrintInfo } from '../reference';
 
 const keyOf = (p: Pick<PrintInfo, 'scryfallId' | 'back'>) => `${p.scryfallId}${p.back ? '~back' : ''}`;
 
-/** Search the reference set's prints (your owned prints, back faces too) by name. */
-export function PrintPicker({ prints, onPick }: { prints: readonly PrintInfo[]; onPick: (p: PrintInfo) => void }) {
+/** Search prints by name (back faces too): the reference set's (your owned prints), or every print of the index. */
+export function PrintPicker({
+  prints,
+  onPick,
+  placeholder = 'Another of your prints…',
+  nothingFound = 'Not in your collection',
+  w = 260,
+}: {
+  prints: readonly PrintInfo[];
+  onPick: (p: PrintInfo) => void;
+  placeholder?: string;
+  nothingFound?: string;
+  w?: number;
+}) {
   const { data, byKey } = useMemo(() => {
     const byKey = new Map<string, PrintInfo>();
     for (const p of prints) byKey.set(keyOf(p), p);
@@ -20,14 +32,14 @@ export function PrintPicker({ prints, onPick }: { prints: readonly PrintInfo[]; 
   return (
     <Select
       size="xs"
-      w={260}
-      placeholder="Another of your prints…"
+      w={w}
+      placeholder={placeholder}
       searchable
       clearable={false}
       limit={40}
       data={data}
       value={null}
-      nothingFoundMessage="Not in your collection"
+      nothingFoundMessage={nothingFound}
       onChange={(v) => {
         const p = v ? byKey.get(v) : undefined;
         if (p) onPick(p);

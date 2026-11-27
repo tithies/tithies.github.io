@@ -1,7 +1,7 @@
 import type { CardMatch, MethodResult } from '@/features/scanner/pipeline';
 import { cardFinish, cardLang, cardStatus, chosenPrint, defaultFinish, finishesOf, toExportItems } from '@/features/scanner/scan-export';
 import { needsCheck, nextJob, shouldYield } from '@/features/scanner/scan-queue';
-import { addSessionPhotos, clearScannerSession, measureScannerSession, removeSessionPhoto, saveSessionPhoto, sessionPhotos, updateSessionCard, type StoredCard, type StoredPhoto } from '@/features/scanner/scan-session';
+import { addSessionPhotos, clearScannerSession, markSessionSent, measureScannerSession, nextCardNumber, putSessionCard, removeSessionPhoto, replaceSessionPhoto, saveSessionPhoto, sessionPhotos, updateSessionCard, type StoredCard, type StoredPhoto } from '@/features/scanner/scan-session';
 import { scannerDb } from '@/features/scanner/store';
 
 const quad = [
@@ -41,6 +41,18 @@ describe('scanner session store', () => {
     expect(await all[1].cards[0].crop.text()).toBe('c');
     expect(await all[0].blob.text()).toBe('one');
     expect(await measureScannerSession()).toMatchObject({ photos: 2, cards: 2 });
+    // A card outlined by the user, then the cards sent.
+    const two = (await sessionPhotos())[1];
+    expect(nextCardNumber(two)).toBe(3);
+    expect((await putSessionCard('id2', card(0, { source: 'user' })))?.n).toBe(3);
+    // Named again from new corners: the card's corrections made meanwhile stay.
+    await updateSessionCard('id2', 2, (c) => ({ ...c, edit: { ...c.edit, removed: true } }));
+    const again = await putSessionCard('id2', card(2, { heightPx: 1 }));
+    expect(again?.photo.cards.find((c) => c.n === 2)).toMatchObject({ heightPx: 1, edit: { lang: 'fr', removed: true } });
+    const sent = await markSessionSent(['id2:1', 'id2:3', 'gone:1'], 77);
+    expect(sent.map((p) => p.cards.map((c) => c.sentAt ?? null))).toEqual([[77, null, 77]]);
+    expect(await replaceSessionPhoto({ ...two, id: 'gone' })).toBe(false);
+    expect(await scannerDb.scanPhotos.get('gone')).toBeUndefined();
     await removeSessionPhoto('id1');
     expect((await sessionPhotos()).map((p) => p.id)).toEqual(['id2']);
     await clearScannerSession();
@@ -101,6 +113,11 @@ describe('scanned cards as a list', () => {
     expect(cardStatus(card(1, { result: result([hit('m3c', '213', 0.45)]) }))).toBe('review');
     expect(cardStatus(card(1, { result: result([hit('m3c', '213', 0.2)]) }))).toBe('unknown');
     expect(cardStatus(card(1, { edit: { lang: 'de' } }))).toBe('user');
+    // Many reprints: the top 5 all have the card's name; the lead is taken to the first other name of the top 20.
+    const reprints = [0.864, 0.864, 0.853, 0.846, 0.827].map((s, i) => hit('s' + i, String(i), s, { art: 9 }));
+    const many = (other: number) => ({ candidates: reprints, more: [...reprints, hit('x', '1', other, { name: 'Other card', art: 3 })], margin: 0.037, turned: false });
+    expect(cardStatus(card(1, { result: many(0.5), check: { print: { pick: 0, how: 'read' }, ms: 1, times: {} } }))).toBe('sure');
+    expect(cardStatus(card(1, { result: many(0.82), check: { print: { pick: 0, how: 'read' }, ms: 1, times: {} } }))).toBe('review');
   });
 
   it('exports listed cards not sent yet, one item each', () => {

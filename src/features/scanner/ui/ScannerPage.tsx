@@ -56,9 +56,9 @@ type MatchAgainst = 'every' | 'mine' | 'built';
 const sourceLabel = (s: ModelSource, v?: string) => (s === 'published' ? `published ${v ?? ''}`.trim() : s === 'dropped' ? 'dropped files' : 'DINOv2');
 
 /**
- * Hidden prototype page (dashboard.html#/collection/scanner): phase 0 of SCANNER_DEV.md. It
- * starts the engine, builds the reference set from the current account's prints, scans photos
- * dropped on it (with labels.json to score them) and shows what each method found.
+ * The Scanner's developer page (dashboard.html#/collection/scanner/dev, not in the menu; the user's page is ScanPage).
+ * It runs the published files, files dropped on it or DINOv2, builds a reference set from the current account's prints,
+ * scans photos dropped on it (with labels.json to score them), shows what each method found, and has the labelling mode.
  */
 export function ScannerPage() {
   const { key: accountKey, account } = useCurrentAccount();

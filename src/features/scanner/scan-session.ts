@@ -85,6 +85,57 @@ export async function updateSessionCard(photoId: string, n: number, change: (c: 
   });
 }
 
+/** Saves a photo the session still has (one removed while it was being scanned stays removed). */
+export async function replaceSessionPhoto(p: StoredPhoto): Promise<boolean> {
+  return scannerDb.transaction('rw', scannerDb.scanPhotos, async () => {
+    if (!(await scannerDb.scanPhotos.get(p.id))) return false;
+    await scannerDb.scanPhotos.put(p);
+    return true;
+  });
+}
+
+/**
+ * A card named again from corners the user gave: it replaces the card of its number, keeping that card's corrections
+ * and sent mark as they are now (made while it was being named); number 0 adds it, numbered after the others.
+ * Returns the photo as saved and the card's number, or null when the photo is gone.
+ */
+export async function putSessionCard(photoId: string, card: Omit<StoredCard, 'edit' | 'sentAt'>): Promise<{ photo: StoredPhoto; n: number } | null> {
+  return scannerDb.transaction('rw', scannerDb.scanPhotos, async () => {
+    const p = await scannerDb.scanPhotos.get(photoId);
+    if (!p) return null;
+    const old = card.n ? p.cards.find((c) => c.n === card.n) : undefined;
+    const n = old ? old.n : nextCardNumber(p);
+    const put: StoredCard = { ...card, n, ...(old?.edit ? { edit: old.edit } : {}), ...(old?.sentAt ? { sentAt: old.sentAt } : {}) };
+    const next = { ...p, cards: old ? p.cards.map((c) => (c.n === n ? put : c)) : [...p.cards, put] };
+    await scannerDb.scanPhotos.put(next);
+    return { photo: next, n };
+  });
+}
+
+/** The number of a card the user adds to a photo. */
+export const nextCardNumber = (p: StoredPhoto): number => p.cards.reduce((m, c) => Math.max(m, c.n), 0) + 1;
+
+/** Marks cards as sent (keys "photo id:number", as the export items'); returns the photos changed. */
+export async function markSessionSent(keys: readonly string[], at = Date.now()): Promise<StoredPhoto[]> {
+  const byPhoto = new Map<string, Set<number>>();
+  for (const k of keys) {
+    const i = k.lastIndexOf(':');
+    const set = byPhoto.get(k.slice(0, i)) ?? byPhoto.set(k.slice(0, i), new Set()).get(k.slice(0, i))!;
+    set.add(Number(k.slice(i + 1)));
+  }
+  return scannerDb.transaction('rw', scannerDb.scanPhotos, async () => {
+    const out: StoredPhoto[] = [];
+    for (const [id, ns] of byPhoto) {
+      const p = await scannerDb.scanPhotos.get(id);
+      if (!p) continue;
+      const next = { ...p, cards: p.cards.map((c) => (ns.has(c.n) ? { ...c, sentAt: at } : c)) };
+      await scannerDb.scanPhotos.put(next);
+      out.push(next);
+    }
+    return out;
+  });
+}
+
 export async function removeSessionPhoto(photoId: string): Promise<void> {
   await scannerDb.scanPhotos.delete(photoId);
 }

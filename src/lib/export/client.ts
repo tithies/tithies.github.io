@@ -49,12 +49,16 @@ const activeFirst = (ops: ChangeOp[]) =>
     .sort((a, b) => (ACTIVE_ORDER[a.o.status] ?? 2) - (ACTIVE_ORDER[b.o.status] ?? 2) || (a.o.status === 'queued' && b.o.status === 'queued' ? a.o.id! - b.o.id! : a.i - b.i))
     .map(({ o }) => o);
 
-/** The latest exports made from `sourceAccountKey`'s pages, running first, then waiting, then newest first, live. */
-export function useRecentExports(sourceAccountKey: AccountKey | null, limit = 10): ChangeOp[] {
+/**
+ * The latest exports made from `sourceAccountKey`'s pages, or (`sourcePrefix`) from a page whose exports come from no
+ * account (the Scanner's "Scanner (3 photos)"), running first, then waiting, then newest first, live.
+ */
+export function useRecentExports(sourceAccountKey: AccountKey | null, limit = 10, sourcePrefix?: string): ChangeOp[] {
   return (
     useLiveQuery(async () => {
-      if (!sourceAccountKey) return [];
-      return activeFirst(await latestOps((o) => o.kind === 'export' && (o.details as ExportDetails | undefined)?.sourceAccountKey === sourceAccountKey, limit));
-    }, [sourceAccountKey, limit]) ?? []
+      if (!sourceAccountKey && !sourcePrefix) return [];
+      const fromPage = (o: ChangeOp) => (sourcePrefix ? o.source.startsWith(sourcePrefix) : (o.details as ExportDetails | undefined)?.sourceAccountKey === sourceAccountKey);
+      return activeFirst(await latestOps((o) => o.kind === 'export' && fromPage(o), limit));
+    }, [sourceAccountKey, limit, sourcePrefix]) ?? []
   );
 }

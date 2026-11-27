@@ -21,6 +21,8 @@ export interface LabelEditorProps {
   onAdded: (quad: Quad) => void;
   /** 1 = fit the width; 2, 4 = zoomed in (the box scrolls). */
   zoom: number;
+  /** The number drawn on each card (default: its place in `cards`, from 1). */
+  numberOf?: (c: LabelCard, i: number) => number;
 }
 
 /**
@@ -28,7 +30,7 @@ export interface LabelEditorProps {
  * The selected card shows its 4 corners as handles to drag; the card's own top-left corner is
  * the filled one. In "adding" mode, clicks place 4 corners (any order).
  */
-export function LabelEditor({ src, width, height, cards, colorOf, selected, onSelect, onQuadChange, adding, onAdded, zoom }: LabelEditorProps) {
+export function LabelEditor({ src, width, height, cards, colorOf, selected, onSelect, onQuadChange, adding, onAdded, zoom, numberOf = (_, i) => i + 1 }: LabelEditorProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<{ id: string; corner: number; quad: Quad } | null>(null);
   const [clicks, setClicks] = useState<Point[]>([]);
@@ -113,11 +115,11 @@ export function LabelEditor({ src, width, height, cards, colorOf, selected, onSe
                     onSelect(isSel ? null : c.id!);
                   }}
                 >
-                  <title>{`#${i + 1} ${c.name}${c.set ? ` (${c.set.toUpperCase()} #${c.cn})` : ''}`}</title>
+                  <title>{`#${numberOf(c, i)} ${c.name}${c.set ? ` (${c.set.toUpperCase()} #${c.cn})` : ''}`}</title>
                 </polygon>
                 <circle cx={center.x} cy={center.y} r={font * 0.9} fill={color} pointerEvents="none" />
                 <text x={center.x} y={center.y} fill="white" fontSize={font} fontWeight={700} textAnchor="middle" dominantBaseline="central" pointerEvents="none">
-                  {i + 1}
+                  {numberOf(c, i)}
                 </text>
                 {isSel &&
                   !adding &&

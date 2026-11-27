@@ -1,6 +1,6 @@
 import { ActionIcon, AppShell, Box, Burger, Divider, Group, NavLink, Stack, Text, Title, Tooltip, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconArrowsDiff, IconCards, IconCash, IconHistory, IconListDetails, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
+import { IconArrowsDiff, IconCamera, IconCards, IconCash, IconHistory, IconListDetails, IconMoon, IconSettings, IconSun } from '@tabler/icons-react';
 import { useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router';
 import { useCurrentAccount } from '@/lib/accounts/AccountProvider';
@@ -22,7 +22,10 @@ const NAV = [
   {
     label: 'Collection',
     icon: IconCards,
-    links: [{ to: '/collection/comparator', label: 'Comparator', icon: IconArrowsDiff }],
+    links: [
+      { to: '/collection/comparator', label: 'Comparator', icon: IconArrowsDiff },
+      { to: '/collection/scanner', label: 'Scanner', icon: IconCamera },
+    ],
   },
 ];
 

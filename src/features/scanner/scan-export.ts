@@ -5,7 +5,7 @@
  */
 import type { Finish } from '@/lib/cards/types';
 import type { ExportItem } from '@/lib/export/types';
-import { confidence, type CardMatch } from './pipeline';
+import { confidence, type CardMatch, type Confidence, type MethodResult } from './pipeline';
 import { candidates, type PrintHow } from './print-check';
 import type { StoredCard, StoredPhoto } from './scan-session';
 
@@ -53,6 +53,17 @@ export const sameArtPrints = (c: StoredCard): number[] => (c.result.more ? candi
 const DECIDED: PrintHow[] = ['only print', 'read', 'read + checked', 'checked', 'checked: kept'];
 
 /**
+ * How sure the name is (the tuned model's limits, pipeline.ts), its lead taken over the first other name among the
+ * index's top 20: a card with many reprints fills the top 5 with its own name, and the lead to the 5th says nothing.
+ */
+export function nameConfidence(r: MethodResult): Confidence {
+  const top = r.candidates[0];
+  if (!top || !r.more) return confidence(r, 'dino-pad-cls', 'tuned');
+  const other = r.more.find((h) => h.name !== top.name);
+  return confidence({ ...r, margin: other ? top.score - other.score : 1 }, 'dino-pad-cls', 'tuned');
+}
+
+/**
  * How sure a card is, for its colour:
  * - 'user': the user corrected it;
  * - 'sure': the name is sure, and its print decided (the only print with that artwork, read on the card, or the picture check);
@@ -63,7 +74,7 @@ export type CardStatus = 'user' | 'sure' | 'review' | 'unknown';
 
 export function cardStatus(c: StoredCard): CardStatus {
   if (c.edit?.print || c.edit?.lang || c.edit?.finish) return 'user';
-  const name = confidence(c.result, 'dino-pad-cls', 'tuned');
+  const name = nameConfidence(c.result);
   if (name !== 'sure') return name;
   if (sameArtPrints(c).length < 2) return 'sure';
   return c.check?.print && DECIDED.includes(c.check.print.how) ? 'sure' : 'review';
